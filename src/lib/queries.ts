@@ -2,6 +2,7 @@ import { cacheLife, cacheTag } from 'next/cache';
 import { executeQuery } from '@/graphql/execute';
 import type {
   HomeLineupQuery,
+  RaceReplayQuery,
   RaceHeaderQuery,
   RaceLibraryQuery,
   RaceSlugsQuery,
@@ -53,7 +54,7 @@ const RACE_HEADER = /* GraphQL */ `
   query RaceHeader($slug: String!) {
     race(slug: $slug) {
       id slug date laps type
-      meeting { name country circuitName round season weather }
+      meeting { name country circuitName round season }
       results {
         finalPosition lapsCompleted points status fastestLap
         driver { code name number }
@@ -104,6 +105,42 @@ export async function getRaceHeader(slug: string) {
   cacheLife('days');
 
   return executeQuery<RaceHeaderQuery, { slug: string }>(RACE_HEADER, { slug });
+}
+
+const RACE_REPLAY = /* GraphQL */ `
+  query RaceReplay($slug: String!) {
+    race(slug: $slug) {
+      id slug laps date type
+      meeting { name country circuitName round season }
+      replay {
+        laps
+        summary { lapCount maxLap maxPosition driverCount }
+        drivers {
+          driver { id code name number }
+          team { id name color }
+          positions { lap position gap lapTime sector1 sector2 sector3 }
+        }
+        events {
+          lap type details
+          driver { id code name number }
+        }
+      }
+    }
+  }
+`;
+
+/**
+ * The replay payload: every lap of every driver, which is the one query in the
+ * application large enough to matter. It is a separate scope from the header so
+ * the classification is not held behind it, and so the two can be invalidated
+ * together but fetched apart.
+ */
+export async function getRaceReplay(slug: string) {
+  'use cache';
+  cacheTag('race', `race:${slug}`);
+  cacheLife('days');
+
+  return executeQuery<RaceReplayQuery, { slug: string }>(RACE_REPLAY, { slug });
 }
 
 export async function getRaceSlugs(first = 100) {

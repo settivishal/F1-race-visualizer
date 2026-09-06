@@ -47,7 +47,6 @@ query RaceHeader($slug: String!) {
       circuitName
       round
       season
-      weather
     }
     results {
       finalPosition
