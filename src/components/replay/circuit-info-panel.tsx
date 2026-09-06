@@ -8,7 +8,6 @@ type CircuitInfoPanelProps = {
   circuitName: string | null;
   country: string | null;
   raceName: string | null;
-  weather?: unknown | null; // Kept for backwards compatibility
 };
 
 export function CircuitInfoPanel({

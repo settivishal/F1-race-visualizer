@@ -54,7 +54,7 @@ const RACE_HEADER = /* GraphQL */ `
   query RaceHeader($slug: String!) {
     race(slug: $slug) {
       id slug date laps type
-      meeting { name country circuitName round season weather }
+      meeting { name country circuitName round season }
       results {
         finalPosition lapsCompleted points status fastestLap
         driver { code name number }
@@ -111,7 +111,7 @@ const RACE_REPLAY = /* GraphQL */ `
   query RaceReplay($slug: String!) {
     race(slug: $slug) {
       id slug laps date type
-      meeting { name country circuitName round season weather }
+      meeting { name country circuitName round season }
       replay {
         laps
         summary { lapCount maxLap maxPosition driverCount }

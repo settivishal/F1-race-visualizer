@@ -76,7 +76,6 @@ export default async function RacePage({ params }: { params: Promise<{ slug: str
           </h1>
           <p className="mt-2 text-sm text-muted">
             {meeting?.circuitName ?? meeting?.country ?? '—'} · {race.laps} laps
-            {meeting?.weather ? ` · ${meeting.weather}` : ''}
           </p>
         </div>
         {race.type === 'SPRINT' ? <Badge>Sprint</Badge> : null}

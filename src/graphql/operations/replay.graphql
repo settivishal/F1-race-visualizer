@@ -61,7 +61,6 @@ query RaceReplay($slug: String!) {
       circuitName
       round
       season
-      weather
     }
     replay {
       ...RaceReplayFields

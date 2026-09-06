@@ -42,7 +42,6 @@ export type ReplayRace = {
   round: number;
   country: string;
   circuitName: string | null;
-  weather: string | null;
   laps: number;
 };
 
@@ -81,7 +80,6 @@ export function toReplayView(race: RaceNode): ReplayView {
       round: race.meeting?.round ?? 0,
       country: race.meeting?.country ?? '',
       circuitName: race.meeting?.circuitName ?? null,
-      weather: race.meeting?.weather ?? null,
       laps: race.laps,
     },
     laps: race.replay.laps,

@@ -442,10 +442,16 @@ function AnimatedCar({
 
   return (
     <g>
+      {/* One string, not an expression list: React treats `title` children as
+          text and warns when handed an array of more than one child. */}
       <title>
-        {driver.code} • {driver.name}
-        {state?.statusLabel ? ` • ${state.statusLabel}` : ""}
-        {retirementEvent ? ` • ${retirementEvent.type} lap ${retirementEvent.lap}` : ""}
+        {[
+          `${driver.code} • ${driver.name}`,
+          state?.statusLabel,
+          retirementEvent && `${retirementEvent.type} lap ${retirementEvent.lap}`,
+        ]
+          .filter(Boolean)
+          .join(" • ")}
       </title>
       <path
         d={fullPath}
