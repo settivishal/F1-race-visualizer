@@ -1,5 +1,42 @@
-import { InputHTMLAttributes, TextareaHTMLAttributes } from "react";
+import { InputHTMLAttributes, SelectHTMLAttributes, TextareaHTMLAttributes } from "react";
 import { cn } from "@/lib/cn";
+
+/**
+ * These previously carried `outline-none` and signalled focus with a border
+ * tint alone, which is not a focus indicator — a 1px colour change is easy to
+ * miss and fails against a dark ground. The global `:focus-visible` ring in
+ * globals.css now does that job, so nothing here suppresses it.
+ */
+const fieldClasses =
+  "w-full rounded-md border border-line bg-panel px-3 py-2 text-sm text-foreground placeholder:text-subtle transition-[border-color,background-color] hover:border-line-strong";
+
+function Field({
+  label,
+  hint,
+  error,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  error?: string | null;
+  children: React.ReactNode;
+}) {
+  return (
+    <label className="block">
+      <span className="mb-1.5 block text-eyebrow font-semibold uppercase text-muted">
+        {label}
+      </span>
+      {children}
+      {error ? (
+        <span role="alert" className="mt-1.5 block text-sm text-flag-red">
+          {error}
+        </span>
+      ) : hint ? (
+        <span className="mt-1.5 block text-sm text-muted">{hint}</span>
+      ) : null}
+    </label>
+  );
+}
 
 type InputProps = InputHTMLAttributes<HTMLInputElement> & {
   label: string;
@@ -9,26 +46,33 @@ type InputProps = InputHTMLAttributes<HTMLInputElement> & {
 
 export function Input({ label, hint, error, className, ...props }: InputProps) {
   return (
-    <label className="block">
-      <span className="mb-2 block text-sm font-medium text-foreground">
-        {label}
-      </span>
+    <Field label={label} hint={hint} error={error}>
       <input
-        className={cn(
-          "w-full rounded-2xl border border-line bg-panel px-4 py-3 text-foreground outline-none transition focus:border-accent focus:bg-panel-strong/90",
-          error ? "border-accent" : "",
-          className,
-        )}
+        aria-invalid={error ? true : undefined}
+        className={cn(fieldClasses, error && "border-flag-red", className)}
         {...props}
       />
-      {error ? (
-        <span className="mt-2 block text-sm text-[#e10600]">
-          {error}
-        </span>
-      ) : hint ? (
-        <span className="mt-2 block text-sm text-muted">{hint}</span>
-      ) : null}
-    </label>
+    </Field>
+  );
+}
+
+type SelectProps = SelectHTMLAttributes<HTMLSelectElement> & {
+  label: string;
+  hint?: string;
+  error?: string | null;
+};
+
+export function Select({ label, hint, error, className, children, ...props }: SelectProps) {
+  return (
+    <Field label={label} hint={hint} error={error}>
+      <select
+        aria-invalid={error ? true : undefined}
+        className={cn(fieldClasses, error && "border-flag-red", className)}
+        {...props}
+      >
+        {children}
+      </select>
+    </Field>
   );
 }
 
@@ -40,25 +84,12 @@ type TextareaProps = TextareaHTMLAttributes<HTMLTextAreaElement> & {
 
 export function Textarea({ label, hint, error, className, ...props }: TextareaProps) {
   return (
-    <label className="block">
-      <span className="mb-2 block text-sm font-medium text-foreground">
-        {label}
-      </span>
+    <Field label={label} hint={hint} error={error}>
       <textarea
-        className={cn(
-          "min-h-32 w-full rounded-2xl border border-line bg-panel px-4 py-3 text-foreground outline-none transition focus:border-accent focus:bg-panel-strong/90",
-          error ? "border-accent" : "",
-          className,
-        )}
+        aria-invalid={error ? true : undefined}
+        className={cn(fieldClasses, "min-h-28", error && "border-flag-red", className)}
         {...props}
       />
-      {error ? (
-        <span className="mt-2 block text-sm text-[#e10600]">
-          {error}
-        </span>
-      ) : hint ? (
-        <span className="mt-2 block text-sm text-muted">{hint}</span>
-      ) : null}
-    </label>
+    </Field>
   );
 }

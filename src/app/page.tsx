@@ -14,7 +14,7 @@ export default async function Home() {
   const { driverStandings } = await getDriverStandings(2025);
 
   return (
-    <main className="mx-auto max-w-2xl p-8 font-sans">
+    <div className="mx-auto max-w-2xl p-8">
       <h1 className="text-2xl font-semibold">F1 Race Visualizer</h1>
       <p className="mt-2 text-sm text-gray-500">
         2025 drivers&rsquo; championship — {driverStandings.length} drivers, derived from race
@@ -49,6 +49,6 @@ export default async function Home() {
           No results. Run <code>pnpm tsx scripts/backfill.ts 2025</code>.
         </p>
       )}
-    </main>
+    </div>
   );
 }

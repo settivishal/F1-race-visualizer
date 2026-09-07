@@ -1,6 +1,10 @@
 import { ReactNode } from "react";
-import { Card } from "./card";
 
+/**
+ * Deliberately not built on `Card`: the tone classes set their own border and
+ * background, and Card's `border-line` would fight them depending on rule
+ * order.
+ */
 export function ErrorState({
   title = "Something went wrong",
   message,
@@ -11,12 +15,10 @@ export function ErrorState({
   action?: ReactNode;
 }) {
   return (
-    <Card className="border-[color:var(--color-accent)]/25 bg-[color:var(--color-accent)]/8">
-      <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[color:var(--color-accent-strong)]">
-        {title}
-      </p>
-      <p className="mt-3 text-sm leading-7 text-[color:var(--color-accent-strong)]">{message}</p>
-      {action ? <div className="mt-6">{action}</div> : null}
-    </Card>
+    <div role="alert" className="tone tone-red rounded-xl border p-6 text-center">
+      <p className="font-heading text-lg font-semibold">{title}</p>
+      <p className="mx-auto mt-2 max-w-sm text-sm leading-6 opacity-90">{message}</p>
+      {action ? <div className="mt-5 flex justify-center">{action}</div> : null}
+    </div>
   );
 }

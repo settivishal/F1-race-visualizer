@@ -1,26 +1,32 @@
 import { ReactNode } from "react";
 
+/**
+ * The heading was `md:text-7xl`, which is a poster, not a page title. The type
+ * scale now tops out somewhere a heading can actually live alongside content.
+ */
 export function SectionHeader({
   eyebrow,
   title,
   description,
   actions,
 }: {
-  eyebrow: string;
+  eyebrow?: string;
   title: string;
-  description: string;
+  description?: string;
   actions?: ReactNode;
 }) {
   return (
-    <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
-      <div className="max-w-3xl">
-        <p className="text-xs font-bold uppercase tracking-[0.38em] text-accent">
-          {eyebrow}
-        </p>
-        <h1 className="font-heading mt-4 text-4xl sm:text-5xl leading-tight tracking-[0.04em] text-foreground md:text-7xl">
+    <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+      <div className="max-w-2xl">
+        {eyebrow ? (
+          <p className="text-eyebrow font-bold uppercase text-accent">{eyebrow}</p>
+        ) : null}
+        <h1 className="font-heading mt-2 text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
           {title}
         </h1>
-        <p className="mt-5 text-base leading-8 text-muted">{description}</p>
+        {description ? (
+          <p className="mt-3 text-base leading-7 text-muted">{description}</p>
+        ) : null}
       </div>
       {actions ? <div className="shrink-0">{actions}</div> : null}
     </div>

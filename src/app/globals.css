@@ -185,13 +185,17 @@
   --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.36);
   --shadow-lg: 0 16px 44px rgba(0, 0, 0, 0.44);
 
-  /* Motion, split by intent so "snappy" is a shared value rather than a number
-     each component picks. Controls answer in `fast`; surfaces and theme changes
-     get `slow`, which is the only place the old 220ms survives. */
+  /* Motion. Tailwind has no theme namespace for durations — `duration-fast`
+     compiles to nothing — so "snappy" is set as the *default* every `transition-*`
+     utility inherits, rather than a token each component has to remember to
+     apply. A control that needs to differ says so with an explicit
+     `duration-*`; nothing else has to say anything.
+     Was 220ms across the board, which is slow enough to feel like lag on hover. */
+  --default-transition-duration: 120ms;
+  --default-transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+
   --ease-standard: cubic-bezier(0.2, 0, 0, 1);
   --ease-out-fast: cubic-bezier(0.16, 1, 0.3, 1);
-  --duration-fast: 120ms;
-  --duration-medium: 160ms;
   --duration-slow: 240ms;
 }
 
