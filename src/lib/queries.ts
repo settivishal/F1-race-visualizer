@@ -1,6 +1,7 @@
 import { cacheLife, cacheTag } from 'next/cache';
 import { executeQuery } from '@/graphql/execute';
 import type {
+  HomeFeatureQuery,
   HomeLineupQuery,
   RaceReplayQuery,
   RaceHeaderQuery,
@@ -59,6 +60,31 @@ const RACE_HEADER = /* GraphQL */ `
         finalPosition lapsCompleted points status fastestLap
         driver { code name number }
         team { name color }
+      }
+    }
+  }
+`;
+
+/**
+ * The race the landing page leads with.
+ *
+ * `Query.races` orders by date ascending and takes no `featured` argument, so
+ * the pick happens here rather than in SQL: the first race flagged featured if
+ * there is one, otherwise the most recent. Nothing is flagged yet — the
+ * mutation that sets it is M3 — so today this resolves to the latest race and
+ * starts honouring the flag the moment one exists, with no change here.
+ *
+ * Asking for 100 rows of four fields to choose one is cheap next to adding a
+ * resolver argument, and the whole thing is one cached entry for a day.
+ */
+const HOME_FEATURE = /* GraphQL */ `
+  query HomeFeature {
+    races(first: 100) {
+      edges {
+        node {
+          id slug laps type isFeatured
+          meeting { name country circuitName round season }
+        }
       }
     }
   }
@@ -141,6 +167,20 @@ export async function getRaceReplay(slug: string) {
   cacheLife('days');
 
   return executeQuery<RaceReplayQuery, { slug: string }>(RACE_REPLAY, { slug });
+}
+
+export async function getFeaturedRace() {
+  'use cache';
+  cacheTag('race');
+  cacheLife('days');
+
+  const { races } = await executeQuery<HomeFeatureQuery, Record<string, unknown>>(
+    HOME_FEATURE,
+    {},
+  );
+
+  const nodes = races.edges.map((edge) => edge.node);
+  return nodes.find((node) => node.isFeatured) ?? nodes.at(-1) ?? null;
 }
 
 export async function getRaceSlugs(first = 100) {
