@@ -2,6 +2,7 @@ import Link from 'next/link';
 
 const NAV_LINKS = [
   { href: '/races', label: 'Races' },
+  { href: '/standings', label: 'Standings' },
 ];
 
 /**

@@ -1,0 +1,32 @@
+# Both championship tables and the season list in one document, because they are
+# one page and one cache entry. Splitting them would mean two round trips for a
+# view nobody wants half of.
+query SeasonStandings($season: Int!) {
+  driverStandings(season: $season) {
+    position
+    points
+    wins
+    podiums
+    driver {
+      code
+      name
+      number
+    }
+    team {
+      name
+      color
+    }
+  }
+  constructorStandings(season: $season) {
+    position
+    points
+    wins
+    team {
+      name
+      color
+    }
+  }
+  seasons {
+    year
+  }
+}
