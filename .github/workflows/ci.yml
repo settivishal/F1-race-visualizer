@@ -30,3 +30,38 @@ jobs:
       # start receiving null, which shows up as a blank area of the UI in
       # production weeks later. Here it fails the build instead.
       - run: pnpm gql:check
+
+  # The one browser test: load a race, press play, assert the order changed.
+  # Separate from `check` because it needs a database and a built app, and
+  # because a browser download should not sit in front of typecheck and lint.
+  e2e:
+    runs-on: ubuntu-latest
+    needs: check
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+
+      # The dev branch database, never production: this reads a race the ingest
+      # already imported, and a test run has no business touching the data the
+      # live site serves. AUTH_SECRET is a throwaway — the proxy needs one to
+      # verify a session that this test never has.
+      - name: Smoke test the replay
+        run: |
+          test -n "$DATABASE_URL" || { echo "::error::DATABASE_URL_DEV secret is empty"; exit 1; }
+          pnpm e2e
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL_DEV }}
+          AUTH_SECRET: e2e-not-a-real-secret
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7

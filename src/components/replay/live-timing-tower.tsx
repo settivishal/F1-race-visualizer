@@ -130,7 +130,10 @@ export function LiveTimingTower({ visualization, currentLap }: TimingTowerProps)
                     className="w-1 h-3 rounded-full shrink-0" 
                     style={{ backgroundColor: standing.entry.team.color }} 
                   />
-                  <span className="font-semibold text-foreground truncate">{standing.entry.driver.code}</span>
+                  {/* The one hook the smoke test holds onto: the tower's
+                      order is the assertion that a replay actually replays,
+                      and every other selector here is a styling class. */}
+                  <span data-testid="tower-driver" className="font-semibold text-foreground truncate">{standing.entry.driver.code}</span>
                 </div>
                 <div className="tabular w-12 truncate text-right font-mono text-[11px] text-muted">
                   {standing.gap === "LEADER" ? "Lap" : standing.gap}

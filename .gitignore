@@ -42,3 +42,5 @@ next-env.d.ts
 
 # env files (.env.example is committed, it holds no secrets)
 !.env.example
+playwright-report/
+test-results/
