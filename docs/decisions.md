@@ -917,3 +917,22 @@ succeeds — `05-delivery.md:71`. If it ran first and the write then failed, the
 dropped and not replaced, and the next visitor would re-render from unchanged data, having
 lost a page that was working.
 
+
+## 2026-09-06 — The cron endpoint answers GET as well as POST
+
+**Decided:** `/api/cron/ingest` exports both `GET` and `POST`, running the same handler.
+
+`docs/system-design.md:554` and `05-delivery.md:151` both specify `POST /api/cron/ingest`.
+Vercel's scheduler invokes a cron path with a **GET**. A POST-only handler would therefore
+return 405 to the only caller that matters, once a morning, forever.
+
+The reason this is worth recording rather than just fixing is the failure it would have
+produced. Nothing errors. The endpoint is correct, the schedule is correct, the secret is
+correct, and no exception is raised anywhere — the site simply stops importing races, which
+is precisely the silent-cron failure `ingest_runs` exists to catch, arriving through the one
+route that page cannot explain. It would have looked like an OpenF1 problem.
+
+GET is what Vercel calls; POST is what a person calls with curl, and what verification step 6
+uses. Vercel adds `Authorization: Bearer $CRON_SECRET` to its own request when that variable
+is set, so both paths authenticate identically and neither needs a special case.
+

@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 const ADMIN_LINKS = [
   { href: '/admin', label: 'Races' },
   { href: '/admin/runs', label: 'Ingest runs' },
+  { href: '/admin/settings', label: 'Settings' },
 ];
 
 /**
