@@ -435,7 +435,7 @@ export function buildEvents(bundle: RaceBundle, positions: PositionRow[]): Event
  * rather than from the sample stream, so an overtake means what the replay
  * shows — the running order changed between two laps a viewer can scrub to.
  */
-function buildOvertakes(positions: PositionRow[]): EventRow[] {
+export function buildOvertakes(positions: PositionRow[]): EventRow[] {
   const byDriver = new Map<number, PositionRow[]>();
   for (const row of positions) {
     const list = byDriver.get(row.driverNumber);
