@@ -1,3 +1,13 @@
+type CareerTotals {
+  bestFinish: Int
+  podiums: Int!
+  points: Float!
+  seasonCount: Int!
+  seasons: [SeasonRecord!]!
+  starts: Int!
+  wins: Int!
+}
+
 type Circuit {
   country: String
   ergastId: String!
@@ -39,6 +49,11 @@ type DriverLapTimes {
   laps: [Lap!]!
   pace: Pace!
   team: Team
+}
+
+type DriverProfile {
+  career: CareerTotals!
+  driver: Driver!
 }
 
 type DriverStanding {
@@ -142,12 +157,18 @@ type PitStop {
 }
 
 type Query {
+  circuit(ergastId: String!): Circuit
+  circuits: [Circuit!]!
   constructorStandings(season: Int!): [ConstructorStanding!]!
+  driver(code: String!): DriverProfile
   driverStandings(season: Int!): [DriverStanding!]!
+  drivers(season: Int): [Driver!]!
   ingestRuns(first: Int = 50): [IngestRun!]!
   race(slug: String!): Race
   races(after: String, first: Int, search: String, season: Int): RaceConnection!
   seasons: [Season!]!
+  team(name: String!): TeamProfile
+  teams: [Team!]!
 }
 
 type Race {
@@ -243,6 +264,16 @@ type Season {
   year: Int!
 }
 
+type SeasonRecord {
+  bestFinish: Int
+  podiums: Int!
+  points: Float!
+  season: Int!
+  starts: Int!
+  team: Team
+  wins: Int!
+}
+
 type Stint {
   compound: String
   driver: Driver
@@ -258,6 +289,12 @@ type Team {
   id: ID!
   logoUrl: String
   name: String!
+}
+
+type TeamProfile {
+  career: CareerTotals!
+  drivers(season: Int): [Driver!]!
+  team: Team!
 }
 
 type TriggerIngestResult {

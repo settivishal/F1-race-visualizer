@@ -1105,3 +1105,29 @@ answer at a bigger scale and it costs money and setup this project has decided n
 dev database is migrated, and green after. The GitHub `check` job is the one that must pass
 on its own merits — it runs against PGlite with the migrations applied to a fresh instance,
 so it is unaffected.
+
+---
+
+## 2026-09-07 — `lib/circuit-data.ts` is retired; circuits come from the database
+
+**Decided:** the circuit panel reads the `circuits` table, and the hardcoded lookup is
+deleted. The three facts Ergast does not publish — length, turn count, first grand prix —
+are seeded into that table by `scripts/seed-circuits.ts`, keyed by Ergast's circuit id.
+
+The old module held those numbers keyed by **country**, and ended with a fallback that
+returned *15 turns, 5.0 km, first held in 1950* for anything it did not recognise. With one
+season on the site that was survivable. With an archive it is not: Hockenheim, Sochi, Paul
+Ricard, Mugello, Portimão, Istanbul and the Nürburgring are all inside the 2018-2022 window,
+and every one of them would have rendered those invented numbers as though they were facts
+about that circuit. A country key also cannot tell Spain 2019 from Spain 2025, and cannot
+hold two races in one country in one season.
+
+**What was lost, deliberately:** the circuit map image and the lap record. Both were
+hardcoded, and the image was hotlinked from `media.formula1.com` — someone else's bandwidth
+for an asset that breaks when they reorganise their CDN. Images move to Vercel Blob in M7,
+where the driver headshots and team logos are going; until then the panel shows the facts it
+can stand behind. A missing figure is now simply absent rather than guessed.
+
+**Considered:** keeping the file as an overlay keyed by circuit id. That is what the seed
+script is, minus the fallback and minus a second copy of the same numbers living in the
+application bundle — the values belong in the row the page already reads.

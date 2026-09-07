@@ -144,9 +144,10 @@ async function RaceDetail({
 
           <div className="mt-10">
             <CircuitInfoPanel
+              circuit={meeting?.circuit ?? null}
               circuitName={meeting?.circuitName ?? null}
               country={meeting?.country ?? null}
-              raceName={meeting?.name ?? null}
+              laps={race.laps}
             />
           </div>
         </>

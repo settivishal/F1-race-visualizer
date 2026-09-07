@@ -96,10 +96,22 @@ export async function AnalysisPanel({ slug }: { slug: string }) {
         <AnalysisHeading
           eyebrow="Strategy"
           title="Tyres"
-          description="Every stint, sized by the laps it lasted."
+          description={
+            race.dataTier === 'LAPS'
+              ? 'Tyre compounds were not published for this era, so the stints below are the pit stops only.'
+              : 'Every stint, sized by the laps it lasted.'
+          }
         />
         <div className="mt-5">
-          <StrategyChart rows={strategyRows} totalLaps={race.laps} />
+          {race.dataTier === 'LAPS' && strategyRows.length === 0 ? (
+            <p className="text-sm text-muted">
+              No tyre data exists for {race.meeting?.season ?? 'this season'} — the compound a
+              car was on is not in the record before 2023. The pit stops are still counted in
+              the lap-time chart above, where they break the line.
+            </p>
+          ) : (
+            <StrategyChart rows={strategyRows} totalLaps={race.laps} />
+          )}
         </div>
       </section>
 

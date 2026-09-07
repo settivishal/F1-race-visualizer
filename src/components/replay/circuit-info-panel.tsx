@@ -1,104 +1,93 @@
-"use client";
-
+import Link from "next/link";
 import { Card } from "@/components/ui/card";
-import { getCircuitData } from "@/lib/circuit-data";
-import Image from "next/image";
 
-type CircuitInfoPanelProps = {
-  circuitName: string | null;
+export type CircuitFacts = {
+  ergastId: string;
+  name: string;
+  locality: string | null;
   country: string | null;
-  raceName: string | null;
+  lengthKm: number | null;
+  turns: number | null;
+  firstGrandPrix: number | null;
 };
 
+/**
+ * The circuit, from the database.
+ *
+ * This used to read `lib/circuit-data.ts`: a table keyed by country, with a
+ * fallback that returned 15 turns, 5.0 km and "first held in 1950" for anything
+ * it did not recognise. One season made that survivable. An archive does not —
+ * Hockenheim, Sochi and Paul Ricard are all inside the 2018 window, and every
+ * one of them would have rendered invented numbers as facts.
+ *
+ * So every figure here is optional, and a missing one is simply absent. The
+ * race distance is computed from laps × length only when the length is known,
+ * because a distance derived from a guessed length is a guess with a decimal
+ * point on it.
+ */
 export function CircuitInfoPanel({
+  circuit,
   circuitName,
   country,
-  raceName,
-}: CircuitInfoPanelProps) {
-  const circuitData = getCircuitData(circuitName, country, raceName);
+  laps,
+}: {
+  circuit: CircuitFacts | null;
+  /** The name on the meeting, used when no circuit row is linked yet. */
+  circuitName: string | null;
+  country: string | null;
+  laps: number;
+}) {
+  const name = circuit?.name ?? circuitName ?? "Circuit";
+  const place = [circuit?.locality, circuit?.country ?? country].filter(Boolean).join(", ");
 
-  // Split lap record into time and driver (if format is "time (driver, year)")
-  const lapRecordParts = circuitData.lapRecord.split(" (");
-  const lapRecordTime = lapRecordParts[0];
-  const lapRecordDriver = lapRecordParts.length > 1 ? lapRecordParts[1].replace(")", "") : "";
+  const facts: { label: string; value: string }[] = [];
+  if (circuit?.lengthKm != null) {
+    facts.push({ label: "Length", value: `${circuit.lengthKm.toFixed(3)} km` });
+  }
+  if (circuit?.turns != null) facts.push({ label: "Turns", value: String(circuit.turns) });
+  facts.push({ label: "Laps", value: String(laps) });
+  if (circuit?.lengthKm != null) {
+    facts.push({
+      label: "Race distance",
+      value: `${(circuit.lengthKm * laps).toFixed(1)} km`,
+    });
+  }
+  if (circuit?.firstGrandPrix != null) {
+    facts.push({ label: "First grand prix", value: String(circuit.firstGrandPrix) });
+  }
 
   return (
-    <Card className="mt-8 mb-4 p-8">
-      <div className="flex justify-between items-center mb-8">
+    <Card>
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="mb-2 text-eyebrow font-bold uppercase text-accent">
-            Circuit Profile
-          </p>
-          <p className="text-xl font-bold text-muted">{circuitData.name}</p>
+          <p className="text-eyebrow font-bold uppercase text-accent">Circuit</p>
+          <h2 className="font-heading mt-2 text-2xl font-bold tracking-tight">{name}</h2>
+          {place ? <p className="mt-1 text-sm text-muted">{place}</p> : null}
         </div>
+        {circuit ? (
+          <Link
+            href={`/circuits/${circuit.ergastId}`}
+            className="rounded-sm text-eyebrow font-semibold uppercase text-muted transition-colors hover:text-foreground"
+          >
+            Every race here →
+          </Link>
+        ) : null}
       </div>
 
-      <div className="grid gap-12 lg:grid-cols-[1.8fr_1fr] items-center">
-        {/* Left: Circuit Map */}
-        <div className="w-full flex items-center justify-center p-6 bg-panel/50 rounded-2xl border border-line">
-          <Image 
-            src={circuitData.imageUrl} 
-            alt={`${circuitData.name} layout`}
-            width={800}
-            height={600}
-            className="w-full h-auto max-w-3xl object-contain drop-shadow-md"
-          />
-        </div>
-        
-        {/* Right: Circuit Statistics */}
-        <div className="flex flex-col text-foreground">
-          <div className="pb-5 border-b border-line">
-            <p className="text-[11px] text-muted mb-1 uppercase tracking-wider">Circuit Length</p>
-            <p className="text-3xl font-heading tracking-wide">
-              {circuitData.lengthKM.toFixed(3)}km
-            </p>
+      <dl className="mt-6 grid grid-cols-2 gap-x-6 gap-y-5 sm:grid-cols-3 lg:grid-cols-5">
+        {facts.map((fact) => (
+          <div key={fact.label}>
+            <dt className="text-[11px] uppercase tracking-wider text-muted">{fact.label}</dt>
+            <dd className="font-heading mt-1 text-xl tracking-wide">{fact.value}</dd>
           </div>
+        ))}
+      </dl>
 
-          <div className="py-5 border-b border-line grid grid-cols-2 gap-4">
-            <div>
-              <p className="text-[11px] text-muted mb-1 uppercase tracking-wider">Turns</p>
-              <p className="text-xl font-heading tracking-wide">
-                {circuitData.turns}
-              </p>
-            </div>
-            <div>
-              <p className="text-[11px] text-muted mb-1 uppercase tracking-wider">Laps</p>
-              <p className="text-xl font-heading tracking-wide">
-                {circuitData.laps ?? 50}
-              </p>
-            </div>
-          </div>
-
-          <div className="py-5 border-b border-line grid grid-cols-2 gap-4">
-            <div>
-              <p className="text-[11px] text-muted mb-1 uppercase tracking-wider">First Grand Prix</p>
-              <p className="text-xl font-heading tracking-wide">
-                {circuitData.firstGrandPrix ?? 1950}
-              </p>
-            </div>
-            <div>
-              <p className="text-[11px] text-muted mb-1 uppercase tracking-wider">Race Distance</p>
-              <p className="text-xl font-heading tracking-wide">
-                {circuitData.raceDistance 
-                  ? circuitData.raceDistance.toFixed(3) 
-                  : ((circuitData.laps ?? 50) * circuitData.lengthKM).toFixed(3)}km
-              </p>
-            </div>
-          </div>
-
-          <div className="pt-5">
-            <p className="text-[11px] text-muted mb-1 uppercase tracking-wider">Fastest lap</p>
-            <p className="text-xl font-heading tracking-wide mb-0.5">
-              {lapRecordTime}
-            </p>
-            {lapRecordDriver && (
-              <p className="text-[11px] text-muted">
-                {lapRecordDriver}
-              </p>
-            )}
-          </div>
-        </div>
-      </div>
+      {circuit === null ? (
+        <p className="mt-5 text-sm text-muted">
+          This meeting has not been matched to a circuit yet, so only the lap count is known.
+        </p>
+      ) : null}
     </Card>
   );
 }
