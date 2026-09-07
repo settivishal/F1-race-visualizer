@@ -1,26 +1,335 @@
 @import "tailwindcss";
 
+/* ---------------------------------------------------------------------------
+   Theme mechanism
+
+   The `dark` variant has to activate under exactly the conditions the custom
+   properties below flip under, or the two halves of the theme disagree — which
+   is precisely the bug this file is being rewritten to fix. Previously the
+   variant was `.dark`-only while the properties keyed off the media query, so
+   on a dark machine every token-driven surface went dark and every `dark:`
+   utility stayed light.
+
+   Both rules are needed. The class wins in either direction, which is what lets
+   M4's toggle override the system preference; the media query is what applies
+   when no class is set. `:root:not(.light)` is how an explicit light choice
+   opts back out of a dark system preference.
+
+   See docs/decisions.md, "The dark variant follows the tokens".
+--------------------------------------------------------------------------- */
+@custom-variant dark {
+  &:where(.dark, .dark *) {
+    @slot;
+  }
+  /* `not (prefers-color-scheme: light)` rather than `(prefers-color-scheme:
+     dark)`, so this matches the token rule below exactly: dark is the default
+     in `:root` and light applies only under an explicit light preference.
+     Written as "dark", the two would disagree for a browser reporting
+     `no-preference` — dark surfaces with light utilities on top, which is the
+     bug this whole block exists to remove. */
+  @media not (prefers-color-scheme: light) {
+    &:where(:root:not(.light), :root:not(.light) *) {
+      @slot;
+    }
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Colour — dark is the designed-for mode, so it is the one written first and
+   the one the values are tuned against. Light is the derivation.
+   See docs/decisions.md, "Dark-first, and the theme moves out of M4".
+--------------------------------------------------------------------------- */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Ground and surfaces. Three levels, not two: the page, a panel on it, and a
+     panel raised above that. The replay needs the third to sit the timing tower
+     and the controls above the chart without a border doing all the work. */
+  --background: #07080b;
+  --panel: #0d0f14;
+  --panel-strong: #14171e;
+  --line: rgba(255, 255, 255, 0.09);
+  --line-strong: rgba(255, 255, 255, 0.16);
+
+  /* Text. `subtle` is for labels and eyebrows that should recede further than
+     `muted` without dropping under the contrast floor. */
+  --foreground: #f3f5f8;
+  --muted: #9aa4b4;
+  --subtle: #6b7482;
+
+  /* F1 red. Kept from v1 — it is the domain's colour and the flag system
+     already leans on it. */
+  --accent: #ff2016;
+  --accent-strong: #ff4a41;
+  --accent-soft: rgba(255, 32, 22, 0.12);
+  --on-accent: #ffffff;
+
+  /* The chart ground. Deliberately not `--panel`: the position chart wants to
+     read as a surface you look *into*, a shade below everything around it. */
+  --track: #05060a;
+
+  /* Race control signals. These are domain facts, not decoration — a yellow
+     flag means one thing and has to stay itself across themes and redesigns.
+     See docs/decisions.md, "Flag colours are tokens, not palette classes". */
+  --flag-green: #22c55e;
+  --flag-yellow: #facc15;
+  --flag-double-yellow: #f59e0b;
+  --flag-red: #ef4444;
+  --flag-safety-car: #fb923c;
+  --flag-vsc: #fdba74;
+  --flag-pit: #38bdf8;
+  --flag-penalty: #fb7185;
+  --flag-chequered: #cbd5e1;
+
+  /* Sector timing, the other set of colours the sport fixes the meaning of:
+     purple is the fastest of anyone, green a personal best, yellow neither. */
+  --timing-best: #c084fc;
+  --timing-personal: #4ade80;
+  --timing-slower: #fbbf24;
+}
+
+:root.light {
+  --background: #fbfaf8;
+  --panel: #ffffff;
+  --panel-strong: #ffffff;
+  --line: rgba(15, 23, 42, 0.1);
+  --line-strong: rgba(15, 23, 42, 0.18);
+
+  --foreground: #10151d;
+  --muted: #56606f;
+  --subtle: #78828f;
+
+  --accent: #e10600;
+  --accent-strong: #b80500;
+  --accent-soft: rgba(225, 6, 0, 0.07);
+  --on-accent: #ffffff;
+
+  --track: #101620;
+
+  --flag-green: #15803d;
+  --flag-yellow: #a16207;
+  --flag-double-yellow: #b45309;
+  --flag-red: #b91c1c;
+  --flag-safety-car: #c2410c;
+  --flag-vsc: #9a3412;
+  --flag-pit: #0369a1;
+  --flag-penalty: #be123c;
+  --flag-chequered: #475569;
+
+  --timing-best: #7e22ce;
+  --timing-personal: #15803d;
+  --timing-slower: #a16207;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not(.dark) {
+    --background: #fbfaf8;
+    --panel: #ffffff;
+    --panel-strong: #ffffff;
+    --line: rgba(15, 23, 42, 0.1);
+    --line-strong: rgba(15, 23, 42, 0.18);
+
+    --foreground: #10151d;
+    --muted: #56606f;
+    --subtle: #78828f;
+
+    --accent: #e10600;
+    --accent-strong: #b80500;
+    --accent-soft: rgba(225, 6, 0, 0.07);
+    --on-accent: #ffffff;
+
+    --track: #101620;
+
+    --flag-green: #15803d;
+    --flag-yellow: #a16207;
+    --flag-double-yellow: #b45309;
+    --flag-red: #b91c1c;
+    --flag-safety-car: #c2410c;
+    --flag-vsc: #9a3412;
+    --flag-pit: #0369a1;
+    --flag-penalty: #be123c;
+    --flag-chequered: #475569;
+
+    --timing-best: #7e22ce;
+    --timing-personal: #15803d;
+    --timing-slower: #a16207;
+  }
 }
 
 @theme inline {
   --color-background: var(--background);
+  --color-panel: var(--panel);
+  --color-panel-strong: var(--panel-strong);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-muted: var(--muted);
+  --color-subtle: var(--subtle);
+  --color-accent: var(--accent);
+  --color-accent-strong: var(--accent-strong);
+  --color-accent-soft: var(--accent-soft);
+  --color-on-accent: var(--on-accent);
+  --color-track: var(--track);
+
+  --color-flag-green: var(--flag-green);
+  --color-flag-yellow: var(--flag-yellow);
+  --color-flag-red: var(--flag-red);
+  --color-flag-safety-car: var(--flag-safety-car);
+  --color-flag-pit: var(--flag-pit);
+  --color-timing-best: var(--timing-best);
+  --color-timing-personal: var(--timing-personal);
+  --color-timing-slower: var(--timing-slower);
+
+  --font-sans: var(--font-body);
+  --font-heading: var(--font-display);
+  --font-mono: var(--font-numeric);
+
+  /* Type scale. Previously every size was picked per site, which is how one
+     heading ended up at `text-7xl`. */
+  --text-eyebrow: 0.6875rem;
+  --text-eyebrow--line-height: 1rem;
+  --text-eyebrow--letter-spacing: 0.18em;
+
+  /* Radii. Five ad-hoc values were in use (`rounded-full`, `[1.8rem]`, `2xl`,
+     `xl`, `lg`) with nothing deciding between them. */
+  --radius-sm: 0.375rem;
+  --radius-md: 0.625rem;
+  --radius-lg: 0.875rem;
+  --radius-xl: 1.25rem;
+  --radius-2xl: 1.75rem;
+
+  /* Depth on a dark ground comes mostly from the border; the shadow only
+     separates. Heavy drop shadows read as smudges here. */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.32);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.36);
+  --shadow-lg: 0 16px 44px rgba(0, 0, 0, 0.44);
+
+  /* Motion. Tailwind has no theme namespace for durations — `duration-fast`
+     compiles to nothing — so "snappy" is set as the *default* every `transition-*`
+     utility inherits, rather than a token each component has to remember to
+     apply. A control that needs to differ says so with an explicit
+     `duration-*`; nothing else has to say anything.
+     Was 220ms across the board, which is slow enough to feel like lag on hover. */
+  --default-transition-duration: 120ms;
+  --default-transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-out-fast: cubic-bezier(0.16, 1, 0.3, 1);
+  --duration-slow: 240ms;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+/* ---------------------------------------------------------------------------
+   Base
+--------------------------------------------------------------------------- */
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-height: 100%;
+  color-scheme: dark;
+  background-color: var(--background);
+}
+
+:root.light,
+html:has(:root.light) {
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: light) {
+  html:not(.dark) {
+    color-scheme: light;
   }
 }
 
 body {
+  min-height: 100vh;
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-body), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Form controls do not inherit the page font on their own. This was in v1 and
+   did not survive the port, which is why selects and inputs were rendering in
+   the UA default. */
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+/* A global focus ring, so keyboard access does not depend on each component
+   remembering to add one. v1 had this; without it `Button` had no ring at all
+   and `Input` removed the UA ring with `outline-none` and replaced it with
+   nothing but a border tint. */
+:focus-visible {
+  outline: 2px solid var(--accent-strong);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+::selection {
+  background: var(--accent-soft);
+  color: var(--foreground);
+}
+
+/* Numbers that change in place — lap times, gaps, positions — must not reflow
+   as digits swap. */
+.tabular {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+/* ---------------------------------------------------------------------------
+   Race control tones
+
+   One rule plus a modifier per signal, rather than nine hand-written pairs of
+   light/dark palette classes. Mixing against `transparent` and `currentColor`
+   means each tone is derived from its token and needs no per-theme spelling.
+--------------------------------------------------------------------------- */
+.tone {
+  border-color: color-mix(in oklab, var(--tone) 32%, transparent);
+  background-color: color-mix(in oklab, var(--tone) 12%, transparent);
+  color: color-mix(in oklab, var(--tone) 82%, var(--foreground));
+}
+
+.tone-green { --tone: var(--flag-green); }
+.tone-yellow { --tone: var(--flag-yellow); }
+.tone-double-yellow { --tone: var(--flag-double-yellow); }
+.tone-red { --tone: var(--flag-red); }
+.tone-safety-car { --tone: var(--flag-safety-car); }
+.tone-vsc { --tone: var(--flag-vsc); }
+.tone-pit { --tone: var(--flag-pit); }
+.tone-penalty { --tone: var(--flag-penalty); }
+.tone-chequered { --tone: var(--flag-chequered); }
+.tone-neutral { --tone: var(--muted); }
+
+/* ---------------------------------------------------------------------------
+   Reduced motion
+
+   Set globally so every component inherits it rather than each one having to
+   remember. This site is the case the preference exists for: a continuously
+   animating position chart is exactly the pattern that triggers vestibular
+   symptoms. The replay stays fully usable — it steps between laps instead of
+   interpolating; see race-visualization-player.tsx.
+--------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

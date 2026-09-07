@@ -643,3 +643,296 @@ satisfy a rule that catches nothing on that hop; and dropping the pull-request r
 **What this does not relax.** A pull request is still required to reach either branch, CI must
 still pass, the rules still apply to admins, and neither branch can be force-pushed or deleted.
 Only the up-to-date requirement on `main` is gone.
+
+---
+
+## 2026-09-06 — urql is deferred out of M2
+
+**Decided:** M2 ships with no client-side GraphQL client. The race library's search and
+filters are a `<form method="get">` read by a server component; the player receives its
+payload as a prop. `urql` arrives in M3, with the admin mutations.
+
+**Follow-up to** *The replay payload travels as server-component props* (2026-09-03), which
+said "urql covers race library filters, standings toggles, and admin forms". The player half
+of that entry stands. The library half does not.
+
+**Considered:** wiring urql now as designed, so the HTTP transport has a real consumer.
+
+`Query.races` already takes `season` and `search`, so the filtering the client would do is
+filtering the database does better and the ISR cache can hold. Fetching it on the client
+means shipping a cache, a provider and a round trip to re-derive a result the server can put
+in the HTML — and it makes each filtered view unshareable, because the state lives in memory
+rather than in the URL. A `<form method="get">` gives back the shareable URL, works before
+the JavaScript loads, and costs nothing to write.
+
+The cost of deferring is that `/api/graphql` has no browser consumer until M3, so the HTTP
+transport is exercised only by GraphiQL and by hand. That is worth naming, and it is not
+worth a dependency to fix.
+
+---
+
+## 2026-09-06 — The v1 explorer is replaced, not ported
+
+**Decided:** `race-visualization-explorer.tsx` — the largest file on the v1 branch at 17.9KB
+— is not ported. It becomes two server-rendered routes: `/races` (library) and
+`/races/[slug]` (detail).
+
+**Considered:** porting it near-verbatim like the rest of the replay tree, on the grounds
+that it works.
+
+It works by doing on the client what v2 does on the server: it fetches every race on mount,
+holds the selected visualization in component state, and filters and sorts in the browser.
+Everything M1.5 built exists so that the page can be rendered once, cached, and served
+without touching the database. Porting the explorer would route the site's main entry point
+around all of it.
+
+The parts worth keeping are inside it rather than the shape of it: the skeleton, empty and
+error states become Suspense boundaries on the new routes.
+
+**Named here** because a file that large disappearing from a port should read as a decision
+rather than an oversight.
+
+---
+
+## 2026-09-06 — Cache Components, and why the ingest cannot revalidate yet
+
+**Decided:** `cacheComponents: true`. The cached reads live in `src/lib/queries.ts` as
+`use cache` scopes carrying `cacheTag('race' | 'standings')` and `cacheLife('days')`. The call
+that invalidates those tags arrives in M3 with the cron route, not in M2.
+
+**Follow-up to** *Rendering: ISR, revalidated by the ingest job* (2026-09-03), which described
+`revalidateTag('race')` as "the last step of the cron handler, after COMMIT". That is still the
+design. What changed is only when it can be written.
+
+`revalidateTag` runs in Server Functions and Route Handlers, because it needs a request context.
+In M2 the ingest runs from `scripts/backfill.ts`, a CLI process — `src/lib/ingest/run.ts` is a
+library it calls, and putting the call there would be code that cannot execute where it sits.
+`POST /api/cron/ingest` is the handler that call belongs in, and that route is M3.
+
+**Considered:** adding a `POST /api/revalidate` route now for the backfill script to hit over
+HTTP. It would close the loop, but it means a publicly reachable endpoint that evicts the cache,
+introduced one milestone before the auth that should guard it. A shortcut whose cost is an
+unguarded endpoint is not a shortcut.
+
+**What holds until then.** `cacheLife('days')` bounds the staleness at a day. The data changes
+weekly, so a race imported today is visible tomorrow at the latest, and ordinary traffic still
+never wakes Neon. The gap is that a fresh import is not visible *immediately*, which matters to
+whoever ran the import and to nobody else.
+
+---
+
+## 2026-09-06 — Grid position is not displayed
+
+**Decided:** the race classification table shows position, driver, team, laps and points. No
+grid column.
+
+`gridPosition` is null for every driver of every race in the database — verified across four
+races, 20 of 20 rows each. This is not a defect: `src/lib/ingest/transform.ts` leaves it unset
+because OpenF1 publishes no starting grid for these seasons, and the column is nullable so an
+unknown fact can be stored as unknown rather than as a zero.
+
+The schema field and the column stay. Only the rendering goes, because a column that reads
+"—" in every row for every race is furniture that looks like missing data. It comes back if a
+source for starting grids ever does.
+
+---
+
+## 2026-09-06 — The dark variant follows the tokens
+
+**Decided:** the Tailwind `dark` variant activates under the system preference *and* an explicit
+`.dark` class, matching the exact conditions the CSS custom properties already flip under.
+
+The two halves of the theme had been disagreeing. `globals.css` declared
+`@custom-variant dark (&:where(.dark, .dark *))`, but nothing in the application ever put `.dark`
+on the document — v1 set it from an inline script that was not ported. The custom properties,
+meanwhile, flip on `@media (prefers-color-scheme: dark)`. So on a machine set to dark, every
+token-driven surface went dark and all 34 `dark:` utilities stayed light. Race event chips
+rendered `bg-sky-50 text-sky-950` — pale blue with near-black text — on a near-black page.
+
+Two ways to reconcile them: set the class from a script, or widen the variant. The variant is the
+one that cannot drift, because it names the same condition the tokens name rather than a class
+some other code is responsible for setting. It also needs no blocking inline script, and no
+`suppressHydrationWarning` on `<html>`.
+
+The `.dark` half of the selector stays, because the M4 theme toggle sets exactly that. A class on
+the root overrides the preference in both directions; the preference is what applies when no class
+is present.
+
+---
+
+## 2026-09-06 — Flag colours are tokens, not palette classes
+
+**Decided:** race control colours — yellow, double yellow, red, safety car, VSC, chequered, green,
+pit, penalty — are named design tokens. `getReplayEventTone` and `getReplayEventMarkerColor` in
+`src/components/replay/replay-state.ts` stop returning raw Tailwind palette classes.
+
+A yellow flag is not "the colour yellow-200". It is a signal with a fixed meaning in the sport,
+and it needs to stay legible and stay *itself* across a redesign, a theme change, and any future
+palette. Encoding it as a palette class ties a domain fact to a colour ramp that exists for
+unrelated reasons, and it is why these strings carry a hand-written `dark:` variant each — nine
+tones, each spelled twice, none of which were doing anything (see the previous entry).
+
+As tokens they are defined once per theme and the components ask for the meaning rather than the
+shade.
+
+---
+
+## 2026-09-06 — Dark-first, and the theme moves out of M4
+
+**Decided:** the redesign is drawn dark-first. Light ships as the secondary mode. The dark theme
+is no longer an M4 polish item.
+
+`docs/system-design.md` lists "dark theme" under M4 alongside skeletons and error boundaries,
+which framed it as a toggle to add at the end. That framing is what produced the split-brained
+state above: a theme treated as a late addition never gets designed, only bolted on.
+
+The replay is the centrepiece and it is a chart of twenty coloured lines. Team colours and the
+position traces carry more contrast against a dark ground, and timing and telemetry products look
+this way because of that, not as a style choice. Designing light-first and deriving dark would
+mean tuning the mode the product is actually used in second.
+
+What stays in M4 is the *toggle UI*. The mode itself is a foundation.
+
+
+## 2026-09-06 — The chart panel stays dark in both themes
+
+**Decided:** the position chart renders on `--track`, a surface that is dark in
+light mode as well as dark mode, with white text on it. Everything around it —
+the timing tower, the controls, the story panel — follows the theme normally.
+
+The chart's whole job is to let twenty coloured lines be told apart at a glance,
+and team colours are chosen against the dark of a broadcast graphic. On a light
+ground the pale liveries wash out and the traces stop separating, which is the
+one thing the component exists to do.
+
+This is the same reasoning a video player uses for its own dark chrome on a
+light page: the surface belongs to the content, not to the document.
+
+**Consequence to know about:** `text-white` and `border-white/10` inside
+`race-visualization-canvas.tsx` and the `#f8fafc` driver codes in
+`race-car.tsx` are correct as literals and should not be "fixed" into tokens.
+The component carries a comment saying so, because it otherwise reads exactly
+like the hardcoding this milestone spent four PRs removing.
+
+
+## 2026-09-06 — Three guard layers, not two
+
+**Decided:** admin access is guarded in three places, and none of them is redundant with
+another.
+
+| Layer | Guards | Why it cannot be dropped |
+|---|---|---|
+| `proxy.ts` | Page navigation | Sends a logged-out visitor to `/login`. UX, not a security boundary. |
+| Each Server Action | Writes | An action is a POST endpoint, reachable without ever loading the page that defines it. |
+| Resolver context | Data | `/api/graphql` is one public URL serving public and admin operations. |
+
+`docs/whiteboard/05-delivery.md:118` already described two layers — middleware for pages,
+resolvers for data — and explained why neither substitutes for the other. The third comes
+from choosing Server Actions for writes, which the whiteboard predates.
+
+Next's own documentation is explicit about why. From the Proxy reference: *"A matcher change
+or a refactor that moves a Server Function to a different route can silently remove Proxy
+coverage. Always verify authentication and authorization inside each Server Function rather
+than relying on Proxy alone."* And from the data-security guide: *"A page-level
+authentication check does not extend to the Server Actions defined within it."* An exported
+Server Action is reachable by direct POST whether or not anything imports it.
+
+**Why it matters here:** the failure is silent. An action with no `auth()` call works
+correctly through the UI forever, because the UI only reaches it from a page the proxy
+already guarded. Nothing surfaces the gap until someone posts to the action directly.
+
+**How to apply:** every function in `src/app/admin/actions.ts` calls `auth()` as its first
+statement. A new action without one is a defect even if the page above it is guarded.
+
+---
+
+## 2026-09-06 — middleware.ts is proxy.ts now
+
+**Decided:** the route guard lives in `proxy.ts`, not `middleware.ts`.
+
+`docs/system-design.md:548` specifies `middleware.ts`. Next 16 deprecated that file
+convention and renamed it to `proxy.js|ts` — same functionality, new file and export name,
+with a codemod for the migration. The design doc predates the rename.
+
+Two consequences worth recording, because they remove work the usual Auth.js v5 setup does:
+
+**Proxy defaults to the Node.js runtime**, and setting the `runtime` option inside a proxy
+file now throws. The familiar `auth.config.ts` / `auth.ts` split — an Edge-safe config
+without the database or bcrypt, plus a Node config with them — exists only to keep those out
+of an Edge bundle. That constraint is gone, so there is one `src/auth.ts`.
+
+The proxy still does no database work. Next may deploy a proxy to the CDN, and the design's
+JWT session strategy means the check is a signature verification rather than a query. That
+was already the reason for choosing JWT (`05-delivery.md:113`); it is also what keeps the
+proxy cheap.
+
+---
+
+## 2026-09-06 — urql is not used, and that is now the decision
+
+**Decided:** no GraphQL client library. Server components read through `executeQuery`, and
+writes go through Server Actions that call the same function.
+
+`docs/system-design.md:572` says "interactive parts through urql", and the M2 entry deferred
+it with "Revisit in M3, where mutations give it a job". M3 has arrived and the job did not
+materialise.
+
+Writes go through Server Actions because `revalidateTag` only runs in a Server Function or
+Route Handler — it needs a request context. That is not a preference, it is where the API is
+allowed to execute. With writes server-side, the admin has no client-side fetching left to
+cache: the pages are server components reading the same schema the public pages read.
+
+Adding urql now would mean a provider, a client configuration and a second data path into
+the same schema, to serve no consumer. The earlier entry deferred the decision; this one
+makes it, so it stops reading as an oversight.
+
+**If it comes back:** something genuinely interactive that mutates and re-reads on the
+client — a live-updating ingest progress view, say — is the case that would earn it.
+
+
+## 2026-09-06 — updateTag in actions, revalidateTag in the cron
+
+**Decided:** Server Actions call `updateTag`; the cron route calls
+`revalidateTag(tag, 'max')`. The design documents say `revalidateTag` in both places, and
+`updateTag` did not exist when they were written.
+
+They differ in who waits.
+
+`updateTag` expires the entry outright, so the next request blocks until fresh data is ready.
+That is read-your-own-writes, and it is what an admin needs: after triggering an import,
+seeing the old page is indistinguishable from the import having failed. It is also
+Server-Action-only — a Route Handler cannot call it.
+
+`revalidateTag(tag, 'max')` marks the data stale and serves the stale copy while refreshing
+in the background. That is the right trade for the cron, where nobody is waiting on the
+result and a visitor who happens to arrive first should not pay for the regeneration. Passing
+no second argument is deprecated and behaves like `{ expire: 0 }`, which would make that
+visitor block.
+
+So the distinction is not a preference but the two halves of the same idea: the person who
+caused the change waits for it; everyone else gets the last good page until it is ready.
+
+**Unchanged:** invalidation is still the last step and still only runs after the write
+succeeds — `05-delivery.md:71`. If it ran first and the write then failed, the cache would be
+dropped and not replaced, and the next visitor would re-render from unchanged data, having
+lost a page that was working.
+
+
+## 2026-09-06 — The cron endpoint answers GET as well as POST
+
+**Decided:** `/api/cron/ingest` exports both `GET` and `POST`, running the same handler.
+
+`docs/system-design.md:554` and `05-delivery.md:151` both specify `POST /api/cron/ingest`.
+Vercel's scheduler invokes a cron path with a **GET**. A POST-only handler would therefore
+return 405 to the only caller that matters, once a morning, forever.
+
+The reason this is worth recording rather than just fixing is the failure it would have
+produced. Nothing errors. The endpoint is correct, the schedule is correct, the secret is
+correct, and no exception is raised anywhere — the site simply stops importing races, which
+is precisely the silent-cron failure `ingest_runs` exists to catch, arriving through the one
+route that page cannot explain. It would have looked like an OpenF1 problem.
+
+GET is what Vercel calls; POST is what a person calls with curl, and what verification step 6
+uses. Vercel adds `Authorization: Bearer $CRON_SECRET` to its own request when that variable
+is set, so both paths authenticate identically and neither needs a special case.
+
