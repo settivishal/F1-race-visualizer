@@ -52,9 +52,15 @@ export const metadata: Metadata = {
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
+  // `suppressHydrationWarning` on <html>: the inline script below adds
+  // `light`/`dark` to this element before React hydrates, so the client's
+  // className never matches the server's. Doing exactly that is the point of
+  // the script — the mismatch warning is the false positive, not the class.
+  // It suppresses one level deep, so nothing inside the tree is affected.
   return (
     <html
       lang="en"
+      suppressHydrationWarning
       className={`${displayFont.variable} ${bodyFont.variable} ${numericFont.variable} h-full antialiased`}
     >
       <head>
