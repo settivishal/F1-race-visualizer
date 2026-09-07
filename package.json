@@ -15,7 +15,8 @@
     "lint:fix": "oxlint --fix && eslint --fix",
     "gql:schema": "tsx scripts/print-schema.ts",
     "gql:generate": "pnpm gql:schema && graphql-codegen --config codegen.ts",
-    "gql:check": "pnpm gql:schema && git diff --exit-code schema.graphql && graphql-codegen --config codegen.ts --check"
+    "gql:check": "pnpm gql:schema && git diff --exit-code schema.graphql && graphql-codegen --config codegen.ts --check",
+    "seed:admin": "tsx scripts/seed-admin.ts"
   },
   "dependencies": {
     "@escape.tech/graphql-armor-cost-limit": "^2.4.3",
@@ -24,12 +25,14 @@
     "@neondatabase/serverless": "^1.1.0",
     "@pothos/core": "^4.13.1",
     "@pothos/plugin-relay": "^4.7.1",
+    "bcryptjs": "^3.0.3",
     "dataloader": "^2.2.3",
     "drizzle-orm": "^0.45.2",
     "framer-motion": "^13.2.0",
     "graphql": "^16.14.2",
     "graphql-yoga": "^5.22.0",
     "next": "16.3.4",
+    "next-auth": "5.0.0-beta.32",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "zod": "^4.5.4"
