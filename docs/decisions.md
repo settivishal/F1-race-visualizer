@@ -1051,3 +1051,57 @@ The parts that are genuinely hard — nice ticks that do not read as 90.30000000
 zero-width domain that must not divide by zero — are the parts with unit tests, which is
 where the confidence comes from rather than from a dependency's reputation. `framer-motion`,
 already in the tree for the replay, animates the results.
+
+---
+
+## 2026-09-07 — Ergast ids are added beside the existing keys, not instead of them
+
+**Decided:** `drivers.ergast_driver_id`, `teams.ergast_constructor_id` and
+`circuits.ergast_circuit_id`, all nullable except the circuit's. `drivers.code` and
+`teams.name` keep their UNIQUE constraints.
+
+**Amends** the M6 sketch in `system-design.md`, which said `drivers.code` would lose its
+uniqueness.
+
+Dropping it would have meant rewriting the OpenF1 ingest's upsert, which conflicts on
+`drivers.code` and has no Ergast id to use instead — a change to the working import, made
+for the benefit of an import that does not exist yet. Codes do collide across the full
+history of the sport; they do not collide inside 2018-2025, which is the whole scope.
+
+Constructor *names* are the identity that actually moves inside the window — Racing Point
+to Aston Martin, Toro Rosso to AlphaTauri to RB to Racing Bulls — so matching an archive
+import on the name would have created a second team row on each rebrand. That is what the
+constructor id is for.
+
+**The rule this follows:** a nullable column added beside a working key costs one migration
+and breaks nothing. Replacing the key costs a migration, a backfill, and a rewrite of the
+one pipeline currently keeping the site up to date.
+
+---
+
+## 2026-09-07 — A migration's own PR needs the dev database migrated by hand
+
+**Observed, then decided:** `migrate.yml` runs on a **push to `main` or `dev`**, never on a
+pull request. So the PR that introduces a migration builds new code against a database that
+does not have it yet, and its Vercel preview fails — which is exactly what M6.1 did, on
+`races.data_tier`: every race query selects every column, including at build time in
+`generateStaticParams` and the sitemap.
+
+M5 did not hit this only because it added *tables* nothing queried at build time.
+
+**Decided:** before opening a PR that adds a migration, run the Migrate workflow by hand
+(`workflow_dispatch`) against the dev branch database. That is what the manual trigger was
+put there for, and it is why applying migrations is idempotent — drizzle-kit skips whatever
+the journal already records.
+
+**Considered and rejected:** migrating from the Vercel build. It is the exact thing
+`decisions.md` already forbids — preview builds would migrate a database concurrently with
+other builds, and a preview of an abandoned branch would leave its columns behind forever.
+
+**Considered and deferred:** a preview-only Neon branch per pull request. It is the right
+answer at a bigger scale and it costs money and setup this project has decided not to spend.
+
+**What this means in practice:** a red Vercel check on a migration PR is expected until the
+dev database is migrated, and green after. The GitHub `check` job is the one that must pass
+on its own merits — it runs against PGlite with the migrations applied to a fresh instance,
+so it is unaffected.

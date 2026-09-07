@@ -12,6 +12,8 @@ type EventRow = typeof raceEvents.$inferSelect;
 type ResultRow = typeof raceResults.$inferSelect;
 
 const RaceType = builder.enumType('RaceType', { values: ['GRAND_PRIX', 'SPRINT'] as const });
+/** What this race's era published. See the `data_tier` enum in db/schema.ts. */
+const DataTier = builder.enumType('DataTier', { values: ['FULL', 'LAPS'] as const });
 const DriverStatus = builder.enumType('DriverStatus', {
   values: ['FINISHED', 'DNF', 'DNS', 'DSQ'] as const,
 });
@@ -175,6 +177,9 @@ Race.implement({
     type: t.field({ type: RaceType, resolve: (r) => r.type }),
     laps: t.exposeInt('laps'),
     isFeatured: t.exposeBoolean('isFeatured'),
+    // How much of this race exists, so a client can say "this era published no
+    // sector times" rather than rendering empty columns.
+    dataTier: t.field({ type: DataTier, resolve: (r) => r.dataTier }),
     // Upstream's public identifier for the session. Exposed because the admin
     // needs it to re-run an import, and it is nullable because a race can be
     // in the database without one — a manually created row, or an import that

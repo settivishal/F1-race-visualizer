@@ -1,8 +1,26 @@
+type Circuit {
+  country: String
+  ergastId: String!
+  firstGrandPrix: Int
+  id: ID!
+  latitude: Float
+  lengthKm: Float
+  locality: String
+  longitude: Float
+  name: String!
+  turns: Int
+}
+
 type ConstructorStanding {
   points: Float!
   position: Int!
   team: Team!
   wins: Int!
+}
+
+enum DataTier {
+  FULL
+  LAPS
 }
 
 scalar DateTime
@@ -84,6 +102,7 @@ type Lap {
 }
 
 type Meeting {
+  circuit: Circuit
   circuitName: String
   country: String!
   id: ID!
@@ -133,6 +152,7 @@ type Query {
 
 type Race {
   analysis: RaceAnalysis!
+  dataTier: DataTier!
   date: DateTime!
   events(lap: Int): [RaceEvent!]!
   id: ID!

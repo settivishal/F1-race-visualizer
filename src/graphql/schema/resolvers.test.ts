@@ -53,9 +53,15 @@ beforeAll(async () => {
   const [norSeat] = await db.insert(dbSchema.driverTeamAssignments)
     .values({ teamSeasonId: mclaren25.id, driverId: norris.id }).returning();
 
+  const [circuit] = await db.insert(dbSchema.circuits).values({
+    ergastCircuitId: 'test_circuit', name: 'Test Circuit',
+    locality: 'Testville', country: 'Testland', latitude: 1.5, longitude: -2.5,
+  }).returning();
+
   const [meeting] = await db.insert(dbSchema.meetings).values({
     seasonYear: 2025, round: 1, name: 'Test Grand Prix', country: 'Testland',
     startDate: new Date('2025-03-01T00:00:00Z'), openf1MeetingKey: 1,
+    circuitId: circuit.id,
   }).returning();
 
   const [race] = await db.insert(dbSchema.races).values({
@@ -156,6 +162,30 @@ describe('race', () => {
       { status: 'FINISHED', finalPosition: 1 },
       { status: 'DNF', finalPosition: null },
     ]);
+  });
+
+  it('defaults an existing race to the FULL tier, since OpenF1 wrote it', async () => {
+    const data = await run<{ race: { dataTier: string } }>(
+      'query { race(slug: "2025-test") { dataTier } }',
+    );
+    expect(data.race.dataTier).toBe('FULL');
+  });
+
+  it('resolves the circuit a meeting was held at', async () => {
+    const data = await run<{ race: { meeting: { circuitName: string; circuit: { name: string; locality: string; lengthKm: number | null } } } }>(`
+      query {
+        race(slug: "2025-test") {
+          meeting { circuitName circuit { name locality lengthKm } }
+        }
+      }
+    `);
+    expect(data.race.meeting.circuit).toEqual({
+      name: 'Test Circuit',
+      locality: 'Testville',
+      // The overlay fields are not in Ergast, so they stay null until a human
+      // fills them in.
+      lengthKm: null,
+    });
   });
 
   it('returns null for a slug that does not exist', async () => {

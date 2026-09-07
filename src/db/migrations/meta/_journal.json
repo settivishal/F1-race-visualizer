@@ -15,6 +15,13 @@
       "when": 1788810981674,
       "tag": "0001_vengeful_bloodaxe",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1788812610626,
+      "tag": "0002_curious_juggernaut",
+      "breakpoints": true
     }
   ]
 }
