@@ -75,16 +75,21 @@ export function ReplayControls({
   const thumbStrCompact = useTransform(percent, (p) => `calc(${p}% - 7px)`);
   const thumbStrNormal = useTransform(percent, (p) => `calc(${p}% - 8px)`);
 
+  // The compact overlay renders inside the chart panel, which stays dark in
+  // both themes (see docs/decisions.md, "The chart panel stays dark in both
+  // themes"). So its surfaces are fixed dark values, not theme tokens — with
+  // tokens it turned into white buttons on a black chart in light mode. Only
+  // the accent is a token, because it is red either way.
   if (compact) {
     return (
-      <div className="min-w-[min(100%,34rem)] rounded-xl border border-line-strong bg-panel-strong/80 px-6 py-5 shadow-lg backdrop-blur-md">
+      <div className="min-w-[min(100%,34rem)] rounded-xl border border-white/10 bg-black/55 px-6 py-5 shadow-lg backdrop-blur-md">
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={onPrevious}
             disabled={!canStepBackward}
             aria-label="Previous lap"
-            className="h-8 w-8 flex items-center justify-center rounded-full border border-line-strong bg-panel text-foreground transition hover:bg-panel-strong disabled:opacity-30"
+            className="h-8 w-8 flex items-center justify-center rounded-full border border-white/15 bg-white/10 text-white transition hover:bg-white/20 disabled:opacity-30"
           >
             <PrevIcon />
           </button>
@@ -101,7 +106,7 @@ export function ReplayControls({
             onClick={onNext}
             disabled={!canStepForward}
             aria-label="Next lap"
-            className="h-8 w-8 flex items-center justify-center rounded-full border border-line-strong bg-panel text-foreground transition hover:bg-panel-strong disabled:opacity-30"
+            className="h-8 w-8 flex items-center justify-center rounded-full border border-white/15 bg-white/10 text-white transition hover:bg-white/20 disabled:opacity-30"
           >
             <NextIcon />
           </button>
@@ -109,7 +114,7 @@ export function ReplayControls({
             type="button"
             onClick={onRestart}
             aria-label="Restart replay"
-            className="h-8 w-8 flex items-center justify-center rounded-full border border-line-strong bg-panel text-foreground transition hover:bg-panel-strong"
+            className="h-8 w-8 flex items-center justify-center rounded-full border border-white/15 bg-white/10 text-white transition hover:bg-white/20"
           >
             <RestartIcon />
           </button>
@@ -125,7 +130,7 @@ export function ReplayControls({
                   className={`rounded-full px-2.5 py-1 text-eyebrow font-bold uppercase transition ${
                     isActive
                       ? "bg-accent text-on-accent hover:bg-accent-strong"
-                      : "border border-line-strong bg-panel text-muted hover:bg-panel-strong hover:text-foreground"
+                      : "border border-white/15 bg-white/10 text-white/70 hover:bg-white/20 hover:text-white"
                   }`}
                 >
                   {option}x
@@ -136,7 +141,7 @@ export function ReplayControls({
         </div>
 
         <div className="mt-3.5 grid gap-2">
-          <div className="flex items-center justify-between text-eyebrow font-bold uppercase text-muted">
+          <div className="flex items-center justify-between text-eyebrow font-bold uppercase text-white/60">
             <span>Lap {currentLap}</span>
             <span>{Math.round(progressPercent)}%</span>
           </div>
