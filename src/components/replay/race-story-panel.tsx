@@ -74,13 +74,13 @@ function buildStoryMoments(visualization: ReplayView) {
 function getStoryToneClasses(tone: StoryMoment["tone"], isActive: boolean) {
   if (tone === "strategy") {
     return isActive
-      ? "border-sky-300 bg-sky-50 text-sky-950 dark:border-sky-500/30 dark:bg-sky-950/20 dark:text-sky-200"
+      ? "tone tone-pit"
       : "border-line bg-panel text-foreground";
   }
 
   if (tone === "overtake") {
     return isActive
-      ? "border-emerald-300 bg-emerald-50 text-emerald-950 dark:border-emerald-500/30 dark:bg-emerald-950/20 dark:text-emerald-200"
+      ? "tone tone-green"
       : "border-line bg-panel text-foreground";
   }
 
@@ -122,10 +122,10 @@ export function RaceStoryPanel({
     <Card>
       <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
         <div className="max-w-3xl">
-          <p className="text-xs font-bold uppercase tracking-[0.24em] text-foreground">
+          <p className="text-eyebrow font-bold uppercase text-accent">
             Race Story
           </p>
-          <h3 className="mt-3 font-heading text-3xl leading-none text-foreground">
+          <h3 className="mt-2.5 font-heading text-2xl font-bold tracking-tight text-foreground">
             Replay context that moves with the race.
           </h3>
           <p className="mt-3 text-sm leading-7 text-muted">
@@ -139,14 +139,14 @@ export function RaceStoryPanel({
       </div>
 
       <div className="mt-6 grid gap-4 lg:grid-cols-[0.85fr_1.15fr]">
-        <div className="flex flex-col gap-4 rounded-[1.6rem] border border-line bg-panel p-5">
+        <div className="flex flex-col gap-4 rounded-xl border border-line bg-panel p-5">
           <div>
-            <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-muted">
+            <p className="text-eyebrow font-bold uppercase text-muted">
               Race control
             </p>
             <div className="mt-3 flex items-center gap-2">
               <div
-                className={`rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] ${getRaceControlTone(raceControl.status)}`}
+                className={`rounded-full border px-3 py-1 text-eyebrow font-semibold uppercase ${getRaceControlTone(raceControl.status)}`}
               >
                 {raceControl.label}
               </div>
@@ -160,17 +160,17 @@ export function RaceStoryPanel({
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted">Lapped</p>
-              <p className="mt-1 text-xl font-heading text-foreground">{trafficSummary.lappedCount}</p>
+              <p className="text-eyebrow font-bold uppercase text-muted">Lapped</p>
+              <p className="tabular mt-1 font-heading text-xl font-bold text-foreground">{trafficSummary.lappedCount}</p>
             </div>
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted">Tail Traffic</p>
-              <p className="mt-1 text-xl font-heading text-foreground">{trafficSummary.backmarkerCount}</p>
+              <p className="text-eyebrow font-bold uppercase text-muted">Tail Traffic</p>
+              <p className="tabular mt-1 font-heading text-xl font-bold text-foreground">{trafficSummary.backmarkerCount}</p>
             </div>
           </div>
 
           {trafficSummary.retiredCount > 0 ? (
-            <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-500/20 dark:bg-amber-950/20 dark:text-amber-200">
+            <div className="tone tone-double-yellow rounded-md border px-3 py-2 text-xs">
               {trafficSummary.retiredCount} driver{trafficSummary.retiredCount === 1 ? "" : "s"} retired
             </div>
           ) : null}
@@ -178,7 +178,7 @@ export function RaceStoryPanel({
           <hr className="border-line" />
 
           <div>
-            <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-muted">
+            <p className="text-eyebrow font-bold uppercase text-muted">
               Current focus
             </p>
             {visibleActiveMoment ? (
@@ -200,10 +200,10 @@ export function RaceStoryPanel({
 
         <div className="space-y-3">
           <div className="flex items-center justify-between gap-3">
-            <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-muted">
+            <p className="text-eyebrow font-bold uppercase text-muted">
               Story chapters
             </p>
-            <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-muted">
+            <p className="text-eyebrow font-bold uppercase text-muted">
               {filteredMoments.length} highlight{filteredMoments.length === 1 ? "" : "s"}
             </p>
           </div>
@@ -216,9 +216,9 @@ export function RaceStoryPanel({
                   key={filter.id}
                   type="button"
                   onClick={() => setSelectedFilter(filter.id)}
-                  className={`rounded-full border px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] transition ${
+                  className={`rounded-full border px-4 py-2 text-eyebrow font-semibold uppercase transition ${
                     isActive
-                      ? "border-transparent bg-[#e10600] text-white shadow-sm"
+                      ? "border-transparent bg-accent text-on-accent"
                       : "border-line bg-panel text-foreground hover:bg-panel-strong"
                   }`}
                 >
@@ -242,11 +242,11 @@ export function RaceStoryPanel({
                     className={`rounded-2xl border px-4 py-4 transition ${getStoryToneClasses(moment.tone, isActive)}`}
                   >
                     <div className="flex items-center justify-between gap-3">
-                      <p className="text-xs font-bold uppercase tracking-[0.22em] text-foreground">
+                      <p className="text-eyebrow font-bold uppercase text-foreground">
                         Lap {moment.lap}
                       </p>
                       {isActive ? (
-                        <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-accent">
+                        <span className="tabular text-eyebrow font-bold uppercase text-accent">
                           Live
                         </span>
                       ) : null}

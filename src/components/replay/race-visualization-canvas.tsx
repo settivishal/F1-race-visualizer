@@ -195,21 +195,26 @@ export function RaceVisualizationCanvas({
   const activeFrames = currentDriverFrames.filter((frame) => !frame.isRetiredAtCurrentLap);
 
   return (
-    <div className={cn("overflow-hidden rounded-[2rem] border border-white/5 bg-[#0b0d10] p-5 text-white shadow-[0_24px_90px_rgba(0,0,0,0.455)] flex flex-col", className)}>
+    // `bg-track` and the white text on it are deliberate in both themes. The
+    // chart is twenty coloured lines whose only job is to be told apart, and a
+    // light ground washes the team colours out — so this panel stays a dark
+    // instrument on a light page, the way a video player does. It is the one
+    // surface here that does not follow the theme.
+    <div className={cn("flex flex-col overflow-hidden rounded-xl border border-line-strong bg-track p-5 text-white shadow-lg", className)}>
       <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-5 border-b border-white/10 px-4 pb-5">
         <div className="max-w-md md:max-w-xl flex-1">
-          <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-[#e10600]">Visualization Engine</p>
-          <h3 className="font-heading mt-2 text-2xl sm:text-3xl leading-tight tracking-[0.04em] text-white break-words">
+          <p className="text-eyebrow font-bold uppercase text-accent">Visualization Engine</p>
+          <h3 className="font-heading mt-2 break-words text-2xl font-bold leading-tight tracking-tight text-white sm:text-3xl">
             {race.season} R{race.round} • {race.name}
           </h3>
           <div className="mt-3.5 flex flex-wrap gap-2 text-xs">
-            <span className="rounded-lg bg-white/5 border border-white/10 px-2.5 py-1 font-semibold text-white/90">
+            <span className="tabular rounded-md border border-white/10 bg-white/5 px-2.5 py-1 font-semibold text-white/90">
               {summary.driverCount} Drivers
             </span>
-            <span className="rounded-lg bg-white/5 border border-white/10 px-2.5 py-1 font-semibold text-white/90">
+            <span className="tabular rounded-md border border-white/10 bg-white/5 px-2.5 py-1 font-semibold text-white/90">
               {summary.maxLap || race.laps} Laps
             </span>
-            <span className="rounded-lg bg-white/5 border border-white/10 px-2.5 py-1 font-semibold text-white/90">
+            <span className="tabular rounded-md border border-white/10 bg-white/5 px-2.5 py-1 font-semibold text-white/90">
               {visualization.events.length} Events
             </span>
           </div>
@@ -237,7 +242,7 @@ export function RaceVisualizationCanvas({
               width={VIEWBOX_WIDTH}
               height={VIEWBOX_HEIGHT}
               rx="28"
-              fill="#060709"
+              fill="var(--track)"
             />
 
             {/* Glowing active lap scrubber line */}
@@ -245,14 +250,14 @@ export function RaceVisualizationCanvas({
               style={{ x: activeLapX }}
               y1={MARGIN.top - 32}
               y2={VIEWBOX_HEIGHT - MARGIN.bottom}
-              stroke="#e10600"
+              stroke="var(--accent)"
               strokeWidth="2.5"
               opacity="0.85"
-              filter="drop-shadow(0px 0px 3px rgba(225,6,0,0.6))"
+              
             />
             {/* Top glowing handle for active line */}
             <motion.g style={{ x: activeLapX, y: MARGIN.top - 32 }}>
-              <circle r="6" fill="#e10600" />
+              <circle r="6" fill="var(--accent)" />
               <circle r="2.5" fill="white" />
             </motion.g>
 
@@ -327,7 +332,7 @@ export function RaceVisualizationCanvas({
                       y1={MARGIN.top - 48}
                       x2={cx}
                       y2={VIEWBOX_HEIGHT - MARGIN.bottom}
-                      stroke={kind === "penalty" ? "#ef4444" : "#eab308"}
+                      stroke={kind === "penalty" ? "var(--flag-penalty)" : "var(--flag-yellow)"}
                       strokeOpacity="0.2"
                       strokeDasharray="4 4"
                     />
@@ -335,7 +340,7 @@ export function RaceVisualizationCanvas({
                       cx={cx}
                       cy={MARGIN.top - 48}
                       r="6"
-                      fill="#0f1115"
+                      fill="var(--track)"
                       stroke={color}
                       strokeWidth="2"
                     />
@@ -364,12 +369,12 @@ export function RaceVisualizationCanvas({
         </div>
       </div>
 
-      <div className="mt-5 grid gap-4 border-t border-white/10 px-4 pt-5 text-[10px] font-bold uppercase tracking-[0.22em] text-white/45 lg:grid-cols-[1fr_auto] lg:items-center">
+      <div className="mt-5 grid gap-4 border-t border-white/10 px-4 pt-5 text-eyebrow font-bold uppercase text-white/45 lg:grid-cols-[1fr_auto] lg:items-center">
         <p>
           The replay controller drives car positions, lap progress, and event markers from the same
           synchronized race state.
         </p>
-        <p className="text-[#e10600]">
+        <p className="text-accent">
           {raceControl.label} • lap {currentLap}
           {nextLap !== currentLap ? ` → ${nextLap}` : ""}
         </p>

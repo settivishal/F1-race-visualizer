@@ -793,3 +793,24 @@ mean tuning the mode the product is actually used in second.
 
 What stays in M4 is the *toggle UI*. The mode itself is a foundation.
 
+
+## 2026-09-06 — The chart panel stays dark in both themes
+
+**Decided:** the position chart renders on `--track`, a surface that is dark in
+light mode as well as dark mode, with white text on it. Everything around it —
+the timing tower, the controls, the story panel — follows the theme normally.
+
+The chart's whole job is to let twenty coloured lines be told apart at a glance,
+and team colours are chosen against the dark of a broadcast graphic. On a light
+ground the pale liveries wash out and the traces stop separating, which is the
+one thing the component exists to do.
+
+This is the same reasoning a video player uses for its own dark chrome on a
+light page: the surface belongs to the content, not to the document.
+
+**Consequence to know about:** `text-white` and `border-white/10` inside
+`race-visualization-canvas.tsx` and the `#f8fafc` driver codes in
+`race-car.tsx` are correct as literals and should not be "fixed" into tokens.
+The component carries a comment saying so, because it otherwise reads exactly
+like the hardcoding this milestone spent four PRs removing.
+
