@@ -4,7 +4,8 @@ import { maxDepthPlugin } from '@escape.tech/graphql-armor-max-depth';
 // prefix is all the rules-of-hooks lint rule looks at.
 import { useDisableIntrospection as disableIntrospection } from '@graphql-yoga/plugin-disable-introspection';
 import { createYoga } from 'graphql-yoga';
-import { createContext } from '@/graphql/context';
+import { auth } from '@/auth';
+import { createContext, type Session } from '@/graphql/context';
 import { schema } from '@/graphql/schema';
 
 const isDev = process.env.NODE_ENV !== 'production';
@@ -37,7 +38,19 @@ const yoga = createYoga<{ request: Request }>({
   ],
   // Fresh per request: the loaders' cache must not outlive the request it was
   // built for.
-  context: createContext,
+  //
+  // The session is resolved here because this is where the cookies are. A
+  // logged-out caller gets `null` and every admin field rejects them — which is
+  // the only thing standing between this URL and the mutations, since one
+  // endpoint serves both public and admin operations and no route rule can
+  // separate them.
+  context: async () => {
+    const authSession = await auth();
+    const userId = authSession?.user?.id;
+    const email = authSession?.user?.email;
+    const session: Session = userId && email ? { userId, email } : null;
+    return createContext(session);
+  },
   graphqlEndpoint: '/api/graphql',
   // Route handlers deal in the Web Request/Response APIs, which is what Yoga
   // already speaks — see node_modules/next/dist/docs/01-app/01-getting-started/

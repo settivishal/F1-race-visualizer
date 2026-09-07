@@ -814,3 +814,78 @@ light page: the surface belongs to the content, not to the document.
 The component carries a comment saying so, because it otherwise reads exactly
 like the hardcoding this milestone spent four PRs removing.
 
+
+## 2026-09-06 — Three guard layers, not two
+
+**Decided:** admin access is guarded in three places, and none of them is redundant with
+another.
+
+| Layer | Guards | Why it cannot be dropped |
+|---|---|---|
+| `proxy.ts` | Page navigation | Sends a logged-out visitor to `/login`. UX, not a security boundary. |
+| Each Server Action | Writes | An action is a POST endpoint, reachable without ever loading the page that defines it. |
+| Resolver context | Data | `/api/graphql` is one public URL serving public and admin operations. |
+
+`docs/whiteboard/05-delivery.md:118` already described two layers — middleware for pages,
+resolvers for data — and explained why neither substitutes for the other. The third comes
+from choosing Server Actions for writes, which the whiteboard predates.
+
+Next's own documentation is explicit about why. From the Proxy reference: *"A matcher change
+or a refactor that moves a Server Function to a different route can silently remove Proxy
+coverage. Always verify authentication and authorization inside each Server Function rather
+than relying on Proxy alone."* And from the data-security guide: *"A page-level
+authentication check does not extend to the Server Actions defined within it."* An exported
+Server Action is reachable by direct POST whether or not anything imports it.
+
+**Why it matters here:** the failure is silent. An action with no `auth()` call works
+correctly through the UI forever, because the UI only reaches it from a page the proxy
+already guarded. Nothing surfaces the gap until someone posts to the action directly.
+
+**How to apply:** every function in `src/app/admin/actions.ts` calls `auth()` as its first
+statement. A new action without one is a defect even if the page above it is guarded.
+
+---
+
+## 2026-09-06 — middleware.ts is proxy.ts now
+
+**Decided:** the route guard lives in `proxy.ts`, not `middleware.ts`.
+
+`docs/system-design.md:548` specifies `middleware.ts`. Next 16 deprecated that file
+convention and renamed it to `proxy.js|ts` — same functionality, new file and export name,
+with a codemod for the migration. The design doc predates the rename.
+
+Two consequences worth recording, because they remove work the usual Auth.js v5 setup does:
+
+**Proxy defaults to the Node.js runtime**, and setting the `runtime` option inside a proxy
+file now throws. The familiar `auth.config.ts` / `auth.ts` split — an Edge-safe config
+without the database or bcrypt, plus a Node config with them — exists only to keep those out
+of an Edge bundle. That constraint is gone, so there is one `src/auth.ts`.
+
+The proxy still does no database work. Next may deploy a proxy to the CDN, and the design's
+JWT session strategy means the check is a signature verification rather than a query. That
+was already the reason for choosing JWT (`05-delivery.md:113`); it is also what keeps the
+proxy cheap.
+
+---
+
+## 2026-09-06 — urql is not used, and that is now the decision
+
+**Decided:** no GraphQL client library. Server components read through `executeQuery`, and
+writes go through Server Actions that call the same function.
+
+`docs/system-design.md:572` says "interactive parts through urql", and the M2 entry deferred
+it with "Revisit in M3, where mutations give it a job". M3 has arrived and the job did not
+materialise.
+
+Writes go through Server Actions because `revalidateTag` only runs in a Server Function or
+Route Handler — it needs a request context. That is not a preference, it is where the API is
+allowed to execute. With writes server-side, the admin has no client-side fetching left to
+cache: the pages are server components reading the same schema the public pages read.
+
+Adding urql now would mean a provider, a client configuration and a second data path into
+the same schema, to serve no consumer. The earlier entry deferred the decision; this one
+makes it, so it stops reading as an oversight.
+
+**If it comes back:** something genuinely interactive that mutates and re-reads on the
+client — a live-updating ingest progress view, say — is the case that would earn it.
+

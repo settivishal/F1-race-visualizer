@@ -1,5 +1,6 @@
 import { execute, parse, validate } from 'graphql';
-import { createContext } from './context';
+import { auth } from '@/auth';
+import { createContext, type Session } from './context';
 import { schema } from './schema';
 
 /**
@@ -16,10 +17,47 @@ import { schema } from './schema';
  * So a race page renders as fast as a direct Drizzle query would, while still
  * going through the schema, the resolvers and the loaders. Server components
  * know this one function and not what is behind it.
+ *
+ * This entry point runs with **no session**, deliberately. Every caller in
+ * `src/lib/queries.ts` is inside a `use cache` scope, which cannot read cookies
+ * — and a cached page must not vary by who is asking anyway. Admin callers use
+ * `executeAsAdmin` below.
  */
 export async function executeQuery<TData, TVariables extends Record<string, unknown> = Record<string, never>>(
   document: string,
   variables?: TVariables,
+): Promise<TData> {
+  return run<TData, TVariables>(document, variables, null);
+}
+
+/**
+ * The same thing, for a caller that is allowed to be somebody.
+ *
+ * Kept as a separate function rather than an optional argument, because the
+ * difference is not a parameter — it is which of two rules the call has to
+ * obey. `executeQuery` is safe inside a `use cache` scope and can never reach
+ * an admin field. This one resolves the session from the request's cookies, so
+ * it must never be called from a cached scope, and it is the only way to reach
+ * a field that calls `requireSession`.
+ *
+ * Server Actions and admin server components use this. Nothing else should.
+ */
+export async function executeAsAdmin<TData, TVariables extends Record<string, unknown> = Record<string, never>>(
+  document: string,
+  variables?: TVariables,
+): Promise<TData> {
+  const authSession = await auth();
+  const userId = authSession?.user?.id;
+  const email = authSession?.user?.email;
+  const session: Session = userId && email ? { userId, email } : null;
+
+  return run<TData, TVariables>(document, variables, session);
+}
+
+async function run<TData, TVariables extends Record<string, unknown>>(
+  document: string,
+  variables: TVariables | undefined,
+  session: Session,
 ): Promise<TData> {
   const parsed = parse(document);
 
@@ -33,7 +71,7 @@ export async function executeQuery<TData, TVariables extends Record<string, unkn
     document: parsed,
     variableValues: variables,
     // Fresh per call, so concurrent renders never share a context.
-    contextValue: await createContext(),
+    contextValue: await createContext(session),
   });
 
   if (result.errors?.length) throw result.errors[0];
