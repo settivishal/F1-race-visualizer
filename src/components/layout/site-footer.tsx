@@ -6,7 +6,8 @@ import Link from 'next/link';
  * The attribution line is the point of it. Race data comes from OpenF1, and
  * saying so is both the courteous thing and the accurate one — this is not
  * official Formula 1 data and the footer should not let anyone assume it is.
- * M4 adds the image attribution for Wikipedia headshots on `/about`.
+ * The full attribution, including why no driver photograph is served, lives on
+ * `/about`; this line is the short form that appears on every page.
  */
 export function SiteFooter() {
   return (
@@ -24,12 +25,20 @@ export function SiteFooter() {
           </a>
           . Unofficial, and not associated with Formula 1.
         </p>
-        <Link
-          href="/races"
-          className="rounded-sm font-medium text-muted transition-colors hover:text-foreground"
-        >
-          Browse races
-        </Link>
+        <div className="flex items-center gap-5">
+          <Link
+            href="/about"
+            className="rounded-sm font-medium text-muted transition-colors hover:text-foreground"
+          >
+            About
+          </Link>
+          <Link
+            href="/races"
+            className="rounded-sm font-medium text-muted transition-colors hover:text-foreground"
+          >
+            Browse races
+          </Link>
+        </div>
       </div>
     </footer>
   );

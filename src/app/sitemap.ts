@@ -21,6 +21,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: siteUrl, changeFrequency: 'weekly', priority: 1 },
     { url: `${siteUrl}/races`, changeFrequency: 'weekly', priority: 0.9 },
     { url: `${siteUrl}/standings`, changeFrequency: 'weekly', priority: 0.8 },
+    { url: `${siteUrl}/about`, changeFrequency: 'yearly', priority: 0.3 },
     ...races.edges.map(({ node }) => ({
       url: `${siteUrl}/races/${node.slug}`,
       lastModified: new Date(node.date),
