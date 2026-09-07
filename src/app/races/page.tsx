@@ -1,10 +1,12 @@
 import { Suspense } from 'react';
 import Link from 'next/link';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
-import { LoadingState } from '@/components/ui/loading-state';
 import { PageContainer } from '@/components/ui/page-container';
 import { SectionHeader } from '@/components/ui/section-header';
+import { Skeleton } from '@/components/ui/skeleton';
 import { getRaceLibrary } from '@/lib/queries';
 
 export const metadata = {
@@ -37,7 +39,7 @@ export default function RacesPage({ searchParams }: { searchParams: SearchParams
         title="Races"
         description="Pick a race to replay it lap by lap."
       />
-      <Suspense fallback={<div className="mt-8"><LoadingState label="Loading races" /></div>}>
+      <Suspense fallback={<LibrarySkeleton />}>
         <RaceLibrary searchParams={searchParams} />
       </Suspense>
     </PageContainer>
@@ -64,16 +66,15 @@ async function RaceLibrary({ searchParams }: { searchParams: SearchParams }) {
 
   const { races, seasons } = await getRaceLibrary(season, search, after);
 
+  const fieldClasses =
+    'h-10 w-full rounded-md border border-line bg-panel px-3 text-sm text-foreground transition-[border-color] hover:border-line-strong';
+
   return (
     <>
-      <form method="get" className="mt-6 flex flex-wrap items-end gap-3">
-        <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-[0.18em] text-muted">
-          Season
-          <select
-            name="season"
-            defaultValue={season ?? ''}
-            className="rounded-lg border border-line bg-panel-strong px-3 py-2 text-sm font-normal normal-case tracking-normal text-foreground"
-          >
+      <form method="get" className="mt-8 flex flex-wrap items-end gap-3">
+        <label className="flex flex-col gap-1.5">
+          <span className="text-eyebrow font-semibold uppercase text-muted">Season</span>
+          <select name="season" defaultValue={season ?? ''} className={fieldClasses}>
             <option value="">All seasons</option>
             {seasons.map((entry) => (
               <option key={entry.year} value={entry.year}>
@@ -83,23 +84,20 @@ async function RaceLibrary({ searchParams }: { searchParams: SearchParams }) {
           </select>
         </label>
 
-        <label className="flex flex-1 flex-col gap-1 text-xs font-semibold uppercase tracking-[0.18em] text-muted">
-          Search
+        <label className="flex min-w-56 flex-1 flex-col gap-1.5">
+          <span className="text-eyebrow font-semibold uppercase text-muted">Search</span>
           <input
             type="search"
             name="q"
             defaultValue={search ?? ''}
             placeholder="Monaco, Silverstone, sprint…"
-            className="w-full rounded-lg border border-line bg-panel-strong px-3 py-2 text-sm font-normal normal-case tracking-normal text-foreground"
+            className={fieldClasses}
           />
         </label>
 
-        <button
-          type="submit"
-          className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-accent-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-        >
+        <Button type="submit" variant="secondary">
           Filter
-        </button>
+        </Button>
       </form>
 
       {races.edges.length === 0 ? (
@@ -107,28 +105,38 @@ async function RaceLibrary({ searchParams }: { searchParams: SearchParams }) {
           <EmptyState
             title="No races match"
             description="Try a different season, or clear the search."
+            action={
+              <Link href="/races">
+                <Button variant="secondary" size="sm">
+                  Clear filters
+                </Button>
+              </Link>
+            }
           />
         </div>
       ) : (
-        <ul className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <ul className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {races.edges.map(({ node }) => (
             <li key={node.id}>
-              <Link
-                href={`/races/${node.slug}`}
-                className="block rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-              >
-                <Card className="h-full transition-colors hover:border-accent">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted">
-                    {node.meeting
-                      ? `${node.meeting.season} · Round ${node.meeting.round}`
-                      : 'Season unknown'}
-                    {node.type === 'SPRINT' ? ' · Sprint' : ''}
-                  </p>
-                  <h2 className="mt-2 text-lg font-semibold">
+              {/* prefetch: the race pages are prerendered and cached, so warming
+                  one on hover costs almost nothing and removes the wait on the
+                  click that matters. */}
+              <Link href={`/races/${node.slug}`} className="block h-full rounded-xl" prefetch>
+                <Card interactive className="flex h-full flex-col">
+                  <div className="flex items-center gap-2">
+                    <span className="text-eyebrow font-semibold uppercase text-muted">
+                      {node.meeting
+                        ? `${node.meeting.season} · Round ${node.meeting.round}`
+                        : 'Season unknown'}
+                    </span>
+                    {node.type === 'SPRINT' ? <Badge>Sprint</Badge> : null}
+                  </div>
+                  <h2 className="font-heading mt-2.5 text-xl font-bold tracking-tight">
                     {node.meeting?.name ?? node.slug}
                   </h2>
-                  <p className="mt-1 text-sm text-muted">
-                    {node.meeting?.circuitName ?? node.meeting?.country ?? '—'} · {node.laps} laps
+                  <p className="mt-1.5 text-sm text-muted">
+                    {node.meeting?.circuitName ?? node.meeting?.country ?? '—'} ·{' '}
+                    <span className="tabular">{node.laps}</span> laps
                   </p>
                 </Card>
               </Link>
@@ -138,7 +146,7 @@ async function RaceLibrary({ searchParams }: { searchParams: SearchParams }) {
       )}
 
       {races.pageInfo.hasNextPage && races.pageInfo.endCursor ? (
-        <div className="mt-8">
+        <div className="mt-8 flex justify-center">
           <Link
             href={{
               pathname: '/races',
@@ -148,12 +156,26 @@ async function RaceLibrary({ searchParams }: { searchParams: SearchParams }) {
                 after: races.pageInfo.endCursor,
               },
             }}
-            className="inline-block rounded-lg border border-line px-4 py-2 text-sm font-semibold transition-colors hover:border-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            className="rounded-md"
           >
-            Next page
+            <Button variant="secondary">Next page</Button>
           </Link>
         </div>
       ) : null}
     </>
+  );
+}
+
+/** Sized to a filled grid, so the page does not grow as the races arrive. */
+function LibrarySkeleton() {
+  return (
+    <div className="mt-8">
+      <Skeleton className="h-10 w-full max-w-2xl" />
+      <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {Array.from({ length: 6 }, (_, index) => (
+          <Skeleton key={index} className="h-[8.5rem] rounded-xl" />
+        ))}
+      </div>
+    </div>
   );
 }

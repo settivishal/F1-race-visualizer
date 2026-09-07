@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
-import { LoadingState } from '@/components/ui/loading-state';
+import { Skeleton } from '@/components/ui/skeleton';
 import { PageContainer } from '@/components/ui/page-container';
 import { CircuitInfoPanel } from '@/components/replay/circuit-info-panel';
 import { RaceVisualizationPlayer } from '@/components/replay/race-visualization-player';
@@ -61,33 +61,34 @@ export default async function RacePage({ params }: { params: Promise<{ slug: str
     <PageContainer>
       <Link
         href="/races"
-        className="text-xs font-semibold uppercase tracking-[0.18em] text-muted transition-colors hover:text-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+        className="inline-flex rounded-sm text-eyebrow font-semibold uppercase text-muted transition-colors hover:text-foreground"
       >
         ← All races
       </Link>
 
-      <header className="mt-4 flex flex-wrap items-start justify-between gap-4">
+      <header className="mt-5 flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted">
+          <p className="text-eyebrow font-semibold uppercase text-accent">
             {meeting ? `${meeting.season} · Round ${meeting.round}` : 'Season unknown'}
           </p>
-          <h1 className="mt-2 text-3xl font-semibold sm:text-4xl">
+          <h1 className="font-heading mt-2.5 text-4xl font-bold tracking-tight sm:text-5xl">
             {meeting?.name ?? race.slug}
           </h1>
-          <p className="mt-2 text-sm text-muted">
-            {meeting?.circuitName ?? meeting?.country ?? '—'} · {race.laps} laps
+          <p className="mt-2.5 text-muted">
+            {meeting?.circuitName ?? meeting?.country ?? '—'} ·{' '}
+            <span className="tabular">{race.laps}</span> laps
           </p>
         </div>
         {race.type === 'SPRINT' ? <Badge>Sprint</Badge> : null}
       </header>
 
-      <div className="mt-8">
-        <Suspense fallback={<LoadingState label="Loading replay" />}>
+      <div className="mt-10">
+        <Suspense fallback={<ReplaySkeleton />}>
           <Replay slug={slug} />
         </Suspense>
       </div>
 
-      <div className="mt-6">
+      <div className="mt-10">
         <CircuitInfoPanel
           circuitName={meeting?.circuitName ?? null}
           country={meeting?.country ?? null}
@@ -95,51 +96,61 @@ export default async function RacePage({ params }: { params: Promise<{ slug: str
         />
       </div>
 
-      <Card className="mt-6 overflow-x-auto">
-        <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-muted">
-          Classification
-        </h2>
-        <table className="mt-4 w-full min-w-[32rem] text-left text-sm">
-          <thead className="text-xs uppercase tracking-[0.12em] text-muted">
-            <tr>
-              <th scope="col" className="py-2 pr-3 font-semibold">Pos</th>
-              <th scope="col" className="py-2 pr-3 font-semibold">Driver</th>
-              <th scope="col" className="py-2 pr-3 font-semibold">Team</th>
-              <th scope="col" className="py-2 pr-3 text-right font-semibold">Laps</th>
-              <th scope="col" className="py-2 text-right font-semibold">Points</th>
+      <section className="mt-10">
+        <h2 className="font-heading text-2xl font-bold tracking-tight">Classification</h2>
+        <Card className="mt-4 overflow-x-auto p-0">
+        <table className="w-full min-w-[34rem] text-left text-sm">
+          <caption className="sr-only">
+            Final classification for the {meeting?.name ?? race.slug}
+          </caption>
+          <thead>
+            <tr className="border-b border-line text-eyebrow uppercase text-muted">
+              <th scope="col" className="py-3 pl-5 pr-3 font-semibold">Pos</th>
+              <th scope="col" className="py-3 pr-3 font-semibold">Driver</th>
+              <th scope="col" className="py-3 pr-3 font-semibold">Team</th>
+              <th scope="col" className="py-3 pr-3 text-right font-semibold">Laps</th>
+              <th scope="col" className="py-3 pr-5 text-right font-semibold">Points</th>
             </tr>
           </thead>
           <tbody>
             {classified.map((result, index) => (
               <tr
                 key={result.driver?.code ?? `row-${index}`}
-                className="border-t border-line"
+                className="border-b border-line/60 last:border-0"
               >
-                <td className="py-2 pr-3 font-mono">
+                <td className="tabular py-2.5 pl-5 pr-3 text-muted">
                   {result.finalPosition ?? STATUS_LABEL[result.status] ?? '—'}
                 </td>
-                <td className="py-2 pr-3">
-                  <span className="inline-flex items-center gap-2">
+                <td className="py-2.5 pr-3">
+                  <span className="flex items-center gap-2.5">
                     <span
-                      className="h-4 w-1 rounded"
-                      style={{ backgroundColor: result.team?.color ?? '#888888' }}
+                      className="h-4 w-1 shrink-0 rounded-full"
+                      style={{ backgroundColor: result.team?.color ?? 'var(--muted)' }}
                       aria-hidden
                     />
-                    <span className="font-mono">{result.driver?.code ?? '—'}</span>
-                    <span>{result.driver?.name ?? 'Unknown driver'}</span>
+                    <span className="font-mono text-xs font-medium text-muted">
+                      {result.driver?.code ?? '—'}
+                    </span>
+                    <span className="font-medium">{result.driver?.name ?? 'Unknown driver'}</span>
                     {result.fastestLap ? (
-                      <span className="text-xs font-semibold text-accent">FL</span>
+                      <span
+                        className="text-eyebrow font-bold uppercase text-accent"
+                        title="Fastest lap"
+                      >
+                        FL
+                      </span>
                     ) : null}
                   </span>
                 </td>
-                <td className="py-2 pr-3 text-muted">{result.team?.name ?? '—'}</td>
-                <td className="py-2 pr-3 text-right font-mono">{result.lapsCompleted}</td>
-                <td className="py-2 text-right font-mono">{result.points}</td>
+                <td className="py-2.5 pr-3 text-muted">{result.team?.name ?? '—'}</td>
+                <td className="tabular py-2.5 pr-3 text-right">{result.lapsCompleted}</td>
+                <td className="tabular py-2.5 pr-5 text-right font-semibold">{result.points}</td>
               </tr>
             ))}
           </tbody>
         </table>
-      </Card>
+        </Card>
+      </section>
     </PageContainer>
   );
 }
@@ -154,4 +165,21 @@ async function Replay({ slug }: { slug: string }) {
   if (!race) return null;
 
   return <RaceVisualizationPlayer visualization={toReplayView(race)} />;
+}
+
+/**
+ * Sized to the player rather than to a spinner. The replay is the tallest thing
+ * on the page, so a short fallback makes everything below it jump when the
+ * payload lands.
+ */
+function ReplaySkeleton() {
+  return (
+    <div className="space-y-4">
+      <Skeleton className="h-[26rem] w-full rounded-xl" />
+      <Skeleton className="h-24 w-full rounded-xl" />
+      <p className="sr-only" role="status">
+        Loading replay
+      </p>
+    </div>
+  );
 }
