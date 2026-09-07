@@ -736,3 +736,60 @@ The schema field and the column stay. Only the rendering goes, because a column 
 source for starting grids ever does.
 
 ---
+
+## 2026-09-06 — The dark variant follows the tokens
+
+**Decided:** the Tailwind `dark` variant activates under the system preference *and* an explicit
+`.dark` class, matching the exact conditions the CSS custom properties already flip under.
+
+The two halves of the theme had been disagreeing. `globals.css` declared
+`@custom-variant dark (&:where(.dark, .dark *))`, but nothing in the application ever put `.dark`
+on the document — v1 set it from an inline script that was not ported. The custom properties,
+meanwhile, flip on `@media (prefers-color-scheme: dark)`. So on a machine set to dark, every
+token-driven surface went dark and all 34 `dark:` utilities stayed light. Race event chips
+rendered `bg-sky-50 text-sky-950` — pale blue with near-black text — on a near-black page.
+
+Two ways to reconcile them: set the class from a script, or widen the variant. The variant is the
+one that cannot drift, because it names the same condition the tokens name rather than a class
+some other code is responsible for setting. It also needs no blocking inline script, and no
+`suppressHydrationWarning` on `<html>`.
+
+The `.dark` half of the selector stays, because the M4 theme toggle sets exactly that. A class on
+the root overrides the preference in both directions; the preference is what applies when no class
+is present.
+
+---
+
+## 2026-09-06 — Flag colours are tokens, not palette classes
+
+**Decided:** race control colours — yellow, double yellow, red, safety car, VSC, chequered, green,
+pit, penalty — are named design tokens. `getReplayEventTone` and `getReplayEventMarkerColor` in
+`src/components/replay/replay-state.ts` stop returning raw Tailwind palette classes.
+
+A yellow flag is not "the colour yellow-200". It is a signal with a fixed meaning in the sport,
+and it needs to stay legible and stay *itself* across a redesign, a theme change, and any future
+palette. Encoding it as a palette class ties a domain fact to a colour ramp that exists for
+unrelated reasons, and it is why these strings carry a hand-written `dark:` variant each — nine
+tones, each spelled twice, none of which were doing anything (see the previous entry).
+
+As tokens they are defined once per theme and the components ask for the meaning rather than the
+shade.
+
+---
+
+## 2026-09-06 — Dark-first, and the theme moves out of M4
+
+**Decided:** the redesign is drawn dark-first. Light ships as the secondary mode. The dark theme
+is no longer an M4 polish item.
+
+`docs/system-design.md` lists "dark theme" under M4 alongside skeletons and error boundaries,
+which framed it as a toggle to add at the end. That framing is what produced the split-brained
+state above: a theme treated as a late addition never gets designed, only bolted on.
+
+The replay is the centrepiece and it is a chart of twenty coloured lines. Team colours and the
+position traces carry more contrast against a dark ground, and timing and telemetry products look
+this way because of that, not as a style choice. Designing light-first and deriving dark would
+mean tuning the mode the product is actually used in second.
+
+What stays in M4 is the *toggle UI*. The mode itself is a foundation.
+
