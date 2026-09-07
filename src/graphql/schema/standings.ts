@@ -16,6 +16,12 @@ import type { DriverRow, TeamRow } from './entity';
  * driver standing has a driver and podiums; a constructor standing has
  * neither. Forcing both through one type means fields that are always null
  * for one of the two cases and clients writing `standing.driver!`.
+ *
+ * `points` sum every scored session, sprints included, because the
+ * championship does. `wins` and `podiums` count grands prix only, because the
+ * championship does that too — a sprint is won, but nobody's win count in a
+ * published table includes it. Counting sprints put a 2025 win beside
+ * Hamilton's name, who had none.
  */
 
 type DriverStandingShape = {
@@ -25,6 +31,7 @@ type DriverStandingShape = {
   points: number;
   wins: number;
   podiums: number;
+  finishes: number[];
 };
 
 type ConstructorStandingShape = {
@@ -32,7 +39,32 @@ type ConstructorStandingShape = {
   team: TeamRow;
   points: number;
   wins: number;
+  finishes: number[];
 };
+
+/**
+ * The FIA tie-break: level on points, the entrant with more first places is
+ * ahead, then more seconds, and so on down the order. Comparing wins and then
+ * podiums — the obvious shortcut — stops discriminating at third, which is
+ * where the real 2025 ties sat (Hadjar/Hulkenberg, Lawson/Ocon, Stroll/Tsunoda).
+ * Sorts b before a when it returns a positive number, like every other
+ * comparator here.
+ *
+ * The finishes counted are grand prix only. Sprint results carry points but no
+ * countback position: include them and all three of those 2025 ties come out
+ * in a different order from the published championship, and two of the three
+ * come out backwards.
+ */
+export function countback(a: number[], b: number[]): number {
+  const tally = (finishes: number[]) =>
+    finishes.reduce((counts, p) => counts.set(p, (counts.get(p) ?? 0) + 1), new Map<number, number>());
+  const [ta, tb] = [tally(a), tally(b)];
+  for (const p of [...new Set([...ta.keys(), ...tb.keys()])].sort((x, y) => x - y)) {
+    const diff = (tb.get(p) ?? 0) - (ta.get(p) ?? 0);
+    if (diff !== 0) return diff;
+  }
+  return 0;
+}
 
 const DriverStanding = builder.objectRef<DriverStandingShape>('DriverStanding').implement({
   fields: (t) => ({
@@ -68,8 +100,9 @@ builder.queryField('driverStandings', (t) =>
           team: teams,
           teamColor: teamSeasons.color,
           points: sql<number>`sum(${raceResults.points})`.mapWith(Number),
-          wins: sql<number>`count(*) filter (where ${raceResults.finalPosition} = 1)`.mapWith(Number),
-          podiums: sql<number>`count(*) filter (where ${raceResults.finalPosition} <= 3)`.mapWith(Number),
+          wins: sql<number>`count(*) filter (where ${raceResults.finalPosition} = 1 and ${races.type} = 'GRAND_PRIX')`.mapWith(Number),
+          podiums: sql<number>`count(*) filter (where ${raceResults.finalPosition} <= 3 and ${races.type} = 'GRAND_PRIX')`.mapWith(Number),
+          finishes: sql<number[]>`coalesce(array_remove(array_agg(${raceResults.finalPosition}) filter (where ${races.type} = 'GRAND_PRIX'), null), '{}')`,
         })
         .from(raceResults)
         .innerJoin(races, eq(races.id, raceResults.raceId))
@@ -89,13 +122,14 @@ builder.queryField('driverStandings', (t) =>
           byDriver.set(row.driver.id, {
             position: 0, driver: row.driver, team,
             points: row.points, wins: row.wins, podiums: row.podiums,
-            teamPoints: row.points,
+            finishes: row.finishes, teamPoints: row.points,
           });
           continue;
         }
         existing.points += row.points;
         existing.wins += row.wins;
         existing.podiums += row.podiums;
+        existing.finishes = [...existing.finishes, ...row.finishes];
         if (row.points > existing.teamPoints) {
           existing.team = team;
           existing.teamPoints = row.points;
@@ -103,7 +137,7 @@ builder.queryField('driverStandings', (t) =>
       }
 
       return [...byDriver.values()]
-        .sort((a, b) => b.points - a.points || b.wins - a.wins || b.podiums - a.podiums)
+        .sort((a, b) => b.points - a.points || countback(a.finishes, b.finishes))
         .map((s, i) => ({ ...s, position: i + 1 }));
     },
   }),
@@ -119,7 +153,8 @@ builder.queryField('constructorStandings', (t) =>
           team: teams,
           teamColor: teamSeasons.color,
           points: sql<number>`sum(${raceResults.points})`.mapWith(Number),
-          wins: sql<number>`count(*) filter (where ${raceResults.finalPosition} = 1)`.mapWith(Number),
+          wins: sql<number>`count(*) filter (where ${raceResults.finalPosition} = 1 and ${races.type} = 'GRAND_PRIX')`.mapWith(Number),
+          finishes: sql<number[]>`coalesce(array_remove(array_agg(${raceResults.finalPosition}) filter (where ${races.type} = 'GRAND_PRIX'), null), '{}')`,
         })
         .from(raceResults)
         .innerJoin(races, eq(races.id, raceResults.raceId))
@@ -136,8 +171,9 @@ builder.queryField('constructorStandings', (t) =>
           team: { ...row.team, color: row.teamColor ?? row.team.color },
           points: row.points,
           wins: row.wins,
+          finishes: row.finishes,
         }))
-        .sort((a, b) => b.points - a.points || b.wins - a.wins)
+        .sort((a, b) => b.points - a.points || countback(a.finishes, b.finishes))
         .map((s, i) => ({ ...s, position: i + 1 }));
     },
   }),

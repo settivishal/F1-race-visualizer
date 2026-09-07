@@ -16,7 +16,8 @@
     "gql:schema": "tsx scripts/print-schema.ts",
     "gql:generate": "pnpm gql:schema && graphql-codegen --config codegen.ts",
     "gql:check": "pnpm gql:schema && git diff --exit-code schema.graphql && graphql-codegen --config codegen.ts --check",
-    "seed:admin": "tsx scripts/seed-admin.ts"
+    "seed:admin": "tsx scripts/seed-admin.ts",
+    "e2e": "playwright test"
   },
   "dependencies": {
     "@escape.tech/graphql-armor-cost-limit": "^2.4.3",
@@ -42,6 +43,7 @@
     "@graphql-codegen/cli": "^7.4.0",
     "@graphql-codegen/client-preset": "^6.1.3",
     "@graphql-typed-document-node/core": "^3.2.0",
+    "@playwright/test": "^1.63.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^24.13.3",
     "@types/react": "^19",

@@ -67,14 +67,15 @@ query RaceHeader($slug: String!) {
   }
 }
 
-# Slugs for generateStaticParams. Deliberately just the slug — the pages are
-# built from it, and asking for anything more would fetch a season of data to
-# throw it away.
+# Slugs for generateStaticParams, and dates for the sitemap's <lastmod>. Still
+# deliberately narrow — two scalars per race rather than a season of data to
+# throw away.
 query RaceSlugs($first: Int) {
   races(first: $first) {
     edges {
       node {
         slug
+        date
       }
     }
   }

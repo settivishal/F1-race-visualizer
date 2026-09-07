@@ -96,7 +96,12 @@ async function Standings() {
         <h2 className="font-heading text-2xl font-bold tracking-tight">
           Drivers&rsquo; championship
         </h2>
-        <p className="text-sm text-muted">Derived from results, not stored</p>
+        <Link
+          href="/standings"
+          className="rounded-sm text-sm font-medium text-muted underline-offset-4 hover:text-foreground hover:underline"
+        >
+          Full standings
+        </Link>
       </div>
 
       <Card className="mt-4 overflow-x-auto p-0">

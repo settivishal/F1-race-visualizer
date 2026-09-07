@@ -77,6 +77,19 @@ beforeAll(async () => {
     { raceId: race.id, assignmentId: norSeat.id, finalPosition: null, status: 'DNF', points: 0, lapsCompleted: 2 },
   ]);
 
+  // A sprint in the same meeting: Norris wins it. Nothing about that belongs in
+  // a published win or podium count, so the standings below must not see it —
+  // only its points.
+  const [sprint] = await db.insert(dbSchema.races).values({
+    meetingId: meeting.id, type: 'SPRINT', slug: '2025-test-sprint',
+    date: new Date('2025-03-01T14:00:00Z'), laps: 2, openf1SessionKey: 2,
+  }).returning();
+
+  await db.insert(dbSchema.raceResults).values([
+    { raceId: sprint.id, assignmentId: norSeat.id, finalPosition: 1, status: 'FINISHED', points: 8, lapsCompleted: 2 },
+    { raceId: sprint.id, assignmentId: lecSeat.id, finalPosition: 2, status: 'FINISHED', points: 7, lapsCompleted: 2 },
+  ]);
+
   await db.insert(dbSchema.raceEvents).values([
     { raceId: race.id, lap: 2, assignmentId: null, type: 'SAFETY_CAR', details: 'Safety car deployed' },
     { raceId: race.id, lap: 3, assignmentId: norSeat.id, type: 'RETIREMENT', details: 'Engine' },
@@ -141,12 +154,14 @@ describe('race', () => {
 
 describe('standings', () => {
   it('derives points, wins and podiums without storing them', async () => {
-    const data = await run<{ driverStandings: { position: number; driver: { code: string }; points: number; wins: number }[] }>(`
-      query { driverStandings(season: 2025) { position driver { code } points wins } }
+    const data = await run<{ driverStandings: { position: number; driver: { code: string }; points: number; wins: number; podiums: number }[] }>(`
+      query { driverStandings(season: 2025) { position driver { code } points wins podiums } }
     `);
+    // Sprint points count — the championship counts them — but the sprint win
+    // and the sprint second place do not reach the win and podium columns.
     expect(data.driverStandings).toEqual([
-      { position: 1, driver: { code: 'LEC' }, points: 25, wins: 1 },
-      { position: 2, driver: { code: 'NOR' }, points: 0, wins: 0 },
+      { position: 1, driver: { code: 'LEC' }, points: 32, wins: 1, podiums: 1 },
+      { position: 2, driver: { code: 'NOR' }, points: 8, wins: 0, podiums: 0 },
     ]);
   });
 
@@ -154,7 +169,7 @@ describe('standings', () => {
     const data = await run<{ constructorStandings: { position: number; team: { name: string }; points: number }[] }>(`
       query { constructorStandings(season: 2025) { position team { name } points } }
     `);
-    expect(data.constructorStandings[0]).toEqual({ position: 1, team: { name: 'Ferrari' }, points: 25 });
+    expect(data.constructorStandings[0]).toEqual({ position: 1, team: { name: 'Ferrari' }, points: 32 });
   });
 });
 
@@ -164,7 +179,9 @@ describe('races pagination', () => {
       query { races(first: 1) { edges { node { slug } cursor } pageInfo { hasNextPage endCursor } } }
     `);
     expect(first.races.edges).toHaveLength(1);
-    expect(first.races.pageInfo.hasNextPage).toBe(false);
+    // Two races are seeded — the grand prix and its sprint — so one page of one
+    // leaves another behind.
+    expect(first.races.pageInfo.hasNextPage).toBe(true);
   });
 
   it('filters by season', async () => {

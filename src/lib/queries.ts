@@ -7,6 +7,7 @@ import type {
   RaceHeaderQuery,
   RaceLibraryQuery,
   RaceSlugsQuery,
+  SeasonStandingsQuery,
 } from '@/graphql/generated/graphql';
 
 /**
@@ -93,7 +94,7 @@ const HOME_FEATURE = /* GraphQL */ `
 const RACE_SLUGS = /* GraphQL */ `
   query RaceSlugs($first: Int) {
     races(first: $first) {
-      edges { node { slug } }
+      edges { node { slug date } }
     }
   }
 `;
@@ -104,6 +105,39 @@ export async function getDriverStandings(season: number) {
   cacheLife('days');
 
   return executeQuery<HomeLineupQuery, { season: number }>(HOME_LINEUP, { season });
+}
+
+const SEASON_STANDINGS = /* GraphQL */ `
+  query SeasonStandings($season: Int!) {
+    driverStandings(season: $season) {
+      position
+      points
+      wins
+      podiums
+      driver { code name number }
+      team { name color }
+    }
+    constructorStandings(season: $season) {
+      position
+      points
+      wins
+      team { name color }
+    }
+    seasons { year }
+  }
+`;
+
+/**
+ * Both championship tables for one season, plus the seasons the selector needs.
+ * One scope rather than two: the page shows both, so splitting them would buy a
+ * second cache entry and a second round trip for no page that wants half.
+ */
+export async function getSeasonStandings(season: number) {
+  'use cache';
+  cacheTag('standings');
+  cacheLife('days');
+
+  return executeQuery<SeasonStandingsQuery, { season: number }>(SEASON_STANDINGS, { season });
 }
 
 export async function getRaceLibrary(
