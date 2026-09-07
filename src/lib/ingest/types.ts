@@ -34,6 +34,13 @@ export type LineupRow = {
   headshotUrl: string | null;
   teamName: string;
   teamColor: string | null;
+  /**
+   * Ergast's stable keys, set only by the archive import. OpenF1 does not
+   * publish them, so they stay null on anything it writes and the existing
+   * upsert keeps matching on code and team name.
+   */
+  ergastDriverId?: string | null;
+  ergastConstructorId?: string | null;
 };
 
 export type PositionRow = {
@@ -75,6 +82,12 @@ export type PitStopRow = {
 
 export type ResultRow = {
   driverNumber: number;
+  /**
+   * Where the car started. Only the archive import can fill this — OpenF1
+   * publishes no starting grid — so it is optional rather than nullable, and
+   * an OpenF1 re-import of a race that has one must not blank it.
+   */
+  gridPosition?: number | null;
   finalPosition: number | null;
   status: 'FINISHED' | 'DNF' | 'DNS' | 'DSQ';
   lapsCompleted: number;
@@ -91,14 +104,28 @@ export type TransformedRace = {
     circuitName: string | null;
     startDate: Date;
     weather: unknown;
-    openf1MeetingKey: number;
+    /** Null for an archive meeting: OpenF1 never saw it. */
+    openf1MeetingKey: number | null;
+    /** The circuit as a place, from Ergast. Null for an OpenF1-only import. */
+    circuit?: {
+      ergastCircuitId: string;
+      name: string;
+      locality: string | null;
+      country: string | null;
+      latitude: number | null;
+      longitude: number | null;
+    } | null;
   };
   race: {
     type: 'GRAND_PRIX' | 'SPRINT';
     slug: string;
     date: Date;
     laps: number;
-    openf1SessionKey: number;
+    openf1SessionKey: number | null;
+    /** What this era published. Defaults to FULL, which is the OpenF1 path. */
+    dataTier?: 'FULL' | 'LAPS';
+    /** How Ergast addresses this race, and how a re-import finds it again. */
+    ergastRound?: number | null;
   };
   lineup: LineupRow[];
   positions: PositionRow[];
