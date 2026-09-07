@@ -1,8 +1,12 @@
 import { cacheLife, cacheTag } from 'next/cache';
 import { executeQuery } from '@/graphql/execute';
 import type {
+  ArchiveIndexQuery,
+  CircuitProfileQuery,
+  DriverProfileQuery,
   HomeFeatureQuery,
   RaceAnalysisQuery,
+  TeamProfileQuery,
   HomeLineupQuery,
   RaceReplayQuery,
   RaceHeaderQuery,
@@ -57,7 +61,10 @@ const RACE_HEADER = /* GraphQL */ `
   query RaceHeader($slug: String!) {
     race(slug: $slug) {
       id slug date laps type
-      meeting { name country circuitName round season }
+      meeting {
+        name country circuitName round season
+        circuit { ergastId name locality country lengthKm turns firstGrandPrix }
+      }
       results {
         finalPosition lapsCompleted points status fastestLap
         driver { code name number }
@@ -171,7 +178,7 @@ export async function getRaceHeader(slug: string) {
 const RACE_REPLAY = /* GraphQL */ `
   query RaceReplay($slug: String!) {
     race(slug: $slug) {
-      id slug laps date type
+      id slug laps date type dataTier
       meeting { name country circuitName round season }
       replay {
         laps
@@ -207,7 +214,7 @@ export async function getRaceReplay(slug: string) {
 const RACE_ANALYSIS = /* GraphQL */ `
   query RaceAnalysis($slug: String!) {
     race(slug: $slug) {
-      id slug laps
+      id slug laps dataTier
       meeting { name season }
       analysis {
         lapTimes {
@@ -241,6 +248,90 @@ export async function getRaceAnalysis(slug: string) {
   cacheLife('days');
 
   return executeQuery<RaceAnalysisQuery, { slug: string }>(RACE_ANALYSIS, { slug });
+}
+
+// ── The archive ───────────────────────────────────────────────────────
+//
+// Tagged `race` like everything else: a career total is an aggregate over race
+// results, so the thing that invalidates it is an ingest, and there is no
+// second tag that would be more precise.
+
+const DRIVER_PROFILE = /* GraphQL */ `
+  query DriverProfile($code: String!) {
+    driver(code: $code) {
+      driver { id code name number country }
+      career {
+        seasonCount starts wins podiums points bestFinish
+        seasons {
+          season starts wins podiums points bestFinish
+          team { name color }
+        }
+      }
+    }
+  }
+`;
+
+export async function getDriverProfile(code: string) {
+  'use cache';
+  cacheTag('race', 'standings');
+  cacheLife('days');
+
+  return executeQuery<DriverProfileQuery, { code: string }>(DRIVER_PROFILE, { code });
+}
+
+const TEAM_PROFILE = /* GraphQL */ `
+  query TeamProfile($name: String!) {
+    team(name: $name) {
+      team { id name color }
+      drivers { code name }
+      career {
+        seasonCount starts wins podiums points bestFinish
+        seasons { season starts wins podiums points bestFinish }
+      }
+    }
+  }
+`;
+
+export async function getTeamProfile(name: string) {
+  'use cache';
+  cacheTag('race', 'standings');
+  cacheLife('days');
+
+  return executeQuery<TeamProfileQuery, { name: string }>(TEAM_PROFILE, { name });
+}
+
+const ARCHIVE_INDEX = /* GraphQL */ `
+  query ArchiveIndex {
+    seasons { year }
+    drivers { id code name country }
+    teams { id name color }
+    circuits { id ergastId name locality country }
+  }
+`;
+
+export async function getArchiveIndex() {
+  'use cache';
+  cacheTag('race');
+  cacheLife('days');
+
+  return executeQuery<ArchiveIndexQuery, Record<string, unknown>>(ARCHIVE_INDEX, {});
+}
+
+const CIRCUIT_PROFILE = /* GraphQL */ `
+  query CircuitProfile($ergastId: String!) {
+    circuit(ergastId: $ergastId) {
+      id ergastId name locality country
+      latitude longitude lengthKm turns firstGrandPrix
+    }
+  }
+`;
+
+export async function getCircuitProfile(ergastId: string) {
+  'use cache';
+  cacheTag('race');
+  cacheLife('days');
+
+  return executeQuery<CircuitProfileQuery, { ergastId: string }>(CIRCUIT_PROFILE, { ergastId });
 }
 
 export async function getFeaturedRace() {

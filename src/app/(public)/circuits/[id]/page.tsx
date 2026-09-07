@@ -1,0 +1,104 @@
+import { Suspense } from 'react';
+import Link from 'next/link';
+import { notFound } from 'next/navigation';
+import { PageContainer } from '@/components/ui/page-container';
+import { Skeleton } from '@/components/ui/skeleton';
+import { StatRow } from '@/components/archive/record-table';
+import { getArchiveIndex, getCircuitProfile } from '@/lib/queries';
+
+export async function generateStaticParams() {
+  const { circuits } = await getArchiveIndex();
+  return circuits.map((circuit) => ({ id: circuit.ergastId }));
+}
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const { circuit } = await getCircuitProfile(id);
+
+  if (!circuit) return { title: 'Circuit not found — F1 Race Visualizer' };
+  return {
+    title: `${circuit.name} — F1 Race Visualizer`,
+    description: `Races held at ${circuit.name}.`,
+  };
+}
+
+export default function CircuitPage({ params }: { params: Promise<{ id: string }> }) {
+  return (
+    <PageContainer>
+      <Link
+        href="/circuits"
+        className="inline-flex rounded-sm text-eyebrow font-semibold uppercase text-muted transition-colors hover:text-foreground"
+      >
+        ← All circuits
+      </Link>
+
+      <Suspense fallback={<CircuitSkeleton />}>
+        <CircuitDetail params={params} />
+      </Suspense>
+    </PageContainer>
+  );
+}
+
+async function CircuitDetail({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const { circuit } = await getCircuitProfile(id);
+
+  if (!circuit) notFound();
+
+  // Only what is known. The dimensions are a hand-maintained overlay and a
+  // circuit nobody has filled in yet shows its name and its place, which is
+  // still true, rather than an invented 5.0 km.
+  const stats = [
+    circuit.lengthKm != null ? { label: 'Length', value: `${circuit.lengthKm.toFixed(3)} km` } : null,
+    circuit.turns != null ? { label: 'Turns', value: String(circuit.turns) } : null,
+    circuit.firstGrandPrix != null
+      ? { label: 'First grand prix', value: String(circuit.firstGrandPrix) }
+      : null,
+    circuit.latitude != null && circuit.longitude != null
+      ? { label: 'Location', value: `${circuit.latitude.toFixed(2)}, ${circuit.longitude.toFixed(2)}` }
+      : null,
+  ].filter((stat): stat is { label: string; value: string } => stat !== null);
+
+  return (
+    <>
+      <header className="mt-5">
+        <p className="text-eyebrow font-semibold uppercase text-accent">Circuit</p>
+        <h1 className="font-heading mt-2.5 text-4xl font-bold tracking-tight sm:text-5xl">
+          {circuit.name}
+        </h1>
+        <p className="mt-2.5 text-muted">
+          {[circuit.locality, circuit.country].filter(Boolean).join(', ') || 'Location unknown'}
+        </p>
+      </header>
+
+      {stats.length > 0 ? (
+        <div className="mt-8">
+          <StatRow stats={stats} />
+        </div>
+      ) : (
+        <p className="mt-8 text-sm text-muted">
+          No dimensions recorded for this circuit yet.
+        </p>
+      )}
+
+      <p className="mt-8 text-sm text-muted">
+        Looking for the races held here?{' '}
+        <Link href={`/races?q=${encodeURIComponent(circuit.locality ?? circuit.name)}`} className="text-accent hover:underline">
+          Search the race library
+        </Link>
+        .
+      </p>
+    </>
+  );
+}
+
+function CircuitSkeleton() {
+  return (
+    <div className="mt-5">
+      <Skeleton className="h-4 w-20" />
+      <Skeleton className="mt-3 h-12 w-96 max-w-full" />
+      <Skeleton className="mt-3 h-5 w-48" />
+      <Skeleton className="mt-8 h-24 w-full rounded-xl" />
+    </div>
+  );
+}

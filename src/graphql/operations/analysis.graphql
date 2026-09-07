@@ -10,6 +10,7 @@ query RaceAnalysis($slug: String!) {
     id
     slug
     laps
+    dataTier
     meeting {
       name
       season

@@ -39,6 +39,11 @@ function formatSector(val: number | null | undefined): string {
 export const TIMING_TOWER_ID = 'replay-timing-tower';
 
 export function LiveTimingTower({ visualization, currentLap }: TimingTowerProps) {
+  // A fact about the era, not about this import — see races.data_tier. Sectors
+  // and gap strings arrive together, from the same feed, so they appear and
+  // disappear together too.
+  const hasTimingDetail = visualization.race.dataTier === 'FULL';
+
   const standings = useMemo(() => {
     const currentStandings = [];
 
@@ -101,15 +106,26 @@ export function LiveTimingTower({ visualization, currentLap }: TimingTowerProps)
         <p className="text-xs text-muted">Lap {currentLap} / {visualization.summary.maxLap || visualization.race.laps}</p>
       </div>
 
+      {hasTimingDetail ? null : (
+        <p className="border-b border-line bg-panel-strong/30 px-5 py-2 text-[11px] leading-relaxed text-muted">
+          Sector times and gaps were not published for {visualization.race.season}. Positions
+          and lap times are the whole record for this era.
+        </p>
+      )}
+
       <div className="flex-1 overflow-y-auto px-2 py-2 hide-scrollbar">
         <div className="flex gap-1 text-eyebrow uppercase font-semibold text-muted mb-2 px-2">
           <div className="w-6">Pos</div>
           <div className="flex-1">Driver</div>
-          <div className="w-10 text-right">Gap</div>
+          {hasTimingDetail ? <div className="w-10 text-right">Gap</div> : null}
           <div className="w-14 text-right">Lap</div>
-          <div className="w-10 text-right">S1</div>
-          <div className="w-10 text-right">S2</div>
-          <div className="w-10 text-right">S3</div>
+          {hasTimingDetail ? (
+            <>
+              <div className="w-10 text-right">S1</div>
+              <div className="w-10 text-right">S2</div>
+              <div className="w-10 text-right">S3</div>
+            </>
+          ) : null}
         </div>
         
         <div className="relative">
@@ -137,9 +153,11 @@ export function LiveTimingTower({ visualization, currentLap }: TimingTowerProps)
                       and every other selector here is a styling class. */}
                   <span data-testid="tower-driver" className="font-semibold text-foreground truncate">{standing.entry.driver.code}</span>
                 </div>
-                <div className="tabular w-10 truncate text-right font-mono text-[11px] text-muted">
-                  {standing.gap === "LEADER" ? "Lap" : standing.gap}
-                </div>
+                {hasTimingDetail ? (
+                  <div className="tabular w-10 truncate text-right font-mono text-[11px] text-muted">
+                    {standing.gap === "LEADER" ? "Lap" : standing.gap}
+                  </div>
+                ) : null}
                 
                 {/* The lap time has been ingested since M1 and displayed
                     nowhere. It is the number the sectors add up to, so it
@@ -148,10 +166,16 @@ export function LiveTimingTower({ visualization, currentLap }: TimingTowerProps)
                   {standing.lapTime == null ? "—" : formatLapTime(standing.lapTime)}
                 </div>
 
-                {/* Mini-Sectors */}
-                <SectorBlock value={standing.sector1} color={standing.s1Color} />
-                <SectorBlock value={standing.sector2} color={standing.s2Color} />
-                <SectorBlock value={standing.sector3} color={standing.s3Color} />
+                {/* Mini-sectors, where the era published them. Columns of
+                    dashes read as broken data rather than as an absence, so a
+                    LAPS-tier race drops them and says why below. */}
+                {hasTimingDetail ? (
+                  <>
+                    <SectorBlock value={standing.sector1} color={standing.s1Color} />
+                    <SectorBlock value={standing.sector2} color={standing.s2Color} />
+                    <SectorBlock value={standing.sector3} color={standing.s3Color} />
+                  </>
+                ) : null}
               </motion.div>
             ))}
           </AnimatePresence>

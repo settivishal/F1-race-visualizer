@@ -1,0 +1,104 @@
+# The archive pages: a driver's record, a team's, and the circuits.
+#
+# Career totals are summed from the season rows on the server so a page cannot
+# render a total that disagrees with the rows beneath it.
+query DriverProfile($code: String!) {
+  driver(code: $code) {
+    driver {
+      id
+      code
+      name
+      number
+      country
+    }
+    career {
+      seasonCount
+      starts
+      wins
+      podiums
+      points
+      bestFinish
+      seasons {
+        season
+        starts
+        wins
+        podiums
+        points
+        bestFinish
+        team {
+          name
+          color
+        }
+      }
+    }
+  }
+}
+
+query TeamProfile($name: String!) {
+  team(name: $name) {
+    team {
+      id
+      name
+      color
+    }
+    drivers {
+      code
+      name
+    }
+    career {
+      seasonCount
+      starts
+      wins
+      podiums
+      points
+      bestFinish
+      seasons {
+        season
+        starts
+        wins
+        podiums
+        points
+        bestFinish
+      }
+    }
+  }
+}
+
+query ArchiveIndex {
+  seasons {
+    year
+  }
+  drivers {
+    id
+    code
+    name
+    country
+  }
+  teams {
+    id
+    name
+    color
+  }
+  circuits {
+    id
+    ergastId
+    name
+    locality
+    country
+  }
+}
+
+query CircuitProfile($ergastId: String!) {
+  circuit(ergastId: $ergastId) {
+    id
+    ergastId
+    name
+    locality
+    country
+    latitude
+    longitude
+    lengthKm
+    turns
+    firstGrandPrix
+  }
+}
