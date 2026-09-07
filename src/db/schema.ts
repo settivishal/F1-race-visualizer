@@ -12,6 +12,19 @@ export const eventType    = pgEnum('event_type', [
 ]);
 export const ingestStatus = pgEnum('ingest_status', ['RUNNING', 'SUCCESS', 'FAILED']);
 
+/**
+ * How much of a race we have, which is a fact about its era rather than about
+ * the import.
+ *
+ * `FULL` is OpenF1's 2023-onward coverage: sectors, gap strings, race control
+ * and tyre stints. `LAPS` is what Ergast serves for 2018-2022 — position and
+ * lap time per lap, and nothing else. The UI branches on this rather than
+ * checking whether a column happens to be null, because a missing sector time
+ * means "this era published none" in one case and "the ingest dropped rows" in
+ * the other, and those must not look the same.
+ */
+export const dataTier = pgEnum('data_tier', ['FULL', 'LAPS']);
+
 // ── Reference data ────────────────────────────────────────────────
 
 export const seasons = pgTable('seasons', {
@@ -21,6 +34,11 @@ export const seasons = pgTable('seasons', {
 export const teams = pgTable('teams', {
   id: uuid('id').primaryKey().defaultRandom(),
   name: text('name').notNull().unique(),
+  // Ergast's stable key ("ferrari", "red_bull"). A constructor's *name* changes
+  // — Racing Point to Aston Martin, Toro Rosso to AlphaTauri to Racing Bulls —
+  // so matching an archive import on the name alone would create a new team the
+  // first time one was rebranded. Null for teams only OpenF1 has seen.
+  ergastConstructorId: text('ergast_constructor_id').unique(),
   color: text('color'),                          // hex, drives the replay palette
   logoUrl: text('logo_url'),                     // our Vercel Blob URL, not upstream
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
@@ -29,7 +47,14 @@ export const teams = pgTable('teams', {
 
 export const drivers = pgTable('drivers', {
   id: uuid('id').primaryKey().defaultRandom(),
+  // Still unique, deliberately. Codes are not unique across the whole history
+  // of the sport, but they are within the 2018+ window this project covers, and
+  // the constraint is what the OpenF1 ingest upserts against — it has no Ergast
+  // id to use instead. Revisit only if the archive is ever extended backwards.
   code: text('code').notNull().unique(),         // VER, HAM
+  // Ergast's stable key ("max_verstappen"). What an archive import matches on
+  // first, falling back to the code for a driver OpenF1 imported already.
+  ergastDriverId: text('ergast_driver_id').unique(),
   name: text('name').notNull(),
   number: integer('number'),
   country: text('country'),
@@ -52,6 +77,33 @@ export const driverTeamAssignments = pgTable('driver_team_assignments', {
   driverId: uuid('driver_id').notNull().references(() => drivers.id),
 }, (t) => [uniqueIndex('dta_team_season_driver_uq').on(t.teamSeasonId, t.driverId)]);
 
+/**
+ * Circuits, from Ergast.
+ *
+ * This replaces `lib/circuit-data.ts`, a hardcoded table keyed by country and
+ * race name. Keyed by country it cannot tell Spain 2019 from Spain 2025, and it
+ * has no key at all for a circuit that has left the calendar — Hockenheim,
+ * Sochi, Paul Ricard, all inside the 2018 window.
+ *
+ * `lengthKm`, `turns` and `firstGrandPrix` are not in Ergast and stay a small
+ * hand-maintained overlay: static facts about physical places, which is the one
+ * kind of data that genuinely does not need an API.
+ */
+export const circuits = pgTable('circuits', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  ergastCircuitId: text('ergast_circuit_id').notNull().unique(),  // "albert_park"
+  name: text('name').notNull(),
+  locality: text('locality'),
+  country: text('country'),
+  latitude: real('latitude'),
+  longitude: real('longitude'),
+  lengthKm: real('length_km'),
+  turns: integer('turns'),
+  firstGrandPrix: integer('first_grand_prix'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 // ── Race weekend ──────────────────────────────────────────────────
 
 export const meetings = pgTable('meetings', {
@@ -61,6 +113,10 @@ export const meetings = pgTable('meetings', {
   name: text('name').notNull(),                  // "São Paulo Grand Prix"
   country: text('country').notNull(),
   circuitName: text('circuit_name'),
+  // Nullable: every meeting OpenF1 imported has a circuit *name* and no circuit
+  // row until the archive import supplies one, and a name is still enough to
+  // render a race.
+  circuitId: uuid('circuit_id').references(() => circuits.id),
   startDate: timestamp('start_date', { withTimezone: true }).notNull(),
   weather: jsonb('weather'),                     // upstream shape, read-only for us
   openf1MeetingKey: integer('openf1_meeting_key').unique(),
@@ -76,7 +132,13 @@ export const races = pgTable('races', {
   date: timestamp('date', { withTimezone: true }).notNull(),
   laps: integer('laps').notNull(),
   isFeatured: boolean('is_featured').notNull().default(false),
+  // FULL is right for every row that exists today: all of them came from
+  // OpenF1. The archive import sets LAPS on what it writes.
+  dataTier: dataTier('data_tier').notNull().default('FULL'),
   openf1SessionKey: integer('openf1_session_key').unique(),
+  // Ergast addresses a race by season and round, which is also how a re-import
+  // finds it again. Null for anything Ergast has never seen.
+  ergastRound: integer('ergast_round'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [uniqueIndex('races_meeting_type_uq').on(t.meetingId, t.type)]);
@@ -215,8 +277,13 @@ export const driverTeamAssignmentsRelations = relations(driverTeamAssignments, (
   pitStops: many(pitStops),
 }));
 
+export const circuitsRelations = relations(circuits, ({ many }) => ({
+  meetings: many(meetings),
+}));
+
 export const meetingsRelations = relations(meetings, ({ one, many }) => ({
   season: one(seasons, { fields: [meetings.seasonYear], references: [seasons.year] }),
+  circuit: one(circuits, { fields: [meetings.circuitId], references: [circuits.id] }),
   races: many(races),
 }));
 

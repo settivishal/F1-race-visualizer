@@ -1051,3 +1051,28 @@ The parts that are genuinely hard — nice ticks that do not read as 90.30000000
 zero-width domain that must not divide by zero — are the parts with unit tests, which is
 where the confidence comes from rather than from a dependency's reputation. `framer-motion`,
 already in the tree for the replay, animates the results.
+
+---
+
+## 2026-09-07 — Ergast ids are added beside the existing keys, not instead of them
+
+**Decided:** `drivers.ergast_driver_id`, `teams.ergast_constructor_id` and
+`circuits.ergast_circuit_id`, all nullable except the circuit's. `drivers.code` and
+`teams.name` keep their UNIQUE constraints.
+
+**Amends** the M6 sketch in `system-design.md`, which said `drivers.code` would lose its
+uniqueness.
+
+Dropping it would have meant rewriting the OpenF1 ingest's upsert, which conflicts on
+`drivers.code` and has no Ergast id to use instead — a change to the working import, made
+for the benefit of an import that does not exist yet. Codes do collide across the full
+history of the sport; they do not collide inside 2018-2025, which is the whole scope.
+
+Constructor *names* are the identity that actually moves inside the window — Racing Point
+to Aston Martin, Toro Rosso to AlphaTauri to RB to Racing Bulls — so matching an archive
+import on the name would have created a second team row on each rebrand. That is what the
+constructor id is for.
+
+**The rule this follows:** a nullable column added beside a working key costs one migration
+and breaks nothing. Replacing the key costs a migration, a backfill, and a rewrite of the
+one pipeline currently keeping the site up to date.

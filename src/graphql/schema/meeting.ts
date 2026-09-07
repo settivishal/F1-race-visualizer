@@ -1,9 +1,32 @@
 import { asc, eq } from 'drizzle-orm';
-import { meetings, races, seasons } from '@/db/schema';
+import { circuits, meetings, races, seasons } from '@/db/schema';
 import { builder } from '../builder';
 import { Race } from './race';
 
 export type MeetingRow = typeof meetings.$inferSelect;
+type CircuitRow = typeof circuits.$inferSelect;
+
+/**
+ * A circuit as a place, not as a string on a race.
+ *
+ * `lengthKm`, `turns` and `firstGrandPrix` are nullable because they are a
+ * hand-maintained overlay — Ergast publishes a name and a coordinate, and the
+ * rest is not worth an API.
+ */
+export const Circuit = builder.objectRef<CircuitRow>('Circuit').implement({
+  fields: (t) => ({
+    id: t.exposeID('id'),
+    ergastId: t.exposeString('ergastCircuitId'),
+    name: t.exposeString('name'),
+    locality: t.exposeString('locality', { nullable: true }),
+    country: t.exposeString('country', { nullable: true }),
+    latitude: t.exposeFloat('latitude', { nullable: true }),
+    longitude: t.exposeFloat('longitude', { nullable: true }),
+    lengthKm: t.exposeFloat('lengthKm', { nullable: true }),
+    turns: t.exposeInt('turns', { nullable: true }),
+    firstGrandPrix: t.exposeInt('firstGrandPrix', { nullable: true }),
+  }),
+});
 
 export const Meeting = builder.objectRef<MeetingRow>('Meeting');
 
@@ -14,6 +37,19 @@ Meeting.implement({
     name: t.exposeString('name'),
     country: t.exposeString('country'),
     circuitName: t.exposeString('circuitName', { nullable: true }),
+    // Null until an archive import has matched this meeting to a circuit row.
+    // The name above still renders a race in the meantime.
+    circuit: t.field({
+      type: Circuit,
+      nullable: true,
+      resolve: async (meeting, _args, ctx) => {
+        if (meeting.circuitId === null) return null;
+        const circuit = await ctx.db.query.circuits.findFirst({
+          where: eq(circuits.id, meeting.circuitId),
+        });
+        return circuit ?? null;
+      },
+    }),
     season: t.exposeInt('seasonYear'),
     startDate: t.field({ type: 'DateTime', resolve: (m) => m.startDate }),
     // Upstream's shape, passed through unread. Nothing in this codebase
