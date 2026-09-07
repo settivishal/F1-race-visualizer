@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, JetBrains_Mono, Titillium_Web } from "next/font/google";
 import { siteUrl } from "@/lib/site-url";
+import { THEME_SCRIPT } from "@/lib/theme";
 import "./globals.css";
 
 /**
@@ -56,6 +57,11 @@ export default function RootLayout({
       lang="en"
       className={`${displayFont.variable} ${bodyFont.variable} ${numericFont.variable} h-full antialiased`}
     >
+      <head>
+        {/* Before the first paint, or a stored light choice renders dark and
+            then flips. See lib/theme.ts. */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+      </head>
       {/* Deliberately bare. The nav, footer and `<main>` landmark belong to
           the (public) group; /admin renders its own shell. */}
       <body className="min-h-full flex flex-col">{children}</body>
