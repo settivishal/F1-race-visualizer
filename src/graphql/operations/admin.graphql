@@ -1,0 +1,104 @@
+# The admin race list. Carries the session key so a re-import can be triggered
+# from the row, and isFeatured so the toggle knows its own state.
+query AdminRaces($season: Int, $search: String, $first: Int, $after: String) {
+  races(season: $season, search: $search, first: $first, after: $after) {
+    edges {
+      cursor
+      node {
+        id
+        slug
+        laps
+        type
+        isFeatured
+        openf1SessionKey
+        meeting {
+          name
+          country
+          circuitName
+          round
+          season
+        }
+      }
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
+  }
+  seasons {
+    year
+  }
+}
+
+query AdminRace($slug: String!) {
+  race(slug: $slug) {
+    id
+    slug
+    laps
+    type
+    isFeatured
+    openf1SessionKey
+    meeting {
+      name
+      country
+      circuitName
+      round
+      season
+    }
+  }
+}
+
+# The ingest history. The dangerous failure in this system is a cron job that
+# quietly stopped working, which throws nothing anywhere — this table is what
+# makes it visible.
+query AdminIngestRuns($first: Int) {
+  ingestRuns(first: $first) {
+    id
+    source
+    target
+    status
+    rowsWritten
+    error
+    startedAt
+    finishedAt
+  }
+}
+
+mutation SetRaceFeatured($slug: String!, $featured: Boolean!) {
+  setRaceFeatured(slug: $slug, featured: $featured) {
+    slug
+    isFeatured
+  }
+}
+
+mutation UpdateRaceMetadata(
+  $slug: String!
+  $laps: Int
+  $name: String
+  $country: String
+  $circuitName: String
+) {
+  updateRaceMetadata(
+    slug: $slug
+    laps: $laps
+    name: $name
+    country: $country
+    circuitName: $circuitName
+  ) {
+    slug
+    laps
+    meeting {
+      name
+      country
+      circuitName
+    }
+  }
+}
+
+mutation TriggerIngest($sessionKey: Int!) {
+  triggerIngest(sessionKey: $sessionKey) {
+    slug
+    rowsWritten
+    warnings
+  }
+}
