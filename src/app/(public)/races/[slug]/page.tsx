@@ -42,7 +42,30 @@ const STATUS_LABEL: Record<string, string> = {
   DSQ: 'DSQ',
 };
 
-export default async function RacePage({ params }: { params: Promise<{ slug: string }> }) {
+/**
+ * `params` is URL data, and reading it above every Suspense boundary makes the
+ * whole route block on the navigation instead of streaming into a shell. So the
+ * page itself is not async: the container and the back link are the shell, and
+ * everything keyed by the slug renders below the boundary.
+ */
+export default function RacePage({ params }: { params: Promise<{ slug: string }> }) {
+  return (
+    <PageContainer>
+      <Link
+        href="/races"
+        className="inline-flex rounded-sm text-eyebrow font-semibold uppercase text-muted transition-colors hover:text-foreground"
+      >
+        ← All races
+      </Link>
+
+      <Suspense fallback={<RaceSkeleton />}>
+        <RaceDetail params={params} />
+      </Suspense>
+    </PageContainer>
+  );
+}
+
+async function RaceDetail({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const { race } = await getRaceHeader(slug);
 
@@ -58,14 +81,7 @@ export default async function RacePage({ params }: { params: Promise<{ slug: str
   });
 
   return (
-    <PageContainer>
-      <Link
-        href="/races"
-        className="inline-flex rounded-sm text-eyebrow font-semibold uppercase text-muted transition-colors hover:text-foreground"
-      >
-        ← All races
-      </Link>
-
+    <>
       <header className="mt-5 flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="text-eyebrow font-semibold uppercase text-accent">
@@ -151,7 +167,7 @@ export default async function RacePage({ params }: { params: Promise<{ slug: str
         </table>
         </Card>
       </section>
-    </PageContainer>
+    </>
   );
 }
 
@@ -165,6 +181,22 @@ async function Replay({ slug }: { slug: string }) {
   if (!race) return null;
 
   return <RaceVisualizationPlayer visualization={toReplayView(race)} />;
+}
+
+/** The shell's fallback: header, player and classification, in that order. */
+function RaceSkeleton() {
+  return (
+    <div className="mt-5">
+      <Skeleton className="h-4 w-40" />
+      <Skeleton className="mt-3 h-12 w-96 max-w-full" />
+      <Skeleton className="mt-3 h-5 w-64" />
+      <div className="mt-10 space-y-4">
+        <Skeleton className="h-[26rem] w-full rounded-xl" />
+        <Skeleton className="h-24 w-full rounded-xl" />
+      </div>
+      <Skeleton className="mt-10 h-[30rem] w-full rounded-xl" />
+    </div>
+  );
 }
 
 /**
