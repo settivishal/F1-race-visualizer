@@ -1,6 +1,7 @@
-import type { Lap, Meeting, PositionSample, Session } from './openf1';
+import type { Lap, Meeting, Pit, PositionSample, Session, Stint } from './openf1';
 import type {
-  EventRow, LineupRow, PositionRow, RaceBundle, ResultRow, TransformedRace,
+  EventRow, LineupRow, PitStopRow, PositionRow, RaceBundle, ResultRow, StintRow,
+  TransformedRace,
 } from './types';
 
 /**
@@ -321,6 +322,57 @@ export function findFastestLap(laps: Lap[]): { driverNumber: number; lap: number
   return best;
 }
 
+// ── Stints and pit stops ──────────────────────────────────────────────
+
+/**
+ * Tyre stints, clipped to laps that exist.
+ *
+ * `lap_end` is null for the stint a driver was on when the session ended, and
+ * for a retirement it can run past the lap they last completed. Both are
+ * clamped to the race's final lap so a strategy bar cannot draw off the end of
+ * the chart. A stint with no start lap is dropped rather than guessed at — that
+ * is upstream saying it does not know when the set went on.
+ */
+export function buildStints(stints: Stint[], lapCount: number): StintRow[] {
+  const rows: StintRow[] = [];
+  for (const stint of stints) {
+    if (stint.lap_start == null) continue;
+    const lapStart = Math.max(1, stint.lap_start);
+    const lapEnd = Math.min(stint.lap_end ?? lapCount, lapCount);
+    if (lapCount > 0 && lapEnd < lapStart) continue;
+    rows.push({
+      driverNumber: stint.driver_number,
+      stintNumber: stint.stint_number,
+      lapStart,
+      lapEnd: Math.max(lapStart, lapEnd),
+      compound: stint.compound,
+      tyreAgeAtStart: stint.tyre_age_at_start,
+    });
+  }
+  return rows.sort((a, b) => a.driverNumber - b.driverNumber || a.stintNumber - b.stintNumber);
+}
+
+/**
+ * Pit stops as rows. The duration is stored in milliseconds because upstream's
+ * seconds are a float and a stop is compared at the hundredth — an integer of
+ * milliseconds compares exactly, which a float does not.
+ *
+ * Two stops by the same driver on the same lap cannot both be stored (the
+ * unique key is race + driver + lap) and do not happen in a green-flag race;
+ * the later one wins, which is the one that finished the sequence.
+ */
+export function buildPitStops(pits: Pit[]): PitStopRow[] {
+  const byKey = new Map<string, PitStopRow>();
+  for (const pit of pits) {
+    byKey.set(`${pit.driver_number}:${pit.lap_number}`, {
+      driverNumber: pit.driver_number,
+      lap: pit.lap_number,
+      durationMs: pit.pit_duration == null ? null : Math.round(pit.pit_duration * 1000),
+    });
+  }
+  return [...byKey.values()].sort((a, b) => a.lap - b.lap || a.driverNumber - b.driverNumber);
+}
+
 // ── Events ────────────────────────────────────────────────────────────
 
 export function buildEvents(bundle: RaceBundle, positions: PositionRow[]): EventRow[] {
@@ -440,6 +492,8 @@ export function transformRace(bundle: RaceBundle): TransformedRace {
     positions,
     events: buildEvents(bundle, positions),
     results: buildResults(bundle, fastest?.driverNumber ?? null),
+    stints: buildStints(bundle.stints, lapCount),
+    pitStops: buildPitStops(bundle.pits),
     warnings,
   };
 }
