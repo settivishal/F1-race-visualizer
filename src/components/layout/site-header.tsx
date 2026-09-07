@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { ThemeToggle } from './theme-toggle';
 
 const NAV_LINKS = [
   { href: '/races', label: 'Races' },
@@ -11,8 +12,8 @@ const NAV_LINKS = [
  * v1's navbar was a client component wired to `AuthProvider` and a profile
  * dropdown. Neither exists yet, and a header does not need to be interactive to
  * render links — so this is a server component and stays one. M3 adds the
- * auth-aware right-hand side; M4 adds the theme toggle. Both slot in beside
- * the nav without changing what is here.
+ * auth-aware right-hand side. The theme toggle is the one client component in
+ * here, an island beside the nav rather than a reason to make the header one.
  */
 export function SiteHeader() {
   return (
@@ -45,6 +46,10 @@ export function SiteHeader() {
             </Link>
           ))}
         </nav>
+
+        <div className="ml-auto flex items-center">
+          <ThemeToggle />
+        </div>
       </div>
     </header>
   );

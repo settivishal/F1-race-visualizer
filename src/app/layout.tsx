@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, JetBrains_Mono, Titillium_Web } from "next/font/google";
 import { siteUrl } from "@/lib/site-url";
+import { THEME_SCRIPT } from "@/lib/theme";
 import "./globals.css";
 
 /**
@@ -51,11 +52,22 @@ export const metadata: Metadata = {
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
+  // `suppressHydrationWarning` on <html>: the inline script below adds
+  // `light`/`dark` to this element before React hydrates, so the client's
+  // className never matches the server's. Doing exactly that is the point of
+  // the script — the mismatch warning is the false positive, not the class.
+  // It suppresses one level deep, so nothing inside the tree is affected.
   return (
     <html
       lang="en"
+      suppressHydrationWarning
       className={`${displayFont.variable} ${bodyFont.variable} ${numericFont.variable} h-full antialiased`}
     >
+      <head>
+        {/* Before the first paint, or a stored light choice renders dark and
+            then flips. See lib/theme.ts. */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+      </head>
       {/* Deliberately bare. The nav, footer and `<main>` landmark belong to
           the (public) group; /admin renders its own shell. */}
       <body className="min-h-full flex flex-col">{children}</body>
