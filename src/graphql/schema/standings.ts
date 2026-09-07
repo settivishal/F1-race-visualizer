@@ -16,6 +16,12 @@ import type { DriverRow, TeamRow } from './entity';
  * driver standing has a driver and podiums; a constructor standing has
  * neither. Forcing both through one type means fields that are always null
  * for one of the two cases and clients writing `standing.driver!`.
+ *
+ * `points` sum every scored session, sprints included, because the
+ * championship does. `wins` and `podiums` count grands prix only, because the
+ * championship does that too — a sprint is won, but nobody's win count in a
+ * published table includes it. Counting sprints put a 2025 win beside
+ * Hamilton's name, who had none.
  */
 
 type DriverStandingShape = {
@@ -94,8 +100,8 @@ builder.queryField('driverStandings', (t) =>
           team: teams,
           teamColor: teamSeasons.color,
           points: sql<number>`sum(${raceResults.points})`.mapWith(Number),
-          wins: sql<number>`count(*) filter (where ${raceResults.finalPosition} = 1)`.mapWith(Number),
-          podiums: sql<number>`count(*) filter (where ${raceResults.finalPosition} <= 3)`.mapWith(Number),
+          wins: sql<number>`count(*) filter (where ${raceResults.finalPosition} = 1 and ${races.type} = 'GRAND_PRIX')`.mapWith(Number),
+          podiums: sql<number>`count(*) filter (where ${raceResults.finalPosition} <= 3 and ${races.type} = 'GRAND_PRIX')`.mapWith(Number),
           finishes: sql<number[]>`coalesce(array_remove(array_agg(${raceResults.finalPosition}) filter (where ${races.type} = 'GRAND_PRIX'), null), '{}')`,
         })
         .from(raceResults)
@@ -147,7 +153,7 @@ builder.queryField('constructorStandings', (t) =>
           team: teams,
           teamColor: teamSeasons.color,
           points: sql<number>`sum(${raceResults.points})`.mapWith(Number),
-          wins: sql<number>`count(*) filter (where ${raceResults.finalPosition} = 1)`.mapWith(Number),
+          wins: sql<number>`count(*) filter (where ${raceResults.finalPosition} = 1 and ${races.type} = 'GRAND_PRIX')`.mapWith(Number),
           finishes: sql<number[]>`coalesce(array_remove(array_agg(${raceResults.finalPosition}) filter (where ${races.type} = 'GRAND_PRIX'), null), '{}')`,
         })
         .from(raceResults)
