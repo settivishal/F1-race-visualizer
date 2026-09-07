@@ -102,65 +102,82 @@ export function classifyReplayEvent(
     return "penalty";
   }
 
-  if (haystack.includes("penalt")) {
-    return "penalty";
-  }
-
   return "other";
 }
 
+/**
+ * The chip styling for a race control event.
+ *
+ * `tone` carries the shared treatment and the modifier names the signal; both
+ * are defined in globals.css, derived from the `--flag-*` tokens with
+ * color-mix. Previously this returned raw Tailwind palette classes with a
+ * hand-written `dark:` variant on each — eighteen spellings for nine signals,
+ * none of which applied, because the `dark` variant was gated on a class
+ * nothing ever set.
+ *
+ * See docs/decisions.md, "Flag colours are tokens, not palette classes".
+ */
 export function getReplayEventTone(kind: ReplayEventKind) {
   switch (kind) {
     case "pit":
-      return "border-sky-300 bg-sky-50 text-sky-950 dark:border-sky-500/20 dark:bg-sky-950/20 dark:text-sky-200";
+      return "tone tone-pit";
     case "dnf":
     case "dns":
     case "dnq":
     case "dsq":
     case "red-flag":
-      return "border-red-200 bg-red-50 text-red-950 dark:border-red-500/20 dark:bg-red-950/20 dark:text-red-200";
+      return "tone tone-red";
     case "yellow":
+      return "tone tone-yellow";
     case "double-yellow":
-      return "border-yellow-200 bg-yellow-50 text-yellow-950 dark:border-yellow-500/20 dark:bg-yellow-950/20 dark:text-yellow-200";
+      return "tone tone-double-yellow";
     case "safety-car":
+      return "tone tone-safety-car";
     case "virtual-safety-car":
-      return "border-orange-200 bg-orange-50 text-orange-950 dark:border-orange-500/20 dark:bg-orange-950/20 dark:text-orange-200";
+      return "tone tone-vsc";
     case "penalty":
-      return "border-rose-200 bg-rose-50 text-rose-950 dark:border-rose-500/20 dark:bg-rose-950/20 dark:text-rose-200";
+      return "tone tone-penalty";
     case "green":
-      return "border-emerald-200 bg-emerald-50 text-emerald-950 dark:border-emerald-500/20 dark:bg-emerald-950/20 dark:text-emerald-200";
+      return "tone tone-green";
     case "chequered":
-      return "border-zinc-300 bg-zinc-100 text-zinc-950 dark:border-zinc-500/20 dark:bg-zinc-950/30 dark:text-zinc-200";
+      return "tone tone-chequered";
     default:
-      return "border-line bg-panel text-foreground";
+      return "tone tone-neutral";
   }
 }
 
+/**
+ * The marker fill on the chart. Returns a `var()` reference rather than a hex
+ * literal so a marker and its chip cannot drift apart, and so both follow the
+ * theme.
+ */
 export function getReplayEventMarkerColor(kind: ReplayEventKind) {
   switch (kind) {
     case "pit":
-      return "#38bdf8";
+      return "var(--flag-pit)";
     case "dnf":
     case "dns":
     case "dnq":
     case "dsq":
-      return "#f59e0b";
+      return "var(--flag-double-yellow)";
     case "yellow":
+      return "var(--flag-yellow)";
     case "double-yellow":
-      return "#facc15";
+      return "var(--flag-double-yellow)";
     case "red-flag":
-      return "#fb7185";
+      return "var(--flag-red)";
     case "safety-car":
+      return "var(--flag-safety-car)";
     case "virtual-safety-car":
-      return "#fb923c";
+      return "var(--flag-vsc)";
     case "penalty":
-      return "#f43f5e";
+      return "var(--flag-penalty)";
     case "green":
-      return "#4ade80";
+      return "var(--flag-green)";
     case "chequered":
-      return "#d4d4d8";
+      return "var(--flag-chequered)";
     default:
-      return "#f8f2e8";
+      return "var(--muted)";
   }
 }
 
