@@ -61,7 +61,7 @@ export default function RacePage({
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ view?: string }>;
+  searchParams: Promise<{ view?: string; lap?: string }>;
 }) {
   return (
     <PageContainer>
@@ -84,14 +84,15 @@ async function RaceDetail({
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ view?: string }>;
+  searchParams: Promise<{ view?: string; lap?: string }>;
 }) {
   const { slug } = await params;
   // The view lives in the URL, so it survives a reload and can be linked to.
   // Anything unrecognised falls back to the replay rather than 404ing: a bad
   // query string is not a missing page.
-  const { view } = await searchParams;
+  const { view, lap } = await searchParams;
   const active: View = isView(view) ? view : 'replay';
+  const initialLap = Number(lap);
   const { race } = await getRaceHeader(slug);
 
   if (!race) notFound();
@@ -137,7 +138,7 @@ async function RaceDetail({
         <>
           <div className="mt-8">
             <Suspense fallback={<ReplaySkeleton />}>
-              <Replay slug={slug} />
+              <Replay slug={slug} initialLap={Number.isFinite(initialLap) && initialLap > 0 ? initialLap : undefined} />
             </Suspense>
           </div>
 
@@ -221,11 +222,11 @@ async function RaceDetail({
  * is missing, and fills a team colour where there is none. Both are conditions
  * the schema is honest about and the renderer has nothing to draw for.
  */
-async function Replay({ slug }: { slug: string }) {
+async function Replay({ slug, initialLap }: { slug: string; initialLap?: number }) {
   const { race } = await getRaceReplay(slug);
   if (!race) return null;
 
-  return <RaceVisualizationPlayer visualization={toReplayView(race)} />;
+  return <RaceVisualizationPlayer visualization={toReplayView(race)} initialLap={initialLap} />;
 }
 
 /** The shell's fallback: header, player and classification, in that order. */

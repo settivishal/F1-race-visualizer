@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { formatLapTime } from "@/lib/scale";
 import type { ReplayView } from "./types";
 
 interface TimingTowerProps {
@@ -101,11 +102,12 @@ export function LiveTimingTower({ visualization, currentLap }: TimingTowerProps)
       </div>
 
       <div className="flex-1 overflow-y-auto px-2 py-2 hide-scrollbar">
-        <div className="flex text-eyebrow uppercase font-semibold text-muted mb-2 px-2">
-          <div className="w-8">Pos</div>
+        <div className="flex gap-1 text-eyebrow uppercase font-semibold text-muted mb-2 px-2">
+          <div className="w-6">Pos</div>
           <div className="flex-1">Driver</div>
-          <div className="w-12 text-right">Gap</div>
-          <div className="w-10 text-right ml-2">S1</div>
+          <div className="w-10 text-right">Gap</div>
+          <div className="w-14 text-right">Lap</div>
+          <div className="w-10 text-right">S1</div>
           <div className="w-10 text-right">S2</div>
           <div className="w-10 text-right">S3</div>
         </div>
@@ -120,9 +122,9 @@ export function LiveTimingTower({ visualization, currentLap }: TimingTowerProps)
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.9 }}
                 transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                className="group flex items-center rounded-md px-2 py-1.5 text-xs transition-colors hover:bg-panel-strong"
+                className="group flex items-center gap-1 rounded-md px-2 py-1.5 text-xs transition-colors hover:bg-panel-strong"
               >
-                <div className="tabular w-8 font-mono font-medium text-muted">
+                <div className="tabular w-6 font-mono font-medium text-muted">
                   {standing.position}
                 </div>
                 <div className="flex-1 flex items-center gap-2 overflow-hidden">
@@ -135,12 +137,19 @@ export function LiveTimingTower({ visualization, currentLap }: TimingTowerProps)
                       and every other selector here is a styling class. */}
                   <span data-testid="tower-driver" className="font-semibold text-foreground truncate">{standing.entry.driver.code}</span>
                 </div>
-                <div className="tabular w-12 truncate text-right font-mono text-[11px] text-muted">
+                <div className="tabular w-10 truncate text-right font-mono text-[11px] text-muted">
                   {standing.gap === "LEADER" ? "Lap" : standing.gap}
                 </div>
                 
+                {/* The lap time has been ingested since M1 and displayed
+                    nowhere. It is the number the sectors add up to, so it
+                    belongs beside them. */}
+                <div className="tabular w-14 text-right font-mono text-[11px] text-foreground">
+                  {standing.lapTime == null ? "—" : formatLapTime(standing.lapTime)}
+                </div>
+
                 {/* Mini-Sectors */}
-                <SectorBlock value={standing.sector1} color={standing.s1Color} className="ml-2" />
+                <SectorBlock value={standing.sector1} color={standing.s1Color} />
                 <SectorBlock value={standing.sector2} color={standing.s2Color} />
                 <SectorBlock value={standing.sector3} color={standing.s3Color} />
               </motion.div>

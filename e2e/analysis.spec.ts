@@ -57,3 +57,12 @@ test('a driver can be added to and removed from the lap-time chart', async ({ pa
   await hamilton.click();
   await expect(chart).not.toHaveAttribute('aria-label', /hamilton/i);
 });
+
+test('a lap can be linked to', async ({ page }) => {
+  await page.goto(`/races/${RACE}?lap=30`);
+
+  const chart = page.getByRole('img', { name: /race position chart/i });
+  await expect(chart).toBeVisible({ timeout: 30_000 });
+  // The replay opens on the linked lap rather than on lap 1.
+  await expect(chart).toHaveAttribute('aria-label', /lap 30 of/i);
+});
