@@ -1025,10 +1025,11 @@ data that genuinely does not need an API.
 
 ---
 
-## 2026-09-07 — Charts are hand-written SVG over `d3-scale` and `d3-shape`
+## 2026-09-07 — Charts are hand-written SVG, with no new dependency at all
 
-**Decided:** no charting framework. The analysis charts are SVG written the same way the
-replay canvas is written, with `d3-scale` and `d3-shape` supplying scales and path geometry.
+**Decided:** no charting framework, and in the end no chart library of any kind. The
+analysis charts are SVG written the same way the replay canvas is written, over about
+thirty lines of scale and tick maths in `lib/scale.ts`.
 
 The replay is already a hand-built 1120×640 SVG with its own axes, ticks, tooltips and
 motion, and it is the best-looking thing in the project. A chart library would put a second,
@@ -1039,6 +1040,14 @@ reduced-motion rule would have to be re-fought inside someone else's component A
 here a line, a band and a box plot. visx is closer to the right level but is a large family
 of packages for the two modules actually needed.
 
-`d3-scale` + `d3-shape` are ~15 KB together, tree-shakeable, and are the parts of d3 that are
-pure math — no DOM, no selections, nothing that fights React. `framer-motion` already in the
-tree animates the results.
+`d3-scale` + `d3-shape` were planned as the compromise — ~15 KB, tree-shakeable, the parts
+of d3 that are pure maths. Writing the first chart showed the compromise was not needed:
+every axis on this site is a linear scale over numbers (laps against seconds), and a linear
+scale plus round-number ticks plus a polyline path is `lib/scale.ts`, tested. The packages
+would also have brought time, log, quantile, ordinal and diverging scales, none of which is
+coming.
+
+The parts that are genuinely hard — nice ticks that do not read as 90.30000000000001, a
+zero-width domain that must not divide by zero — are the parts with unit tests, which is
+where the confidence comes from rather than from a dependency's reputation. `framer-motion`,
+already in the tree for the replay, animates the results.
