@@ -1,0 +1,73 @@
+name: Backfill archive season
+
+# Ergast's sustained limit is 500 requests an hour and a season costs about 280,
+# so a season takes roughly 35 minutes of mostly waiting. That is why this is a
+# workflow and not a route handler: nothing serverless survives it, and nothing
+# about it needs to be fast.
+#
+# Manual only. There is no schedule because the archive is closed history —
+# 2018 through 2022 will not gain a race, and re-running for its own sake would
+# spend the hourly budget the live ingest may need.
+on:
+  workflow_dispatch:
+    inputs:
+      season:
+        description: 'Season to import (1996-2022; OpenF1 serves 2023 onward)'
+        required: true
+        type: string
+      target:
+        description: 'Which database to write to'
+        required: true
+        default: dev
+        type: choice
+        options: [dev, production]
+      force:
+        description: 'Re-import rounds that are already stored'
+        required: false
+        default: false
+        type: boolean
+
+# Two runs against the same database would race on the same rows and burn the
+# rate limit twice over. Queued, never cancelled: a cancelled run leaves a
+# half-imported season, which is the state this workflow exists to avoid.
+concurrency:
+  group: backfill-${{ inputs.target }}
+  cancel-in-progress: false
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    # A season is ~35 minutes; the ceiling is generous enough for a slow one and
+    # far short of the six hours a hung run would otherwise hold a runner for.
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      # One step per target, matching migrate.yml. Selecting the URL with an
+      # expression falls through to the wrong database whenever the first
+      # secret is empty, which is precisely the failure that matters here.
+      - name: Backfill the dev branch database
+        if: inputs.target == 'dev'
+        run: |
+          test -n "$DATABASE_URL" || { echo "::error::DATABASE_URL_DEV secret is empty"; exit 1; }
+          pnpm tsx scripts/backfill-archive.ts "$SEASON" $FORCE
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL_DEV }}
+          SEASON: ${{ inputs.season }}
+          FORCE: ${{ inputs.force && '--force' || '' }}
+
+      - name: Backfill production
+        if: inputs.target == 'production'
+        run: |
+          test -n "$DATABASE_URL" || { echo "::error::DATABASE_URL secret is empty"; exit 1; }
+          pnpm tsx scripts/backfill-archive.ts "$SEASON" $FORCE
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          SEASON: ${{ inputs.season }}
+          FORCE: ${{ inputs.force && '--force' || '' }}
