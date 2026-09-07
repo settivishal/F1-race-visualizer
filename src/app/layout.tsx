@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter, JetBrains_Mono, Titillium_Web } from "next/font/google";
+import { siteUrl } from "@/lib/site-url";
 import "./globals.css";
 
 /**
@@ -40,6 +41,9 @@ const numericFont = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
+  // Without a base, the generated OG image tags are relative and every crawler
+  // that reads them resolves nothing.
+  metadataBase: new URL(siteUrl),
   title: "F1 Race Visualizer",
   description: "Watch a grand prix unfold as an animated position chart.",
 };

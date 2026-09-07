@@ -22,6 +22,11 @@ const config: CodegenConfig = {
     './src/graphql/generated/': {
       preset: 'client',
       presetConfig: { fragmentMasking: false },
+      // The DateTime scalar serializes with toISOString (see builder.ts), so on
+      // the client it is a string. Without this it generates as `unknown` and
+      // every caller has to cast — which is a cast that could be wrong, in the
+      // one place the pipeline is supposed to stop guessing.
+      config: { scalars: { DateTime: 'string' } },
     },
   },
   ignoreNoDocuments: false,

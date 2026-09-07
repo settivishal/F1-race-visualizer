@@ -94,7 +94,7 @@ const HOME_FEATURE = /* GraphQL */ `
 const RACE_SLUGS = /* GraphQL */ `
   query RaceSlugs($first: Int) {
     races(first: $first) {
-      edges { node { slug } }
+      edges { node { slug date } }
     }
   }
 `;
