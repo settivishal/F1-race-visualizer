@@ -1,7 +1,5 @@
 import type { Metadata } from "next";
 import { Inter, JetBrains_Mono, Titillium_Web } from "next/font/google";
-import { SiteFooter } from "@/components/layout/site-footer";
-import { SiteHeader } from "@/components/layout/site-header";
 import "./globals.css";
 
 /**
@@ -54,23 +52,9 @@ export default function RootLayout({
       lang="en"
       className={`${displayFont.variable} ${bodyFont.variable} ${numericFont.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">
-        {/* First thing in the tab order, visible only once focused. Without it
-            a keyboard user walks the whole header on every page. */}
-        <a
-          href="#content"
-          className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-panel-strong focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:shadow-lg"
-        >
-          Skip to content
-        </a>
-        <SiteHeader />
-        {/* The landmark lived only on the home page before this; /races and the
-            race detail page rendered their content in bare divs. */}
-        <main id="content" className="flex-1">
-          {children}
-        </main>
-        <SiteFooter />
-      </body>
+      {/* Deliberately bare. The nav, footer and `<main>` landmark belong to
+          the (public) group; /admin renders its own shell. */}
+      <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );
 }

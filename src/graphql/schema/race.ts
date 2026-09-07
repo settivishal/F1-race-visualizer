@@ -204,6 +204,11 @@ Race.implement({
     type: t.field({ type: RaceType, resolve: (r) => r.type }),
     laps: t.exposeInt('laps'),
     isFeatured: t.exposeBoolean('isFeatured'),
+    // Upstream's public identifier for the session. Exposed because the admin
+    // needs it to re-run an import, and it is nullable because a race can be
+    // in the database without one — a manually created row, or an import that
+    // predates the column.
+    openf1SessionKey: t.exposeInt('openf1SessionKey', { nullable: true }),
     date: t.field({ type: 'DateTime', resolve: (r) => r.date }),
     meeting: t.field({
       type: Meeting,

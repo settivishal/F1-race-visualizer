@@ -889,3 +889,31 @@ makes it, so it stops reading as an oversight.
 **If it comes back:** something genuinely interactive that mutates and re-reads on the
 client — a live-updating ingest progress view, say — is the case that would earn it.
 
+
+## 2026-09-06 — updateTag in actions, revalidateTag in the cron
+
+**Decided:** Server Actions call `updateTag`; the cron route calls
+`revalidateTag(tag, 'max')`. The design documents say `revalidateTag` in both places, and
+`updateTag` did not exist when they were written.
+
+They differ in who waits.
+
+`updateTag` expires the entry outright, so the next request blocks until fresh data is ready.
+That is read-your-own-writes, and it is what an admin needs: after triggering an import,
+seeing the old page is indistinguishable from the import having failed. It is also
+Server-Action-only — a Route Handler cannot call it.
+
+`revalidateTag(tag, 'max')` marks the data stale and serves the stale copy while refreshing
+in the background. That is the right trade for the cron, where nobody is waiting on the
+result and a visitor who happens to arrive first should not pay for the regeneration. Passing
+no second argument is deprecated and behaves like `{ expire: 0 }`, which would make that
+visitor block.
+
+So the distinction is not a preference but the two halves of the same idea: the person who
+caused the change waits for it; everyone else gets the last good page until it is ready.
+
+**Unchanged:** invalidation is still the last step and still only runs after the write
+succeeds — `05-delivery.md:71`. If it ran first and the write then failed, the cache would be
+dropped and not replaced, and the next visitor would re-render from unchanged data, having
+lost a page that was working.
+

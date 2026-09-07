@@ -1,3 +1,4 @@
+import { GraphQLError } from 'graphql';
 import type { PgDatabase, PgQueryResultHKT } from 'drizzle-orm/pg-core';
 import { getDb } from '@/db';
 import type * as dbSchema from '@/db/schema';
@@ -30,9 +31,20 @@ export type Context = {
  * Throwing rather than returning null is deliberate: a field that returns null
  * to an unauthenticated caller is indistinguishable from a field with no data,
  * so a missing guard would look exactly like an empty database.
+ *
+ * A `GraphQLError` rather than a plain `Error`, for two reasons. Yoga masks
+ * unexpected errors — a plain Error reaches the client as "Unexpected error."
+ * with the original and its stack attached in development, which both hides the
+ * real reason and prints absolute paths from this machine. A GraphQLError is
+ * treated as intended output: the message survives, and nothing else is
+ * attached. "You are not allowed" is a normal answer, not a crash.
  */
 export function requireSession(ctx: Context): NonNullable<Session> {
-  if (!ctx.session) throw new Error('Unauthorized');
+  if (!ctx.session) {
+    throw new GraphQLError('Unauthorized', {
+      extensions: { code: 'UNAUTHORIZED', http: { status: 401 } },
+    });
+  }
   return ctx.session;
 }
 

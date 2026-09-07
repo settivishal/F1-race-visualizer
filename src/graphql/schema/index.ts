@@ -5,6 +5,7 @@ import { builder } from '../builder';
 // lazily — but the schema must be built after all of them have run.
 import './entity';
 import './meeting';
+import './mutation';
 import './race';
 import './standings';
 

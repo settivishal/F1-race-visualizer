@@ -32,6 +32,23 @@ enum DriverStatus {
   FINISHED
 }
 
+type IngestRun {
+  error: String
+  finishedAt: DateTime
+  id: ID!
+  rowsWritten: Int!
+  source: String!
+  startedAt: DateTime!
+  status: IngestRunStatus!
+  target: String
+}
+
+enum IngestRunStatus {
+  FAILED
+  RUNNING
+  SUCCESS
+}
+
 type Meeting {
   circuitName: String
   country: String!
@@ -44,6 +61,12 @@ type Meeting {
   weather: String
 }
 
+type Mutation {
+  setRaceFeatured(featured: Boolean!, slug: String!): Race!
+  triggerIngest(sessionKey: Int!): TriggerIngestResult!
+  updateRaceMetadata(circuitName: String, country: String, laps: Int, name: String, slug: String!): Race!
+}
+
 type PageInfo {
   endCursor: String
   hasNextPage: Boolean!
@@ -52,6 +75,7 @@ type PageInfo {
 type Query {
   constructorStandings(season: Int!): [ConstructorStanding!]!
   driverStandings(season: Int!): [DriverStanding!]!
+  ingestRuns(first: Int = 50): [IngestRun!]!
   race(slug: String!): Race
   races(after: String, first: Int, search: String, season: Int): RaceConnection!
   seasons: [Season!]!
@@ -64,6 +88,7 @@ type Race {
   isFeatured: Boolean!
   laps: Int!
   meeting: Meeting
+  openf1SessionKey: Int
   positions(lap: Int): [RacePosition!]!
   replay: RaceReplay!
   results: [RaceResult!]!
@@ -145,4 +170,10 @@ type Team {
   id: ID!
   logoUrl: String
   name: String!
+}
+
+type TriggerIngestResult {
+  rowsWritten: Int!
+  slug: String!
+  warnings: [String!]!
 }
