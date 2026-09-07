@@ -11,12 +11,10 @@ export function EmptyState({
   action?: ReactNode;
 }) {
   return (
-    <Card className="border-dashed bg-white/50 text-center">
-      <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[color:var(--color-track)]">
-        {title}
-      </p>
-      <p className="mt-3 text-sm leading-7 text-[color:var(--color-muted)]">{description}</p>
-      {action ? <div className="mt-6">{action}</div> : null}
+    <Card className="border-dashed bg-transparent py-10 text-center shadow-none">
+      <p className="font-heading text-lg font-semibold text-foreground">{title}</p>
+      <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-muted">{description}</p>
+      {action ? <div className="mt-5 flex justify-center">{action}</div> : null}
     </Card>
   );
 }

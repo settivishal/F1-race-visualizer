@@ -4,14 +4,20 @@ import { cn } from "@/lib/cn";
 export function Badge({
   children,
   className,
+  tone = "neutral",
 }: {
   children: ReactNode;
   className?: string;
+  /** `accent` for anything that should read as a status, not a label. */
+  tone?: "neutral" | "accent";
 }) {
   return (
     <span
       className={cn(
-        "inline-flex rounded-full border border-line bg-panel px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-foreground transition-[background-color,border-color] duration-220",
+        "inline-flex items-center rounded-full border px-2.5 py-0.5 text-eyebrow font-semibold uppercase",
+        tone === "accent"
+          ? "border-accent/30 bg-accent-soft text-accent-strong"
+          : "border-line bg-panel text-muted",
         className,
       )}
     >
