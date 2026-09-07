@@ -102,7 +102,7 @@ export function LiveTimingTower({ visualization, currentLap }: TimingTowerProps)
 
       <div className="flex-1 overflow-y-auto px-2 py-2 hide-scrollbar">
         <div className="flex text-eyebrow uppercase font-semibold text-muted mb-2 px-2">
-          <div className="w-6">Pos</div>
+          <div className="w-8">Pos</div>
           <div className="flex-1">Driver</div>
           <div className="w-12 text-right">Gap</div>
           <div className="w-10 text-right ml-2">S1</div>
@@ -122,7 +122,7 @@ export function LiveTimingTower({ visualization, currentLap }: TimingTowerProps)
                 transition={{ type: "spring", stiffness: 300, damping: 30 }}
                 className="group flex items-center rounded-md px-2 py-1.5 text-xs transition-colors hover:bg-panel-strong"
               >
-                <div className="tabular w-6 font-mono font-medium text-muted">
+                <div className="tabular w-8 font-mono font-medium text-muted">
                   {standing.position}
                 </div>
                 <div className="flex-1 flex items-center gap-2 overflow-hidden">
