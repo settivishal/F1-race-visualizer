@@ -107,6 +107,17 @@ export const PitSchema = z.object({
   date: z.string(),
 });
 
+// lap_end is null for a stint still running when the session ended; upstream
+// also emits stints with no compound during testing sessions.
+export const StintSchema = z.object({
+  driver_number: z.number(),
+  stint_number: z.number(),
+  lap_start: z.number().nullable(),
+  lap_end: z.number().nullable(),
+  compound: z.string().nullable(),
+  tyre_age_at_start: z.number().nullable(),
+});
+
 export const RaceControlSchema = z.object({
   driver_number: z.number().nullable(),
   lap_number: z.number().nullable(),
@@ -136,6 +147,7 @@ export type Driver = z.infer<typeof DriverSchema>;
 export type Lap = z.infer<typeof LapSchema>;
 export type PositionSample = z.infer<typeof PositionSampleSchema>;
 export type Pit = z.infer<typeof PitSchema>;
+export type Stint = z.infer<typeof StintSchema>;
 export type RaceControl = z.infer<typeof RaceControlSchema>;
 export type SessionResult = z.infer<typeof SessionResultSchema>;
 export type Weather = z.infer<typeof WeatherSchema>;
@@ -165,6 +177,8 @@ export const fetchPositions = (sessionKey: number) =>
   getList('/position', { session_key: sessionKey }, PositionSampleSchema);
 export const fetchPits = (sessionKey: number) =>
   getList('/pit', { session_key: sessionKey }, PitSchema);
+export const fetchStints = (sessionKey: number) =>
+  getList('/stints', { session_key: sessionKey }, StintSchema);
 export const fetchRaceControl = (sessionKey: number) =>
   getList('/race_control', { session_key: sessionKey }, RaceControlSchema);
 export const fetchSessionResults = (sessionKey: number) =>

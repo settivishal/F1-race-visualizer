@@ -22,7 +22,7 @@ v1 is not thrown away — it is the reference implementation. Working code (the 
 | Database | **Neon Postgres + Drizzle ORM.** Migrations are the only source of truth. |
 | API layer | **GraphQL** — Yoga + Pothos (code-first) at `/api/graphql`. One schema serves all reads and admin mutations. urql + graphql-codegen on the client. |
 | Data pipeline | **Scheduled ingest into own DB.** Vercel Cron → protected route handler. App never calls an external API at request time. |
-| Upstream data | **OpenF1 only.** Wikipedia for images. No Ergast/Jolpica. |
+| Upstream data | **OpenF1 for 2023+**, and from M6 **Jolpica/Ergast for 2018-2022 and for starting grids** (see the 2026-09-07 reversal in `decisions.md`). Wikipedia for images. |
 | Standings | **Derived from `race_results`** by aggregate query. No stored snapshot. |
 | Deployment | **Vercel** (push to deploy, preview per PR) + Neon. Default `*.vercel.app` domain — no custom domain for now. GitHub Actions for lint/typecheck/test and for long backfills. |
 | Update cadence | Cron fires **daily**; the handler decides whether work is due. Target window is Monday morning (after Sunday races), overridable without a redeploy. |
@@ -41,7 +41,7 @@ v1 is not thrown away — it is the reference implementation. Working code (the 
 - **Drizzle** — v1's specific failure was schema drift from `db pull`. Drizzle's schema is TypeScript that generates SQL migrations; there is no round-trip that can silently overwrite the model. Also lighter on serverless cold starts.
 - **Scheduled ingest** — v1 hit `api.openf1.org` and `api.jolpi.ca` live on every request with no cache. Reading only our own DB means the site is fast, works when upstream is down, and cannot be rate-limited.
 - **ISR over dynamic rendering** — race data changes once a week, so rendering it per request is pure waste. Statically cached pages mean a visitor never waits on a Neon cold start, and Neon's free tier is never woken by traffic at all. The ingest job already knows exactly when the data changed, so it revalidates the tag itself; nothing is ever stale for longer than it takes to write the rows.
-- **OpenF1 as the only upstream** — once standings are derived from `race_results`, the second source had no job left. `/session_result` already returns final position, status, and points for the 2023+ range that is the entire scope. One client, one rate limit, one failure mode. The cost is real and accepted: no pre-2023 season can ever be imported.
+- **OpenF1 as the only upstream** — once standings are derived from `race_results`, the second source had no job left. `/session_result` already returns final position, status, and points for the 2023+ range that was then the entire scope. One client, one rate limit, one failure mode. *Reversed on 2026-09-07 for the archive:* Ergast serves per-lap position from 1996 and starting grids from 1950, so it comes back for the closed 2018-2022 window and for the grid column OpenF1 cannot fill. The live cron path still talks to exactly one upstream.
 - **GraphQL** — an explicit learning goal, not an architectural necessity: server components could query Drizzle directly. It is made genuine by being *the* data layer rather than a veneer, so the parts worth learning are unavoidable — schema design, resolver composition, DataLoader batching, pagination, fragments, codegen. Pothos infers types from Drizzle models, so the schema cannot drift from the database.
 
 ---
@@ -573,7 +573,19 @@ Race library with search/filter, race detail page, server components reading thr
 
 **M4 — Polish + ship.** Standings page reading the derived `driverStandings`/`constructorStandings` resolvers (port `standings-view.tsx` and `wikipedia-image.tsx` from `origin/dev`), SEO (sitemap, robots, per-race OG images — port from v1), loading skeletons, dark theme, error boundaries. Image attribution line on `/about` — headshots originate from Wikipedia (CC BY-SA) and OpenF1. Custom domain.
 
-**Deferred (post-v2):** public accounts (Auth.js OAuth providers + `users` table growth), Armchair Strategist (`predictions`/`race_scores`, stint builder, scoring, leaderboard — **built, not ported**: no strategist code survives on any archived v1 branch, only the orphaned `Prediction`/`RaceScore` Prisma models on `dev`). Both slot into the existing schema as new types and mutations rather than new endpoints — a good demonstration of why the GraphQL layer was worth building.
+---
+
+*M0–M4 shipped 2026-09-07. Everything below is the second arc: the site stops being a one-season demonstration and becomes a product. Constraints, decided with the milestones: the archive reaches back to **2018 and no further**, everything stays inside the **free tier** (Neon 0.5 GB, Vercel Hobby, no paid Redis or error tracking), and each milestone must be visible to a visitor on its own.*
+
+**M5 — Race analysis.** The race page stops being only a replay and starts answering questions about the race. New tables `stints` (compound, lap range, tyre age — from OpenF1 `/stints`, the one endpoint the ingest never called) and `pit_stops` (a real duration column instead of prose inside an event's `details`). New `Race` fields: `lapTimes`, `stints`, `pitStops`, `paceSummary`, `headToHead`. The page becomes tabbed — Replay · Analysis · Classification — with the tab in the URL so it stays server-rendered and shareable. Charts are hand-written SVG over `d3-scale`/`d3-shape`: lap-time trace, gap to leader, tyre strategy bars, pace distribution. Two small debts close here: `race_positions.lap_time` has been ingested since M1 and rendered nowhere, and the replay's lap gets a `?lap=` deep link. *Done when: a visitor can explain why a race was won from the Analysis tab alone, and the query count for the tab is bounded — `scripts/count-queries.ts`, not assumed.*
+
+**M6 — The 2018 archive.** `lib/ingest/ergast.ts` beside `openf1.ts`, and `races.data_tier` saying which fidelity a race carries (see the two 2026-09-07 decisions). A `circuits` table replaces the hardcoded `lib/circuit-data.ts`; `drivers.ergast_driver_id` and `teams.ergast_constructor_id` become the stable identities across seasons, and `drivers.code` loses its UNIQUE constraint — driver codes are not unique across eras and that constraint is the one guaranteed to break a backfill mid-run. Grid positions arrive for every race, including the 2023+ ones OpenF1 could never supply. Backfill is a `workflow_dispatch` action per season, resumable, recorded in `ingest_runs` with `source: 'ergast'`. New pages: `/seasons/[year]`, `/drivers/[id]`, `/teams/[id]`, `/circuits/[id]`. *Done when: 2018–2022 replay end to end at the `LAPS` tier, each of those five seasons' derived standings match the published championship, and the database is still under a quarter of the free-tier budget.*
+
+**M7 — Motion and polish.** A ⌘K command palette over races, drivers, teams and circuits (one `search` resolver); a compare view for two drivers or two teams; next-race countdown on the home page. The motion pass: View Transitions between race cards and race pages, chart reveals, layout animation on standings reorder — all of it behind the `<MotionConfig reducedMotion="user">` handling the replay already established, because reduced motion is load-bearing here, not decoration. Images move off hotlinks into Vercel Blob, finally filling `teams.logo_url` and `drivers.headshot_url`, which have been columns with no writer since M0. The replay and chart islands get `next/dynamic` — six of nine client components are the replay and none of it is code-split.
+
+**M8 — Production hardening.** The gaps M0–M4 never had a milestone for: rate limiting on `/api/graphql` and `/login` (a Postgres token bucket — free tier means no Redis, and the existing depth and cost limits bound a query's shape, not how many arrive); `/api/health` plus a scheduled GitHub Action that fails when the newest `ingest_runs` row is stale, since the whole observability design rests on a human noticing that row; route-level tests for the depth, cost and introspection plugins, which have never been exercised over HTTP by anything but a hand-run GraphiQL query; an axe pass in Playwright; `serverActions.allowedOrigins`; and the `race:${slug}` cache tag, which is written and never invalidated.
+
+**Deferred (still):** public accounts (Auth.js OAuth providers + `users` table growth), Armchair Strategist (`predictions`/`race_scores`, stint builder, scoring, leaderboard — **built, not ported**: no strategist code survives on any archived v1 branch, only the orphaned `Prediction`/`RaceScore` Prisma models on `dev`). Both slot into the existing schema as new types and mutations rather than new endpoints — a good demonstration of why the GraphQL layer was worth building.
 
 ---
 
@@ -607,6 +619,7 @@ Race library with search/filter, race detail page, server components reading thr
 ## Open questions for later (not blocking M0)
 
 - Nothing blocking. Custom domain deferred — ships on `*.vercel.app`.
+- Free-tier ceilings are the real constraint on M6-M8: Neon's 0.5 GB (the 2018+ archive is budgeted at ~150 MB), no Neon query log to read, and no Redis to rate-limit against.
 
 ## Working agreement
 

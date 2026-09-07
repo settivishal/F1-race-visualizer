@@ -16,6 +16,13 @@ type Driver {
   number: Int
 }
 
+type DriverLapTimes {
+  driver: Driver
+  laps: [Lap!]!
+  pace: Pace!
+  team: Team
+}
+
 type DriverStanding {
   driver: Driver!
   podiums: Int!
@@ -30,6 +37,27 @@ enum DriverStatus {
   DNS
   DSQ
   FINISHED
+}
+
+type HeadToHead {
+  a: HeadToHeadSide!
+  b: HeadToHeadSide!
+  laps: [HeadToHeadLap!]!
+  lapsAheadA: Int!
+  lapsAheadB: Int!
+}
+
+type HeadToHeadLap {
+  lap: Int!
+  positionDelta: Int
+  timeDelta: Float
+}
+
+type HeadToHeadSide {
+  driver: Driver
+  finalPosition: Int
+  pace: Pace!
+  team: Team
 }
 
 type IngestRun {
@@ -47,6 +75,12 @@ enum IngestRunStatus {
   FAILED
   RUNNING
   SUCCESS
+}
+
+type Lap {
+  isOutlier: Boolean!
+  lap: Int!
+  time: Float!
 }
 
 type Meeting {
@@ -67,9 +101,25 @@ type Mutation {
   updateRaceMetadata(circuitName: String, country: String, laps: Int, name: String, slug: String!): Race!
 }
 
+type Pace {
+  best: Float
+  consistency: Float
+  lapsCounted: Int!
+  lapsExcluded: Int!
+  mean: Float
+  median: Float
+}
+
 type PageInfo {
   endCursor: String
   hasNextPage: Boolean!
+}
+
+type PitStop {
+  driver: Driver
+  durationSeconds: Float
+  lap: Int!
+  team: Team
 }
 
 type Query {
@@ -82,6 +132,7 @@ type Query {
 }
 
 type Race {
+  analysis: RaceAnalysis!
   date: DateTime!
   events(lap: Int): [RaceEvent!]!
   id: ID!
@@ -94,6 +145,13 @@ type Race {
   results: [RaceResult!]!
   slug: String!
   type: RaceType!
+}
+
+type RaceAnalysis {
+  headToHead(driverA: String!, driverB: String!): HeadToHead
+  lapTimes: [DriverLapTimes!]!
+  pitStops: [PitStop!]!
+  stints: [Stint!]!
 }
 
 type RaceConnection {
@@ -163,6 +221,16 @@ type ReplaySummary {
 
 type Season {
   year: Int!
+}
+
+type Stint {
+  compound: String
+  driver: Driver
+  lapEnd: Int!
+  lapStart: Int!
+  stintNumber: Int!
+  team: Team
+  tyreAgeAtStart: Int
 }
 
 type Team {

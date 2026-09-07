@@ -2,6 +2,7 @@ import { cacheLife, cacheTag } from 'next/cache';
 import { executeQuery } from '@/graphql/execute';
 import type {
   HomeFeatureQuery,
+  RaceAnalysisQuery,
   HomeLineupQuery,
   RaceReplayQuery,
   RaceHeaderQuery,
@@ -201,6 +202,45 @@ export async function getRaceReplay(slug: string) {
   cacheLife('days');
 
   return executeQuery<RaceReplayQuery, { slug: string }>(RACE_REPLAY, { slug });
+}
+
+const RACE_ANALYSIS = /* GraphQL */ `
+  query RaceAnalysis($slug: String!) {
+    race(slug: $slug) {
+      id slug laps
+      meeting { name season }
+      analysis {
+        lapTimes {
+          driver { id code name }
+          team { id name color }
+          laps { lap time isOutlier }
+          pace { best median consistency lapsCounted lapsExcluded }
+        }
+        stints {
+          stintNumber lapStart lapEnd compound
+          driver { id code }
+          team { color }
+        }
+        pitStops {
+          lap durationSeconds
+          driver { id code }
+        }
+      }
+    }
+  }
+`;
+
+/**
+ * The Analysis tab. A third scope beside the header and the replay, for the same
+ * reason those two are separate: a visitor who never opens the tab never pays
+ * for it, and the tab does not wait on the replay's payload to render.
+ */
+export async function getRaceAnalysis(slug: string) {
+  'use cache';
+  cacheTag('race', `race:${slug}`);
+  cacheLife('days');
+
+  return executeQuery<RaceAnalysisQuery, { slug: string }>(RACE_ANALYSIS, { slug });
 }
 
 export async function getFeaturedRace() {

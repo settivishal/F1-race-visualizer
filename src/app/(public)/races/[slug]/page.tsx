@@ -5,7 +5,9 @@ import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PageContainer } from '@/components/ui/page-container';
+import { Tabs } from '@/components/ui/tabs';
 import { CircuitInfoPanel } from '@/components/replay/circuit-info-panel';
+import { AnalysisPanel } from './analysis-panel';
 import { RaceVisualizationPlayer } from '@/components/replay/race-visualization-player';
 import { toReplayView } from '@/components/replay/types';
 import { getRaceHeader, getRaceReplay, getRaceSlugs } from '@/lib/queries';
@@ -42,13 +44,25 @@ const STATUS_LABEL: Record<string, string> = {
   DSQ: 'DSQ',
 };
 
+const VIEWS = ['replay', 'analysis'] as const;
+type View = (typeof VIEWS)[number];
+
+const isView = (value: unknown): value is View =>
+  typeof value === 'string' && (VIEWS as readonly string[]).includes(value);
+
 /**
  * `params` is URL data, and reading it above every Suspense boundary makes the
  * whole route block on the navigation instead of streaming into a shell. So the
  * page itself is not async: the container and the back link are the shell, and
  * everything keyed by the slug renders below the boundary.
  */
-export default function RacePage({ params }: { params: Promise<{ slug: string }> }) {
+export default function RacePage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ slug: string }>;
+  searchParams: Promise<{ view?: string; lap?: string }>;
+}) {
   return (
     <PageContainer>
       <Link
@@ -59,14 +73,26 @@ export default function RacePage({ params }: { params: Promise<{ slug: string }>
       </Link>
 
       <Suspense fallback={<RaceSkeleton />}>
-        <RaceDetail params={params} />
+        <RaceDetail params={params} searchParams={searchParams} />
       </Suspense>
     </PageContainer>
   );
 }
 
-async function RaceDetail({ params }: { params: Promise<{ slug: string }> }) {
+async function RaceDetail({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ slug: string }>;
+  searchParams: Promise<{ view?: string; lap?: string }>;
+}) {
   const { slug } = await params;
+  // The view lives in the URL, so it survives a reload and can be linked to.
+  // Anything unrecognised falls back to the replay rather than 404ing: a bad
+  // query string is not a missing page.
+  const { view, lap } = await searchParams;
+  const active: View = isView(view) ? view : 'replay';
+  const initialLap = Number(lap);
   const { race } = await getRaceHeader(slug);
 
   if (!race) notFound();
@@ -98,19 +124,39 @@ async function RaceDetail({ params }: { params: Promise<{ slug: string }> }) {
         {race.type === 'SPRINT' ? <Badge>Sprint</Badge> : null}
       </header>
 
-      <div className="mt-10">
-        <Suspense fallback={<ReplaySkeleton />}>
-          <Replay slug={slug} />
-        </Suspense>
-      </div>
-
-      <div className="mt-10">
-        <CircuitInfoPanel
-          circuitName={meeting?.circuitName ?? null}
-          country={meeting?.country ?? null}
-          raceName={meeting?.name ?? null}
+      <div className="mt-8">
+        <Tabs
+          active={active}
+          tabs={[
+            { id: 'replay', label: 'Replay', href: `/races/${slug}` },
+            { id: 'analysis', label: 'Analysis', href: `/races/${slug}?view=analysis` },
+          ]}
         />
       </div>
+
+      {active === 'replay' ? (
+        <>
+          <div className="mt-8">
+            <Suspense fallback={<ReplaySkeleton />}>
+              <Replay slug={slug} initialLap={Number.isFinite(initialLap) && initialLap > 0 ? initialLap : undefined} />
+            </Suspense>
+          </div>
+
+          <div className="mt-10">
+            <CircuitInfoPanel
+              circuitName={meeting?.circuitName ?? null}
+              country={meeting?.country ?? null}
+              raceName={meeting?.name ?? null}
+            />
+          </div>
+        </>
+      ) : (
+        <div className="mt-8">
+          <Suspense fallback={<AnalysisSkeleton />}>
+            <AnalysisPanel slug={slug} />
+          </Suspense>
+        </div>
+      )}
 
       <section className="mt-10">
         <h2 className="font-heading text-2xl font-bold tracking-tight">Classification</h2>
@@ -176,11 +222,11 @@ async function RaceDetail({ params }: { params: Promise<{ slug: string }> }) {
  * is missing, and fills a team colour where there is none. Both are conditions
  * the schema is honest about and the renderer has nothing to draw for.
  */
-async function Replay({ slug }: { slug: string }) {
+async function Replay({ slug, initialLap }: { slug: string; initialLap?: number }) {
   const { race } = await getRaceReplay(slug);
   if (!race) return null;
 
-  return <RaceVisualizationPlayer visualization={toReplayView(race)} />;
+  return <RaceVisualizationPlayer visualization={toReplayView(race)} initialLap={initialLap} />;
 }
 
 /** The shell's fallback: header, player and classification, in that order. */
@@ -195,6 +241,20 @@ function RaceSkeleton() {
         <Skeleton className="h-24 w-full rounded-xl" />
       </div>
       <Skeleton className="mt-10 h-[30rem] w-full rounded-xl" />
+    </div>
+  );
+}
+
+/** Sized to the charts, for the same reason the replay's fallback is. */
+function AnalysisSkeleton() {
+  return (
+    <div className="space-y-8">
+      <Skeleton className="h-8 w-56" />
+      <Skeleton className="h-[22rem] w-full rounded-xl" />
+      <Skeleton className="h-56 w-full rounded-xl" />
+      <p className="sr-only" role="status">
+        Loading analysis
+      </p>
     </div>
   );
 }

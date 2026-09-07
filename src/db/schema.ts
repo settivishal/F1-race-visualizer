@@ -109,6 +109,41 @@ export const raceEvents = pgTable('race_events', {
   details: text('details').notNull(),
 }, (t) => [index('race_events_race_lap_idx').on(t.raceId, t.lap)]);
 
+/**
+ * A tyre stint: the laps between two pit stops. Upstream gives the compound and
+ * the lap range, not a per-lap tyre, because that is the shape the data has —
+ * expanding it to one row per lap would be the same fact stored sixty times.
+ */
+export const stints = pgTable('stints', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  raceId: uuid('race_id').notNull().references(() => races.id, { onDelete: 'cascade' }),
+  assignmentId: uuid('assignment_id').notNull().references(() => driverTeamAssignments.id),
+  stintNumber: integer('stint_number').notNull(),
+  lapStart: integer('lap_start').notNull(),
+  lapEnd: integer('lap_end').notNull(),
+  compound: text('compound'),                    // SOFT | MEDIUM | HARD | INTERMEDIATE | WET
+  tyreAgeAtStart: integer('tyre_age_at_start'),  // laps already on the set when fitted
+}, (t) => [
+  // No separate race_id index: this one is already prefixed by race_id, which
+  // is the only way these rows are ever looked up.
+  uniqueIndex('stints_race_driver_stint_uq').on(t.raceId, t.assignmentId, t.stintNumber),
+]);
+
+/**
+ * Pit stops as data rather than prose. The duration has always been ingested,
+ * but only ever survived inside a race event's `details` string, where nothing
+ * can compare two stops or sum a team's pit time.
+ */
+export const pitStops = pgTable('pit_stops', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  raceId: uuid('race_id').notNull().references(() => races.id, { onDelete: 'cascade' }),
+  assignmentId: uuid('assignment_id').notNull().references(() => driverTeamAssignments.id),
+  lap: integer('lap').notNull(),
+  durationMs: integer('duration_ms'),            // null when upstream timed no stop
+}, (t) => [
+  uniqueIndex('pit_stops_race_driver_lap_uq').on(t.raceId, t.assignmentId, t.lap),
+]);
+
 // Final classification. v1 had no home for this and faked DNFs through events.
 export const raceResults = pgTable('race_results', {
   raceId: uuid('race_id').notNull().references(() => races.id, { onDelete: 'cascade' }),
@@ -176,6 +211,8 @@ export const driverTeamAssignmentsRelations = relations(driverTeamAssignments, (
   positions: many(racePositions),
   events: many(raceEvents),
   results: many(raceResults),
+  stints: many(stints),
+  pitStops: many(pitStops),
 }));
 
 export const meetingsRelations = relations(meetings, ({ one, many }) => ({
@@ -188,6 +225,22 @@ export const racesRelations = relations(races, ({ one, many }) => ({
   positions: many(racePositions),
   events: many(raceEvents),
   results: many(raceResults),
+  stints: many(stints),
+  pitStops: many(pitStops),
+}));
+
+export const stintsRelations = relations(stints, ({ one }) => ({
+  race: one(races, { fields: [stints.raceId], references: [races.id] }),
+  assignment: one(driverTeamAssignments, {
+    fields: [stints.assignmentId], references: [driverTeamAssignments.id],
+  }),
+}));
+
+export const pitStopsRelations = relations(pitStops, ({ one }) => ({
+  race: one(races, { fields: [pitStops.raceId], references: [races.id] }),
+  assignment: one(driverTeamAssignments, {
+    fields: [pitStops.assignmentId], references: [driverTeamAssignments.id],
+  }),
 }));
 
 export const racePositionsRelations = relations(racePositions, ({ one }) => ({

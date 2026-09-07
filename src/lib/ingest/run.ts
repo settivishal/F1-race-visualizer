@@ -1,12 +1,12 @@
 import { eq, sql } from 'drizzle-orm';
 import { getDb } from '@/db';
 import {
-  driverTeamAssignments, drivers, ingestRuns, meetings, racePositions,
-  raceEvents, raceResults, races, seasons, teamSeasons, teams,
+  driverTeamAssignments, drivers, ingestRuns, meetings, pitStops, racePositions,
+  raceEvents, raceResults, races, seasons, stints, teamSeasons, teams,
 } from '@/db/schema';
 import {
   fetchDrivers, fetchLaps, fetchMeetings, fetchPits, fetchPositions,
-  fetchRaceControl, fetchSessionResults, fetchSessions, fetchWeather,
+  fetchRaceControl, fetchSessionResults, fetchSessions, fetchStints, fetchWeather,
 } from './openf1';
 import { deriveRounds, isScoredSession, transformRace } from './transform';
 import type { RaceBundle, TransformedRace } from './types';
@@ -58,7 +58,7 @@ export async function ingestRace(sessionKey: number): Promise<IngestResult> {
   }
 }
 
-/** Everything one session needs. Nine calls, all paced by the client's throttle. */
+/** Everything one session needs. Ten calls, all paced by the client's throttle. */
 export async function fetchRaceBundle(sessionKey: number): Promise<RaceBundle> {
   const [firstSession] = await fetchSessionsByKey(sessionKey);
   if (!firstSession) throw new Error(`session ${sessionKey} not found`);
@@ -76,15 +76,15 @@ export async function fetchRaceBundle(sessionKey: number): Promise<RaceBundle> {
   const round = deriveRounds(allMeetings, allSessions).get(meeting.meeting_key);
   if (round === undefined) throw new Error(`meeting ${meeting.meeting_key} has no race, so no round`);
 
-  const [ldrivers, laps, positions, pits, raceControl, results, weather] = await Promise.all([
+  const [ldrivers, laps, positions, pits, stintList, raceControl, results, weather] = await Promise.all([
     fetchDrivers(sessionKey), fetchLaps(sessionKey), fetchPositions(sessionKey),
-    fetchPits(sessionKey), fetchRaceControl(sessionKey), fetchSessionResults(sessionKey),
-    fetchWeather(sessionKey),
+    fetchPits(sessionKey), fetchStints(sessionKey), fetchRaceControl(sessionKey),
+    fetchSessionResults(sessionKey), fetchWeather(sessionKey),
   ]);
 
   return {
     meeting, session: firstSession, round,
-    drivers: ldrivers, laps, positions, pits, raceControl, results, weather,
+    drivers: ldrivers, laps, positions, pits, stints: stintList, raceControl, results, weather,
   };
 }
 
@@ -221,6 +221,36 @@ async function writeRace(race: TransformedRace): Promise<number> {
     }));
     for (const chunk of chunked(eventRows, 500)) {
       await tx.insert(raceEvents).values(chunk);
+      rows += chunk.length;
+    }
+
+    // Same replace-wholesale rule as positions and events, and for the same
+    // reason: a re-import that produces fewer stints must not leave the old
+    // ones behind, where they would draw a strategy the driver never ran.
+    await tx.delete(stints).where(eq(stints.raceId, raceRow.id));
+    const stintRows = race.stints
+      .filter((s) => assignmentByNumber.has(s.driverNumber))
+      .map((s) => ({
+        raceId: raceRow.id,
+        assignmentId: assignmentFor(s.driverNumber),
+        stintNumber: s.stintNumber, lapStart: s.lapStart, lapEnd: s.lapEnd,
+        compound: s.compound, tyreAgeAtStart: s.tyreAgeAtStart,
+      }));
+    for (const chunk of chunked(stintRows, 500)) {
+      await tx.insert(stints).values(chunk);
+      rows += chunk.length;
+    }
+
+    await tx.delete(pitStops).where(eq(pitStops.raceId, raceRow.id));
+    const pitRows = race.pitStops
+      .filter((p) => assignmentByNumber.has(p.driverNumber))
+      .map((p) => ({
+        raceId: raceRow.id,
+        assignmentId: assignmentFor(p.driverNumber),
+        lap: p.lap, durationMs: p.durationMs,
+      }));
+    for (const chunk of chunked(pitRows, 500)) {
+      await tx.insert(pitStops).values(chunk);
       rows += chunk.length;
     }
 

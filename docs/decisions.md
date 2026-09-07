@@ -936,3 +936,118 @@ GET is what Vercel calls; POST is what a person calls with curl, and what verifi
 uses. Vercel adds `Authorization: Bearer $CRON_SECRET` to its own request when that variable
 is set, so both paths authenticate identically and neither needs a special case.
 
+
+---
+
+## 2026-09-07 — After M4: the site becomes a product, not a portfolio piece
+
+**Decided:** four more milestones — M5 race analysis, M6 the 2018+ archive, M7 motion and
+polish, M8 production hardening. Written out in `system-design.md`.
+
+Every milestone in the original plan is shipped, so the design doc stopped saying what
+happens next. The choice was to stop at a finished portfolio project or to keep going.
+Vishal chose to keep going, with three constraints that shape everything below: the archive
+goes back to **2018 and no further**, the whole thing stays on the **free tier**, and the
+first slice must be **visible to a visitor**, not infrastructure.
+
+**Considered:** the two features deferred at the start — public accounts and the Armchair
+Strategist prediction game. Both lose to analysis and archive on the same argument: they add
+a second product on top of a single season of data, where the archive makes the product that
+already exists worth more. They stay deferred.
+
+---
+
+## 2026-09-07 — Jolpica (Ergast) is reinstated for 2018–2022
+
+**Decided:** a second ingest client, `lib/ingest/ergast.ts`, alongside `openf1.ts`. OpenF1
+remains the only source for 2023 onward.
+
+**Supersedes** the 2026-09-03 entry "Jolpica (Ergast) dropped; OpenF1 is the only upstream".
+
+That entry accepted a cost — "no season before 2023 can ever be imported" — on the reasoning
+that pre-2023 seasons would be "standings tables with no races behind them". That reasoning
+was wrong on the facts, and the facts were checked this time rather than assumed:
+
+- Jolpica serves **per-lap position and lap time from 1996**, which is exactly the payload
+  the replay renders. 2018–2022 is not a standings table; it is 105 more replayable races.
+- It serves **starting grid from 1950**. OpenF1 publishes no grid at all and has no
+  `/starting_grid` endpoint, which is why `race_results.grid_position` has sat unpopulated
+  since M1 and why no page can show a grid-versus-finish delta.
+
+What the original entry got right stands: a second client is a second rate limit and a second
+failure mode. It is scoped accordingly — Ergast is used for the closed 2018–2022 window and
+for grid positions, never for a live race weekend, so the cron path keeps exactly one
+upstream and its failure modes do not change.
+
+Measured limits, 2026-09-07: 100 records per request (hard cap), 4 requests/second burst,
+500/hour sustained. A race's lap data is ~10 requests; a season is ~280, about 35 minutes.
+The backfill therefore runs from a `workflow_dispatch` GitHub Action per season, not from a
+serverless function, the same way the original season backfill did.
+
+**Cost, accepted:** 2018–2022 races have no sector times, no gap strings, no race control
+messages and no tyre stints, because only OpenF1 publishes those. Those races are a thinner
+replay, not a broken one.
+
+---
+
+## 2026-09-07 — A race declares which tier of data it has
+
+**Decided:** `races.data_tier` — `FULL` for OpenF1-sourced races (sectors, gaps, race
+control, stints) and `LAPS` for Ergast-sourced ones (position and lap time only). The UI
+branches on the tier; it never infers coverage by checking whether a column is null.
+
+Two sources with different fidelity would otherwise be indistinguishable from two sources
+where one had a bad import. A missing sector time means "this era has no sector data" in one
+case and "the ingest dropped rows" in the other, and `ingest_runs` is the only place that
+difference is currently visible.
+
+**Considered:** deriving the tier from `openf1_session_key IS NOT NULL`. It is the same
+information today and stops being so the first time a race is re-imported from the other
+source, which is precisely when a wrong answer would be hardest to see.
+
+---
+
+## 2026-09-07 — Circuits become a table; `lib/circuit-data.ts` is retired
+
+**Decided:** a `circuits` table populated from Ergast, with `meetings.circuit_id` pointing at
+it.
+
+`src/lib/circuit-data.ts` is a hardcoded lookup keyed by country and race name, holding
+length, turns, first-GP year and lap record for the 2025 calendar. Keyed by country, it
+cannot answer "Spain, 2019" versus "Spain, 2025" differently, and there is no key at all for
+a circuit that has left the calendar — Hockenheim, Sochi, Paul Ricard, all of them inside
+the 2018 window. Every season added makes the lookup more wrong.
+
+**Cost, accepted:** Ergast gives name, locality, country and coordinates but not turn count
+or lap record, so those two fields keep a small hand-maintained overlay rather than
+disappearing. That is a table of static facts about physical places, which is the one kind of
+data that genuinely does not need an API.
+
+---
+
+## 2026-09-07 — Charts are hand-written SVG, with no new dependency at all
+
+**Decided:** no charting framework, and in the end no chart library of any kind. The
+analysis charts are SVG written the same way the replay canvas is written, over about
+thirty lines of scale and tick maths in `lib/scale.ts`.
+
+The replay is already a hand-built 1120×640 SVG with its own axes, ticks, tooltips and
+motion, and it is the best-looking thing in the project. A chart library would put a second,
+differently-styled rendering model beside it, and every theme token, focus ring and
+reduced-motion rule would have to be re-fought inside someone else's component API.
+
+**Considered:** Recharts and visx. Recharts brings its own React tree and ~90 KB for what is
+here a line, a band and a box plot. visx is closer to the right level but is a large family
+of packages for the two modules actually needed.
+
+`d3-scale` + `d3-shape` were planned as the compromise — ~15 KB, tree-shakeable, the parts
+of d3 that are pure maths. Writing the first chart showed the compromise was not needed:
+every axis on this site is a linear scale over numbers (laps against seconds), and a linear
+scale plus round-number ticks plus a polyline path is `lib/scale.ts`, tested. The packages
+would also have brought time, log, quantile, ordinal and diverging scales, none of which is
+coming.
+
+The parts that are genuinely hard — nice ticks that do not read as 90.30000000000001, a
+zero-width domain that must not divide by zero — are the parts with unit tests, which is
+where the confidence comes from rather than from a dependency's reputation. `framer-motion`,
+already in the tree for the replay, animates the results.

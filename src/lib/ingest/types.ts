@@ -1,5 +1,5 @@
 import type {
-  Driver, Lap, Meeting, Pit, PositionSample, RaceControl, Session, SessionResult, Weather,
+  Driver, Lap, Meeting, Pit, PositionSample, RaceControl, Session, SessionResult, Stint, Weather,
 } from './openf1';
 
 /** Everything one scored session needs, already fetched and validated. */
@@ -12,6 +12,7 @@ export type RaceBundle = {
   laps: Lap[];
   positions: PositionSample[];
   pits: Pit[];
+  stints: Stint[];
   raceControl: RaceControl[];
   results: SessionResult[];
   weather: Weather[];
@@ -56,6 +57,22 @@ export type EventRow = {
   details: string;
 };
 
+export type StintRow = {
+  driverNumber: number;
+  stintNumber: number;
+  lapStart: number;
+  lapEnd: number;
+  compound: string | null;
+  tyreAgeAtStart: number | null;
+};
+
+export type PitStopRow = {
+  driverNumber: number;
+  lap: number;
+  /** Milliseconds, so the column is an integer; upstream publishes seconds. */
+  durationMs: number | null;
+};
+
 export type ResultRow = {
   driverNumber: number;
   finalPosition: number | null;
@@ -87,6 +104,8 @@ export type TransformedRace = {
   positions: PositionRow[];
   events: EventRow[];
   results: ResultRow[];
+  stints: StintRow[];
+  pitStops: PitStopRow[];
   /**
    * Things that were survivable but not right — a driver with no position
    * samples at all, for instance. Surfaced rather than swallowed, because a

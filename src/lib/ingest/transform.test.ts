@@ -9,9 +9,11 @@ import pits from './__fixtures__/australia-2025/pits.json';
 import positions from './__fixtures__/australia-2025/positions.json';
 import raceControl from './__fixtures__/australia-2025/raceControl.json';
 import results from './__fixtures__/australia-2025/results.json';
+import stints from './__fixtures__/australia-2025/stints.json';
 import weather from './__fixtures__/australia-2025/weather.json';
 import {
-  buildLapPositions, buildResults, deriveRounds, findFastestLap, raceSlug, transformRace,
+  buildLapPositions, buildPitStops, buildResults, buildStints, deriveRounds,
+  findFastestLap, raceSlug, transformRace,
 } from './transform';
 import type { Lap, Meeting, PositionSample, Session } from './openf1';
 import type { RaceBundle } from './types';
@@ -45,6 +47,7 @@ const bundle: RaceBundle = {
   laps: laps as Lap[],
   positions: positions as PositionSample[],
   pits,
+  stints,
   raceControl,
   results,
   weather,
@@ -365,5 +368,47 @@ describe('results', () => {
     for (const row of rows.filter((r) => r.status !== 'FINISHED')) {
       expect(row.finalPosition).toBeNull();
     }
+  });
+});
+
+describe('stints', () => {
+  const lapCount = (laps as Lap[]).reduce((max, l) => Math.max(max, l.lap_number), 0);
+  const rows = buildStints(stints, lapCount);
+
+  it('never runs a stint past the end of the race', () => {
+    // Australia 2025 was a wet race: upstream leaves lap_end null for whoever
+    // was still circulating at the flag, and a retirement's stint can be
+    // reported beyond the lap that driver last completed. Either one drawn
+    // literally puts a strategy bar off the end of the chart.
+    expect(rows.length).toBeGreaterThan(0);
+    for (const row of rows) {
+      expect(row.lapStart).toBeGreaterThanOrEqual(1);
+      expect(row.lapEnd).toBeLessThanOrEqual(lapCount);
+      expect(row.lapEnd).toBeGreaterThanOrEqual(row.lapStart);
+    }
+  });
+
+  it('keeps one row per driver per stint, which is the unique key', () => {
+    const seen = new Set(rows.map((r) => `${r.driverNumber}:${r.stintNumber}`));
+    expect(seen.size).toBe(rows.length);
+  });
+
+  it('carries the compound through, since that is the whole point of the table', () => {
+    expect(rows.some((r) => r.compound === 'INTERMEDIATE')).toBe(true);
+  });
+});
+
+describe('pit stops', () => {
+  const rows = buildPitStops(pits);
+
+  it('stores the duration as whole milliseconds', () => {
+    const timed = rows.filter((r) => r.durationMs !== null);
+    expect(timed.length).toBeGreaterThan(0);
+    for (const row of timed) expect(Number.isInteger(row.durationMs)).toBe(true);
+  });
+
+  it('collapses to one stop per driver per lap, which is the unique key', () => {
+    const seen = new Set(rows.map((r) => `${r.driverNumber}:${r.lap}`));
+    expect(seen.size).toBe(rows.length);
   });
 });
