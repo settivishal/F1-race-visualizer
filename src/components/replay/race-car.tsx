@@ -61,14 +61,14 @@ export function RaceCar({
         width={CAR_WIDTH}
         height={CAR_HEIGHT}
         rx="5"
-        fill="#0f1115"
+        fill="var(--track)"
         stroke={
           caution
-            ? "#eab308"
+            ? "var(--flag-yellow)"
             : accent === "up"
-              ? "#22c55e"
+              ? "var(--flag-green)"
               : accent === "down"
-                ? "#e10600"
+                ? "var(--flag-red)"
                 : "rgba(255,255,255,0.12)"
         }
         strokeWidth={caution || accent ? "1.5" : "1"}
@@ -102,7 +102,7 @@ export function RaceCar({
         fontSize="9"
         fontWeight="800"
         fill="#f8fafc"
-        style={{ letterSpacing: "0.08em", fontFamily: "monospace" }}
+        style={{ letterSpacing: "0.08em", fontFamily: "var(--font-numeric), monospace" }}
       >
         {driverCode}
       </text>
@@ -116,7 +116,7 @@ export function RaceCar({
             width={72}
             height={CAR_HEIGHT}
             rx="4"
-            fill="#0f1115"
+            fill="var(--track)"
             stroke="rgba(255,255,255,0.1)"
             strokeWidth="1"
           />

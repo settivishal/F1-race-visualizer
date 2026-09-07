@@ -93,7 +93,7 @@ export function LiveTimingTower({ visualization, currentLap }: TimingTowerProps)
   return (
     <div
       id={TIMING_TOWER_ID}
-      className="flex flex-col h-full bg-panel shadow-sm ring-1 ring-line rounded-[2rem] overflow-hidden"
+      className="flex flex-col h-full overflow-hidden rounded-xl bg-panel shadow-sm ring-1 ring-line"
     >
       <div className="px-5 py-4 border-b border-line bg-panel-strong/50">
         <h3 className="font-semibold text-sm text-foreground tracking-tight">Live Timing</h3>
@@ -101,7 +101,7 @@ export function LiveTimingTower({ visualization, currentLap }: TimingTowerProps)
       </div>
 
       <div className="flex-1 overflow-y-auto px-2 py-2 hide-scrollbar">
-        <div className="flex text-[10px] uppercase font-semibold text-muted mb-2 px-2">
+        <div className="flex text-eyebrow uppercase font-semibold text-muted mb-2 px-2">
           <div className="w-6">Pos</div>
           <div className="flex-1">Driver</div>
           <div className="w-12 text-right">Gap</div>
@@ -120,9 +120,9 @@ export function LiveTimingTower({ visualization, currentLap }: TimingTowerProps)
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.9 }}
                 transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                className="flex items-center text-xs py-1.5 px-2 rounded-md hover:bg-black/5 dark:hover:bg-white/5 group"
+                className="group flex items-center rounded-md px-2 py-1.5 text-xs transition-colors hover:bg-panel-strong"
               >
-                <div className="w-6 font-mono font-medium text-muted">
+                <div className="tabular w-6 font-mono font-medium text-muted">
                   {standing.position}
                 </div>
                 <div className="flex-1 flex items-center gap-2 overflow-hidden">
@@ -132,7 +132,7 @@ export function LiveTimingTower({ visualization, currentLap }: TimingTowerProps)
                   />
                   <span className="font-semibold text-foreground truncate">{standing.entry.driver.code}</span>
                 </div>
-                <div className="w-12 text-right font-mono text-[11px] text-muted truncate">
+                <div className="tabular w-12 truncate text-right font-mono text-[11px] text-muted">
                   {standing.gap === "LEADER" ? "Lap" : standing.gap}
                 </div>
                 
@@ -153,15 +153,15 @@ function SectorBlock({ value, color, className = "" }: { value: number | null | 
   let colorClass = "text-muted";
   
   if (color === "purple") {
-    colorClass = "text-purple-600 dark:text-purple-400 font-bold";
+    colorClass = "text-timing-best font-bold";
   } else if (color === "green") {
-    colorClass = "text-emerald-600 dark:text-emerald-400 font-bold";
+    colorClass = "text-timing-personal font-bold";
   } else if (color === "yellow") {
-    colorClass = "text-amber-600 dark:text-amber-400";
+    colorClass = "text-timing-slower";
   }
 
   return (
-    <div className={`w-10 text-right font-mono text-[10px] ${colorClass} ${className}`}>
+    <div className={`tabular w-10 text-right font-mono text-[10px] ${colorClass} ${className}`}>
       {formatSector(value)}
     </div>
   );

@@ -12,7 +12,7 @@ import {
 import { ReplayControls } from "./replay-controls";
 import { LiveTimingTower } from "./live-timing-tower";
 import type { ReplayView } from "./types";
-import { useMotionValue, animate } from "framer-motion";
+import { MotionConfig, animate, useMotionValue, useReducedMotion } from "framer-motion";
 
 const BASE_LAP_DURATION_MS = 1600;
 const DEFAULT_SPEED = 1;
@@ -28,6 +28,7 @@ export function RaceVisualizationPlayer({
   const lapProgress = useMotionValue(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [speed, setSpeed] = useState(DEFAULT_SPEED);
+  const shouldReduceMotion = useReducedMotion();
 
   const laps = visualization.laps;
   const currentLap = laps[currentLapIndex] ?? 1;
@@ -75,27 +76,50 @@ export function RaceVisualizationPlayer({
       return;
     }
 
+    const advance = () => {
+      lapProgress.set(0);
+      setCurrentLapIndex((currentIndex) => {
+        const nextIndex = Math.min(currentIndex + 1, Math.max(0, laps.length - 1));
+        if (nextIndex >= Math.max(0, laps.length - 1)) {
+          setIsPlaying(false);
+        }
+        return nextIndex;
+      });
+    };
+
+    // Under a reduced-motion preference the cars step from lap to lap rather
+    // than sliding between them: `lapProgress` stays at 0, so each car renders
+    // at its position for the current lap and jumps to the next.
+    //
+    // A continuously animating position chart is the pattern the preference
+    // exists for. What it must not do is take the feature away — playback, the
+    // speed control, the scrubber, the timing tower and the keyboard shortcuts
+    // all behave exactly as they otherwise would. Only the interpolation stops.
+    if (shouldReduceMotion) {
+      const timer = setTimeout(advance, BASE_LAP_DURATION_MS / speed);
+      return () => clearTimeout(timer);
+    }
+
     const duration = (BASE_LAP_DURATION_MS / speed) * (1 - lapProgress.get());
 
     const controls = animate(lapProgress, 1, {
       duration: duration / 1000,
       ease: "linear",
-      onComplete: () => {
-        lapProgress.set(0);
-        setCurrentLapIndex((currentIndex) => {
-          const nextIndex = Math.min(currentIndex + 1, Math.max(0, laps.length - 1));
-          if (nextIndex >= Math.max(0, laps.length - 1)) {
-            setIsPlaying(false);
-          }
-          return nextIndex;
-        });
-      },
+      onComplete: advance,
     });
 
     return () => {
       controls.stop();
     };
-  }, [canAdvance, isPlaying, laps.length, speed, lapProgress, currentLapIndex]);
+  }, [
+    canAdvance,
+    isPlaying,
+    laps.length,
+    speed,
+    lapProgress,
+    currentLapIndex,
+    shouldReduceMotion,
+  ]);
 
   useEffect(() => {
     function handleKeydown(event: KeyboardEvent) {
@@ -138,91 +162,97 @@ export function RaceVisualizationPlayer({
   }, [canAdvance, laps.length, lapProgress]);
 
   return (
-    <div className="space-y-5" aria-label={`${visualization.race.name} replay`} role="region">
-      {/* The shortcuts work whether or not this is read, but a control nobody
-          can discover is not really operable. Visible to screen readers and on
-          keyboard focus; out of the way otherwise. */}
-      <p className="sr-only focus-within:not-sr-only" tabIndex={0}>
-        Keyboard: Space plays and pauses, Left and Right arrows step one lap,
-        Home returns to lap one. The live timing tower lists the running order
-        for the current lap as text.
-      </p>
-      <div className="overflow-x-auto pb-10">
-        <div className="grid w-full items-stretch gap-5 lg:grid-cols-[20rem_minmax(0,1fr)]">
-          <div className="h-full max-h-[800px]">
-            <LiveTimingTower
-              visualization={visualization}
-              currentLap={currentLap}
-            />
-          </div>
+    // `reducedMotion="user"` makes every framer-motion animation below here
+    // follow the preference, including the timing tower's spring reordering,
+    // which this component does not otherwise control. The CSS rule in
+    // globals.css cannot reach JS-driven animation; this is its counterpart.
+    <MotionConfig reducedMotion="user">
+      <div className="space-y-5" aria-label={`${visualization.race.name} replay`} role="region">
+        {/* The shortcuts work whether or not this is read, but a control nobody
+            can discover is not really operable. Visible to screen readers and on
+            keyboard focus; out of the way otherwise. */}
+        <p className="sr-only focus-within:not-sr-only" tabIndex={0}>
+          Keyboard: Space plays and pauses, Left and Right arrows step one lap,
+          Home returns to lap one. The live timing tower lists the running order
+          for the current lap as text.
+        </p>
+        <div className="overflow-x-auto pb-10">
+          <div className="grid w-full items-stretch gap-5 lg:grid-cols-[20rem_minmax(0,1fr)]">
+            <div className="h-full max-h-[800px]">
+              <LiveTimingTower
+                visualization={visualization}
+                currentLap={currentLap}
+              />
+            </div>
 
-          <div className="h-full flex flex-col min-h-[600px] max-h-[800px]">
-            <RaceVisualizationCanvas
-              className="h-full flex-1"
-              visualization={visualization}
-              currentLap={currentLap}
-              nextLap={nextLap}
-              lapProgress={lapProgress}
-              raceControl={activeRaceControl}
-              driverStates={driverReplayStates}
-              controls={
-                <ReplayControls
-                  compact
-                  currentLap={currentLap}
-                  maxLap={visualization.summary.maxLap || visualization.race.laps}
-                  isPlaying={isPlaying}
-                  speed={speed}
-                  progressPercent={replayProgressPercent}
-                  lapProgress={lapProgress}
-                  canStepBackward={currentLapIndex > 0}
-                  canStepForward={canAdvance}
-                  onPlayPause={() => {
-                    if (!canAdvance && currentLapIndex >= laps.length - 1) {
+            <div className="h-full flex flex-col min-h-[600px] max-h-[800px]">
+              <RaceVisualizationCanvas
+                className="h-full flex-1"
+                visualization={visualization}
+                currentLap={currentLap}
+                nextLap={nextLap}
+                lapProgress={lapProgress}
+                raceControl={activeRaceControl}
+                driverStates={driverReplayStates}
+                controls={
+                  <ReplayControls
+                    compact
+                    currentLap={currentLap}
+                    maxLap={visualization.summary.maxLap || visualization.race.laps}
+                    isPlaying={isPlaying}
+                    speed={speed}
+                    progressPercent={replayProgressPercent}
+                    lapProgress={lapProgress}
+                    canStepBackward={currentLapIndex > 0}
+                    canStepForward={canAdvance}
+                    onPlayPause={() => {
+                      if (!canAdvance && currentLapIndex >= laps.length - 1) {
+                        setCurrentLapIndex(0);
+                        lapProgress.set(0);
+                      }
+                      setIsPlaying((current) => !current);
+                    }}
+                    onRestart={() => {
+                      setIsPlaying(false);
                       setCurrentLapIndex(0);
                       lapProgress.set(0);
-                    }
-                    setIsPlaying((current) => !current);
-                  }}
-                  onRestart={() => {
-                    setIsPlaying(false);
-                    setCurrentLapIndex(0);
-                    lapProgress.set(0);
-                  }}
-                  onPrevious={() => {
-                    setIsPlaying(false);
-                    lapProgress.set(0);
-                    setCurrentLapIndex((current) => Math.max(current - 1, 0));
-                  }}
-                  onNext={() => {
-                    setIsPlaying(false);
-                    lapProgress.set(0);
-                    setCurrentLapIndex((current) =>
-                      Math.min(current + 1, Math.max(0, laps.length - 1)),
-                    );
-                  }}
-                  onJumpToLap={(lap) => {
-                    setIsPlaying(false);
-                    lapProgress.set(0);
-                    const nextIndex = Math.max(0, laps.findIndex((entry) => entry === lap));
-                    setCurrentLapIndex(nextIndex);
-                  }}
-                  onChangeSpeed={(nextSpeed) => setSpeed(nextSpeed)}
-                />
-              }
-            />
+                    }}
+                    onPrevious={() => {
+                      setIsPlaying(false);
+                      lapProgress.set(0);
+                      setCurrentLapIndex((current) => Math.max(current - 1, 0));
+                    }}
+                    onNext={() => {
+                      setIsPlaying(false);
+                      lapProgress.set(0);
+                      setCurrentLapIndex((current) =>
+                        Math.min(current + 1, Math.max(0, laps.length - 1)),
+                      );
+                    }}
+                    onJumpToLap={(lap) => {
+                      setIsPlaying(false);
+                      lapProgress.set(0);
+                      const nextIndex = Math.max(0, laps.findIndex((entry) => entry === lap));
+                      setCurrentLapIndex(nextIndex);
+                    }}
+                    onChangeSpeed={(nextSpeed) => setSpeed(nextSpeed)}
+                  />
+                }
+              />
+            </div>
+
           </div>
-
         </div>
-      </div>
 
-      {storyPanel ? (
-        <RaceStoryPanel 
-          visualization={visualization} 
-          currentLap={currentLap} 
-          raceControl={activeRaceControl}
-          trafficSummary={trafficSummary}
-        />
-      ) : null}
-    </div>
+        {storyPanel ? (
+          <RaceStoryPanel 
+            visualization={visualization} 
+            currentLap={currentLap} 
+            raceControl={activeRaceControl}
+            trafficSummary={trafficSummary}
+          />
+        ) : null}
+      </div>
+    </MotionConfig>
   );
 }

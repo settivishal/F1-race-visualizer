@@ -78,6 +78,12 @@
   --flag-pit: #38bdf8;
   --flag-penalty: #fb7185;
   --flag-chequered: #cbd5e1;
+
+  /* Sector timing, the other set of colours the sport fixes the meaning of:
+     purple is the fastest of anyone, green a personal best, yellow neither. */
+  --timing-best: #c084fc;
+  --timing-personal: #4ade80;
+  --timing-slower: #fbbf24;
 }
 
 :root.light {
@@ -107,6 +113,10 @@
   --flag-pit: #0369a1;
   --flag-penalty: #be123c;
   --flag-chequered: #475569;
+
+  --timing-best: #7e22ce;
+  --timing-personal: #15803d;
+  --timing-slower: #a16207;
 }
 
 @media (prefers-color-scheme: light) {
@@ -137,6 +147,10 @@
     --flag-pit: #0369a1;
     --flag-penalty: #be123c;
     --flag-chequered: #475569;
+
+    --timing-best: #7e22ce;
+    --timing-personal: #15803d;
+    --timing-slower: #a16207;
   }
 }
 
@@ -160,6 +174,9 @@
   --color-flag-red: var(--flag-red);
   --color-flag-safety-car: var(--flag-safety-car);
   --color-flag-pit: var(--flag-pit);
+  --color-timing-best: var(--timing-best);
+  --color-timing-personal: var(--timing-personal);
+  --color-timing-slower: var(--timing-slower);
 
   --font-sans: var(--font-body);
   --font-heading: var(--font-display);

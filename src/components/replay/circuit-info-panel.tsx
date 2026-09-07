@@ -26,7 +26,7 @@ export function CircuitInfoPanel({
     <Card className="mt-8 mb-4 p-8">
       <div className="flex justify-between items-center mb-8">
         <div>
-          <p className="text-xs font-bold uppercase tracking-[0.24em] text-foreground mb-2">
+          <p className="mb-2 text-eyebrow font-bold uppercase text-accent">
             Circuit Profile
           </p>
           <p className="text-xl font-bold text-muted">{circuitData.name}</p>

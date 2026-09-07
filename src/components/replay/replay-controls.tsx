@@ -4,13 +4,13 @@ import { motion, MotionValue, useTransform } from "framer-motion";
 const SPEED_OPTIONS = [0.5, 1, 2, 4, 8];
 
 const PlayIcon = () => (
-  <svg viewBox="0 0 24 24" fill="currentColor" className="w-3.5 h-3.5 text-white">
+  <svg viewBox="0 0 24 24" fill="currentColor" className="w-3.5 h-3.5">
     <path d="M8 5v14l11-7z" />
   </svg>
 );
 
 const PauseIcon = () => (
-  <svg viewBox="0 0 24 24" fill="currentColor" className="w-3.5 h-3.5 text-white">
+  <svg viewBox="0 0 24 24" fill="currentColor" className="w-3.5 h-3.5">
     <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
   </svg>
 );
@@ -77,14 +77,14 @@ export function ReplayControls({
 
   if (compact) {
     return (
-      <div className="min-w-[min(100%,34rem)] rounded-[1.6rem] border border-white/10 bg-[#07090c]/55 px-6 py-5 shadow-2xl backdrop-blur-md">
+      <div className="min-w-[min(100%,34rem)] rounded-xl border border-line-strong bg-panel-strong/80 px-6 py-5 shadow-lg backdrop-blur-md">
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={onPrevious}
             disabled={!canStepBackward}
             aria-label="Previous lap"
-            className="h-8 w-8 flex items-center justify-center rounded-full border border-white/10 bg-white/5 text-white hover:bg-white/15 disabled:opacity-30 transition"
+            className="h-8 w-8 flex items-center justify-center rounded-full border border-line-strong bg-panel text-foreground transition hover:bg-panel-strong disabled:opacity-30"
           >
             <PrevIcon />
           </button>
@@ -92,7 +92,7 @@ export function ReplayControls({
             type="button"
             onClick={onPlayPause}
             aria-label={isPlaying ? "Pause replay" : "Play replay"}
-            className="h-8 w-8 flex items-center justify-center rounded-full bg-[#e10600] text-white hover:bg-[#ff0700] hover:shadow-[0_0_12px_rgba(225,6,0,0.5)] transition-all duration-200"
+            className="h-8 w-8 flex items-center justify-center rounded-full bg-accent text-on-accent transition hover:bg-accent-strong active:brightness-90"
           >
             {isPlaying ? <PauseIcon /> : <PlayIcon />}
           </button>
@@ -101,7 +101,7 @@ export function ReplayControls({
             onClick={onNext}
             disabled={!canStepForward}
             aria-label="Next lap"
-            className="h-8 w-8 flex items-center justify-center rounded-full border border-white/10 bg-white/5 text-white hover:bg-white/15 disabled:opacity-30 transition"
+            className="h-8 w-8 flex items-center justify-center rounded-full border border-line-strong bg-panel text-foreground transition hover:bg-panel-strong disabled:opacity-30"
           >
             <NextIcon />
           </button>
@@ -109,7 +109,7 @@ export function ReplayControls({
             type="button"
             onClick={onRestart}
             aria-label="Restart replay"
-            className="h-8 w-8 flex items-center justify-center rounded-full border border-white/10 bg-white/5 text-white hover:bg-white/15 transition"
+            className="h-8 w-8 flex items-center justify-center rounded-full border border-line-strong bg-panel text-foreground transition hover:bg-panel-strong"
           >
             <RestartIcon />
           </button>
@@ -122,10 +122,10 @@ export function ReplayControls({
                   key={option}
                   type="button"
                   onClick={() => onChangeSpeed(option)}
-                  className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] transition-all duration-200 ${
+                  className={`rounded-full px-2.5 py-1 text-eyebrow font-bold uppercase transition ${
                     isActive
-                      ? "bg-[#e10600] text-white shadow-md hover:bg-[#ff0700]"
-                      : "border border-white/8 bg-white/5 text-white/70 hover:bg-white/10 hover:text-white"
+                      ? "bg-accent text-on-accent hover:bg-accent-strong"
+                      : "border border-line-strong bg-panel text-muted hover:bg-panel-strong hover:text-foreground"
                   }`}
                 >
                   {option}x
@@ -136,22 +136,22 @@ export function ReplayControls({
         </div>
 
         <div className="mt-3.5 grid gap-2">
-          <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-[0.2em] text-white/60">
+          <div className="flex items-center justify-between text-eyebrow font-bold uppercase text-muted">
             <span>Lap {currentLap}</span>
             <span>{Math.round(progressPercent)}%</span>
           </div>
           
           <div className="relative w-full h-1.5 mt-1">
             {/* The visual progress track */}
-            <div className="absolute inset-0 h-full overflow-hidden rounded-full bg-white/10">
+            <div className="absolute inset-0 h-full overflow-hidden rounded-full bg-line">
               <motion.div
-                className="h-full rounded-full bg-[#e10600]"
+                className="h-full rounded-full bg-accent"
                 style={{ width: widthStr }}
               />
             </div>
             {/* The visible scrubber head (thumb) */}
             <motion.div
-              className="absolute top-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full bg-white border border-[#e10600] shadow-[0_0_6px_rgba(225,6,0,0.8)] pointer-events-none"
+              className="absolute top-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full bg-foreground border-2 border-accent pointer-events-none"
               style={{ left: thumbStrCompact }}
             />
             {/* The invisible interactive range slider on top */}
@@ -172,15 +172,11 @@ export function ReplayControls({
   }
 
   return (
-    <div className="rounded-[2rem] border border-[color:var(--color-line)] bg-white/72 p-5 shadow-sm">
+    <div className="rounded-xl border border-line bg-panel p-5 shadow-sm">
       <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
         <div className="space-y-4">
           <div className="flex flex-wrap items-center gap-3">
-            <Button
-              type="button"
-              onClick={onPlayPause}
-              className="bg-[#e10600] text-white hover:bg-[#ff0700] hover:shadow-[0_0_12px_rgba(225,6,0,0.4)]"
-            >
+            <Button type="button" onClick={onPlayPause}>
               {isPlaying ? "Pause Replay" : "Play Replay"}
             </Button>
             <Button type="button" variant="secondary" onClick={onRestart}>
@@ -195,7 +191,7 @@ export function ReplayControls({
           </div>
 
           <div>
-            <div className="flex items-center justify-between gap-4 text-xs font-semibold uppercase tracking-[0.24em] text-[color:var(--color-muted)]">
+            <div className="flex items-center justify-between gap-4 text-eyebrow font-semibold uppercase text-muted">
               <span>Lap scrubber</span>
               <span>
                 Lap {currentLap} / {maxLap}
@@ -204,15 +200,15 @@ export function ReplayControls({
             
             <div className="relative w-full h-2 mt-3">
               {/* The visual progress track */}
-              <div className="absolute inset-0 h-full overflow-hidden rounded-full bg-[color:var(--color-line)]">
+              <div className="absolute inset-0 h-full overflow-hidden rounded-full bg-line">
                 <motion.div
-                  className="h-full rounded-full bg-[#e10600]"
+                  className="h-full rounded-full bg-accent"
                   style={{ width: widthStr }}
                 />
               </div>
               {/* The visible scrubber head (thumb) */}
               <motion.div
-                className="absolute top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-white border border-[#e10600] shadow-[0_0_6px_rgba(225,6,0,0.8)] pointer-events-none"
+                className="absolute top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-foreground border-2 border-accent pointer-events-none"
                 style={{ left: thumbStrNormal }}
               />
               {/* The invisible interactive range slider on top */}
@@ -231,7 +227,7 @@ export function ReplayControls({
 
         <div className="space-y-4">
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.24em] text-foreground">
+            <p className="text-eyebrow font-bold uppercase text-foreground">
               Playback speed
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
@@ -242,8 +238,8 @@ export function ReplayControls({
                   onClick={() => onChangeSpeed(option)}
                   className={
                     option === speed
-                      ? "rounded-full bg-[#e10600] px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-white"
-                      : "rounded-full border border-line bg-panel px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-foreground hover:bg-panel-strong transition-colors"
+                      ? "rounded-full bg-accent px-4 py-2 text-eyebrow font-semibold uppercase text-on-accent"
+                      : "rounded-full border border-line bg-panel px-4 py-2 text-eyebrow font-semibold uppercase text-foreground transition-colors hover:bg-panel-strong"
                   }
                 >
                   {option}x
@@ -254,26 +250,26 @@ export function ReplayControls({
 
           <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-3">
             <div className="rounded-2xl border border-line bg-panel px-4 py-3">
-              <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-muted">
+              <p className="text-eyebrow font-bold uppercase text-muted">
                 Current lap
               </p>
-              <p className="mt-2 font-heading text-3xl leading-none text-foreground">
+              <p className="tabular mt-2 font-heading text-3xl leading-none text-foreground">
                 {currentLap}
               </p>
             </div>
             <div className="rounded-2xl border border-line bg-panel px-4 py-3">
-              <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-muted">
+              <p className="text-eyebrow font-bold uppercase text-muted">
                 Progress
               </p>
-              <p className="mt-2 font-heading text-3xl leading-none text-foreground">
+              <p className="tabular mt-2 font-heading text-3xl leading-none text-foreground">
                 {Math.round(progressPercent)}%
               </p>
             </div>
             <div className="rounded-2xl border border-line bg-panel px-4 py-3">
-              <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-muted">
+              <p className="text-eyebrow font-bold uppercase text-muted">
                 Speed
               </p>
-              <p className="mt-2 font-heading text-3xl leading-none text-foreground">
+              <p className="tabular mt-2 font-heading text-3xl leading-none text-foreground">
                 {speed}x
               </p>
             </div>
