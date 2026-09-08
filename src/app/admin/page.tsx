@@ -68,7 +68,7 @@ async function RaceList({ searchParams }: { searchParams: SearchParams }) {
   return (
     <>
       <Card className="mt-8">
-        <h2 className="font-heading text-lg font-bold">Import a session</h2>
+        <h2 className="type-card-title">Import a session</h2>
         <p className="mt-1 text-sm text-muted">
           Runs the same code path as the backfill script and the cron job — same transaction,
           same idempotency. Re-importing a race that already exists changes no row counts.
@@ -140,7 +140,7 @@ async function RaceList({ searchParams }: { searchParams: SearchParams }) {
                     {node.type === 'SPRINT' ? <Badge>Sprint</Badge> : null}
                     {node.isFeatured ? <Badge tone="accent">Featured</Badge> : null}
                   </div>
-                  <p className="font-heading mt-1.5 text-lg font-bold">
+                  <p className="type-card-title mt-1.5">
                     {node.meeting?.name ?? node.slug}
                   </p>
                   <p className="tabular mt-0.5 text-sm text-muted">

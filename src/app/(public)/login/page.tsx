@@ -34,7 +34,7 @@ type SearchParams = Promise<{ [key: string]: string | string[] | undefined }>;
 export default function LoginPage({ searchParams }: { searchParams: SearchParams }) {
   return (
     <PageContainer className="max-w-md py-16">
-      <h1 className="font-heading text-3xl font-bold tracking-tight">Sign in</h1>
+      <h1 className="type-page-title">Sign in</h1>
       <p className="mt-2 text-muted">Admin access only. There is no public account.</p>
 
       <Suspense fallback={<FormSkeleton />}>

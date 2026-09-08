@@ -104,7 +104,7 @@ async function Standings({ searchParams }: { searchParams: SearchParams }) {
       ) : (
         <>
           <section className="mt-10">
-            <h2 className="font-heading text-2xl font-bold tracking-tight">
+            <h2 className="type-section-title">
               Drivers&rsquo; championship
             </h2>
 
@@ -163,7 +163,7 @@ async function Standings({ searchParams }: { searchParams: SearchParams }) {
           </section>
 
           <section className="mt-12">
-            <h2 className="font-heading text-2xl font-bold tracking-tight">
+            <h2 className="type-section-title">
               Constructors&rsquo; championship
             </h2>
 

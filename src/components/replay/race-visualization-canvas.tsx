@@ -8,6 +8,7 @@ import { RaceCar } from "./race-car";
 import { TIMING_TOWER_ID } from "./live-timing-tower";
 import {
   classifyReplayEvent,
+  type ReplayEventKind,
   DriverReplayState,
   getReplayEventMarkerColor,
   ReplayRaceControl,
@@ -18,10 +19,38 @@ const VIEWBOX_WIDTH = 1120;
 const VIEWBOX_HEIGHT = 640;
 const MARGIN = {
   top: 80,
-  right: 120,
-  bottom: 68,
-  left: 176,
+  // The driver badges ride the playhead rather than sitting at the right edge,
+  // so this only has to clear the last lap label.
+  right: 56,
+  // The last row sits exactly on top + innerHeight, so its label needs room
+  // below the plot or it is clipped by the container — P18 was rendering as a
+  // half-height label on an eighteen-car race.
+  bottom: 96,
+  // "P18" is four characters. 176 spent a sixth of the chart's width on it.
+  left: 96,
 };
+
+/**
+ * The signals that describe the race rather than one car, and so earn a rule
+ * across the whole plot.
+ */
+const RACE_CONTROL_KINDS = new Set<ReplayEventKind>([
+  "safety-car",
+  "virtual-safety-car",
+  "red-flag",
+  "yellow",
+  "double-yellow",
+  "chequered",
+  "green",
+]);
+
+/** Race control plus the non-finishes: a line that stops should say why. */
+const CHART_EVENT_KINDS = new Set<ReplayEventKind>([
+  ...RACE_CONTROL_KINDS,
+  "dnf",
+  "dns",
+  "dsq",
+]);
 
 function getLapX(lap: number, maxLap: number) {
   const innerWidth = VIEWBOX_WIDTH - MARGIN.left - MARGIN.right;
@@ -147,6 +176,14 @@ export function RaceVisualizationCanvas({
     [visualization.events],
   );
 
+  const chartEvents = useMemo(
+    () =>
+      visualization.events
+        .map((event, index) => ({ event, index, kind: classifyReplayEvent(event) }))
+        .filter(({ kind }) => CHART_EVENT_KINDS.has(kind)),
+    [visualization.events],
+  );
+
   const currentDriverFrames = useMemo(
     () =>
       drivers.map((entry, index) => {
@@ -201,31 +238,45 @@ export function RaceVisualizationCanvas({
     // instrument on a light page, the way a video player does. It is the one
     // surface here that does not follow the theme.
     <div className={cn("flex flex-col overflow-hidden rounded-xl border border-line-strong bg-track p-5 text-white shadow-lg", className)}>
-      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-5 border-b border-white/10 px-4 pb-5">
-        <div className="max-w-md md:max-w-xl flex-1">
-          <p className="text-eyebrow font-bold uppercase text-accent">Visualization Engine</p>
-          <h3 className="font-heading mt-2 break-words text-2xl font-bold leading-tight tracking-tight text-white sm:text-3xl">
-            {race.season} R{race.round} • {race.name}
-          </h3>
-          <div className="mt-3.5 flex flex-wrap gap-2 text-xs">
-            <span className="tabular rounded-md border border-white/10 bg-white/5 px-2.5 py-1 font-semibold text-white/90">
-              {summary.driverCount} Drivers
-            </span>
-            <span className="tabular rounded-md border border-white/10 bg-white/5 px-2.5 py-1 font-semibold text-white/90">
-              {summary.maxLap || race.laps} Laps
-            </span>
-            <span className="tabular rounded-md border border-white/10 bg-white/5 px-2.5 py-1 font-semibold text-white/90">
-              {visualization.events.length} Events
-            </span>
+      <div className="border-b border-white/10 px-4 pb-5">
+        <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
+          {/* min-w-0 so a long race name wraps instead of pushing the controls
+              off; the chips used to live in here and inherited the squeeze. */}
+          <div className="min-w-0 max-w-xl flex-1">
+            <p className="text-eyebrow font-bold uppercase text-accent">Visualization Engine</p>
+            <h3 className="font-heading mt-2 break-words text-2xl font-bold leading-tight tracking-tight text-white sm:text-3xl">
+              {race.season} R{race.round} • {race.name}
+            </h3>
+          </div>
+          <div className="flex flex-col items-start gap-3 md:flex-shrink-0 md:items-end">
+            {controls ? <div>{controls}</div> : null}
           </div>
         </div>
-        <div className="flex flex-col items-start md:items-end gap-3 flex-shrink-0">
-          {controls ? <div>{controls}</div> : null}
+
+        {/* Their own row, full width. In the title's column they were sharing
+            space with a flex-shrink-0 sibling and wrapped one-then-two. */}
+        <div className="mt-3.5 flex flex-wrap gap-2 text-xs">
+          <span className="tabular rounded-md border border-white/10 bg-white/5 px-2.5 py-1 font-semibold text-white/90">
+            {summary.driverCount} Drivers
+          </span>
+          <span className="tabular rounded-md border border-white/10 bg-white/5 px-2.5 py-1 font-semibold text-white/90">
+            {summary.maxLap || race.laps} Laps
+          </span>
+          <span className="tabular rounded-md border border-white/10 bg-white/5 px-2.5 py-1 font-semibold text-white/90">
+            {/* What the chart draws, not what the race recorded — a "186
+                Events" chip above five visible markers reads as a bug. The
+                full count is the timeline's business. */}
+            {chartEvents.length} Flags
+          </span>
         </div>
       </div>
 
-      <div className="mt-4 overflow-x-auto">
-        <div className="min-w-[760px]">
+      {/* min-h-0 so this can shrink inside the card's flex column: without it
+          an `h-auto` SVG keeps its intrinsic height, the column overflows the
+          card's max height, and the bottom of the chart is cropped — which is
+          what cut P18 in half on an eighteen-car race. */}
+      <div className="mt-4 min-h-0 flex-1 overflow-x-auto">
+        <div className="h-full min-w-[760px]">
           <svg
             viewBox={`0 0 ${VIEWBOX_WIDTH} ${VIEWBOX_HEIGHT}`}
             role="img"
@@ -233,7 +284,10 @@ export function RaceVisualizationCanvas({
               summary.maxLap || race.laps
             }`}
             aria-describedby={TIMING_TOWER_ID}
-            className="h-auto w-full"
+            // `meet` letterboxes rather than crops, so a short container makes
+            // a smaller chart instead of a clipped one.
+            preserveAspectRatio="xMidYMid meet"
+            className="h-full max-h-full w-full"
           >
             {/* Dark background panel */}
             <rect
@@ -319,23 +373,33 @@ export function RaceVisualizationCanvas({
               );
             })}
 
-            {/* Telemetry Event Markers with concentric design */}
-            {visualization.events.map((event, eventIndex) => {
+            {/* Race control, and only race control.
+                This drew a dot and a full-height dashed line for every event,
+                which on a race carrying 186 of them — the archive files an
+                overtake per position change — put the plot behind a curtain.
+                What earns a rule across the whole chart is a signal that
+                applies to the whole chart: a safety car, a red flag, the
+                chequered. Retirements keep a dot, because a line that stops
+                should say why. Everything else is in the timeline below, which
+                is the place built for listing things. */}
+            {chartEvents.map(({ event, kind, index: eventIndex }) => {
               const cx = getLapX(event.lap, summary.maxLap);
-              const kind = classifyReplayEvent(event);
               const color = getReplayEventMarkerColor(kind);
+              const isRaceControl = RACE_CONTROL_KINDS.has(kind);
 
               return (
                 <g key={`${event.lap}-${event.type}-${eventIndex}`}>
-                    <line
-                      x1={cx}
-                      y1={MARGIN.top - 48}
-                      x2={cx}
-                      y2={VIEWBOX_HEIGHT - MARGIN.bottom}
-                      stroke={kind === "penalty" ? "var(--flag-penalty)" : "var(--flag-yellow)"}
-                      strokeOpacity="0.2"
-                      strokeDasharray="4 4"
-                    />
+                    {isRaceControl ? (
+                      <line
+                        x1={cx}
+                        y1={MARGIN.top - 48}
+                        x2={cx}
+                        y2={VIEWBOX_HEIGHT - MARGIN.bottom}
+                        stroke={color}
+                        strokeOpacity="0.25"
+                        strokeDasharray="4 4"
+                      />
+                    ) : null}
                     <circle
                       cx={cx}
                       cy={MARGIN.top - 48}
@@ -374,8 +438,10 @@ export function RaceVisualizationCanvas({
           The replay controller drives car positions, lap progress, and event markers from the same
           synchronized race state.
         </p>
+        {/* The race-control label lives in the story strip directly below;
+            printing it here as well said the same thing twice on one screen. */}
         <p className="text-accent">
-          {raceControl.label} • lap {currentLap}
+          Lap {currentLap}
           {nextLap !== currentLap ? ` → ${nextLap}` : ""}
         </p>
       </div>

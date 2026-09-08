@@ -2,6 +2,7 @@ import { Suspense } from 'react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { PageContainer } from '@/components/ui/page-container';
+import { SectionHeader } from '@/components/ui/section-header';
 import { Skeleton } from '@/components/ui/skeleton';
 import { StatRow } from '@/components/archive/record-table';
 import { getArchiveIndex, getCircuitProfile } from '@/lib/queries';
@@ -61,15 +62,15 @@ async function CircuitDetail({ params }: { params: Promise<{ id: string }> }) {
 
   return (
     <>
-      <header className="mt-5">
-        <p className="text-eyebrow font-semibold uppercase text-accent">Circuit</p>
-        <h1 className="font-heading mt-2.5 text-4xl font-bold tracking-tight sm:text-5xl">
-          {circuit.name}
-        </h1>
-        <p className="mt-2.5 text-muted">
-          {[circuit.locality, circuit.country].filter(Boolean).join(', ') || 'Location unknown'}
-        </p>
-      </header>
+      <div className="mt-5">
+        <SectionHeader
+          eyebrow="Circuit"
+          title={circuit.name}
+          description={
+            [circuit.locality, circuit.country].filter(Boolean).join(', ') || 'Location unknown'
+          }
+        />
+      </div>
 
       {stats.length > 0 ? (
         <div className="mt-8">
