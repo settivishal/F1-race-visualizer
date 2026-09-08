@@ -12,6 +12,7 @@ import type {
   RaceHeaderQuery,
   RaceLibraryQuery,
   RaceSlugsQuery,
+  SeasonScheduleQuery,
   SeasonStandingsQuery,
 } from '@/graphql/generated/graphql';
 
@@ -298,6 +299,36 @@ export async function getTeamProfile(name: string) {
   cacheLife('days');
 
   return executeQuery<TeamProfileQuery, { name: string }>(TEAM_PROFILE, { name });
+}
+
+const SEASON_SCHEDULE = /* GraphQL */ `
+  query SeasonSchedule($season: Int!) {
+    races(season: $season, first: 100) {
+      edges {
+        node {
+          slug
+          date
+          type
+          meeting { name round }
+        }
+      }
+    }
+  }
+`;
+
+/**
+ * Every race of a season, for the home page's progress and countdown.
+ *
+ * `first: 100` rather than the library's 24: a season is at most 24 grands
+ * prix plus six sprints, and a page boundary here would silently under-count
+ * the season rather than showing a "next page" the caller could follow.
+ */
+export async function getSeasonSchedule(season: number) {
+  'use cache';
+  cacheTag('race');
+  cacheLife('days');
+
+  return executeQuery<SeasonScheduleQuery, { season: number }>(SEASON_SCHEDULE, { season });
 }
 
 const ARCHIVE_INDEX = /* GraphQL */ `
