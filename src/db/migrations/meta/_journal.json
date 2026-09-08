@@ -22,6 +22,13 @@
       "when": 1788812610626,
       "tag": "0002_curious_juggernaut",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1788839158022,
+      "tag": "0003_unique_tattoo",
+      "breakpoints": true
     }
   ]
 }
