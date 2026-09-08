@@ -4,6 +4,7 @@ import type {
   ArchiveIndexQuery,
   CircuitProfileQuery,
   DriverProfileQuery,
+  HeadToHeadQuery,
   HeroReplayQuery,
   LatestResultQuery,
   SeasonPulseQuery,
@@ -402,6 +403,45 @@ export async function getSeasonSchedule(season: number) {
   cacheLife('days');
 
   return executeQuery<SeasonScheduleQuery, { season: number }>(SEASON_SCHEDULE, { season });
+}
+
+const HEAD_TO_HEAD = /* GraphQL */ `
+  query HeadToHead($slug: String!, $driverA: String!, $driverB: String!) {
+    race(slug: $slug) {
+      slug
+      laps
+      meeting { name season }
+      results { finalPosition driver { code name } }
+      analysis {
+        headToHead(driverA: $driverA, driverB: $driverB) {
+          lapsAheadA
+          lapsAheadB
+          a { driver { code name } team { name color } finalPosition pace { best median consistency lapsCounted } }
+          b { driver { code name } team { name color } finalPosition pace { best median consistency lapsCounted } }
+          laps { lap positionDelta timeDelta }
+        }
+      }
+    }
+  }
+`;
+
+/**
+ * Two drivers inside one race.
+ *
+ * Its own scope rather than part of `getRaceAnalysis`: the pair keys the cache
+ * entry, and the rest of that payload — every lap time of every driver — does
+ * not vary by it. Sharing one entry would mean re-fetching all of it for each
+ * comparison someone tries.
+ */
+export async function getHeadToHead(slug: string, driverA: string, driverB: string) {
+  'use cache';
+  cacheTag('race');
+  cacheLife('days');
+
+  return executeQuery<HeadToHeadQuery, { slug: string; driverA: string; driverB: string }>(
+    HEAD_TO_HEAD,
+    { slug, driverA, driverB },
+  );
 }
 
 const ARCHIVE_INDEX = /* GraphQL */ `
