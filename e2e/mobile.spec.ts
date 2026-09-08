@@ -61,21 +61,36 @@ test('the nav is reachable behind the menu button', async ({ page }) => {
   await expect(page).toHaveURL(/\/standings/);
 });
 
-test('the chart pans inside its own box rather than the page', async ({ page }) => {
-  await page.goto('/races/2026-monza');
+test('the chart fits the screen and windows the race instead of panning', async ({ page }) => {
+  // It used to be 760px wide inside a scrolling box, so reading one race meant
+  // scrolling in two directions at once. Now the axis shows as many laps as fit
+  // at a legible spacing, centred on wherever the replay is.
+  await page.goto('/races/2026-monza?lap=40');
   await page.waitForLoadState('networkidle');
 
-  const scroller = page.locator('div.overflow-x-auto', { has: page.locator('svg[role="img"]') }).first();
+  const chart = await page.evaluate(() => {
+    const svg = document.querySelector('svg[role="img"]');
+    const box = svg?.parentElement?.parentElement as HTMLElement;
+    const ticks = [...document.querySelectorAll('svg text')]
+      .map((node) => node.textContent ?? '')
+      .filter((text) => text.startsWith('Lap '))
+      .map((text) => Number(text.replace('Lap ', '')));
 
-  const box = await scroller.evaluate((element) => ({
-    // Wider content than container is the point — twenty lines need the room.
-    content: element.scrollWidth,
-    visible: element.clientWidth,
-    onScreen: element.getBoundingClientRect().width,
-  }));
+    return {
+      content: box.scrollWidth,
+      visible: box.clientWidth,
+      firstTick: Math.min(...ticks),
+      lastTick: Math.max(...ticks),
+    };
+  });
 
-  expect(box.content).toBeGreaterThan(box.visible);
-  expect(box.onScreen).toBeLessThanOrEqual(390);
+  // Nothing to pan: the chart is drawn to the box it has.
+  expect(chart.content).toBeLessThanOrEqual(chart.visible);
+
+  // A window rather than the whole 53-lap race, and it is around lap 40.
+  expect(chart.lastTick - chart.firstTick).toBeLessThan(40);
+  expect(chart.firstTick).toBeLessThanOrEqual(40);
+  expect(chart.lastTick).toBeGreaterThanOrEqual(40);
 });
 
 test('what a finger lands on is big enough to hit', async ({ page }) => {

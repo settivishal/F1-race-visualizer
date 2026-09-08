@@ -1,7 +1,6 @@
 "use client";
 
-import { ReactNode } from "react";
-import { useMemo } from "react";
+import { ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/cn";
 import type { ReplayEntry, ReplayEvent, ReplayPosition, ReplaySummary, ReplayView } from "./types";
 import { RaceCar } from "./race-car";
@@ -52,14 +51,55 @@ const CHART_EVENT_KINDS = new Set<ReplayEventKind>([
   "dsq",
 ]);
 
-function getLapX(lap: number, maxLap: number) {
-  const innerWidth = VIEWBOX_WIDTH - MARGIN.left - MARGIN.right;
+/**
+ * The lap axis, over a window rather than always the whole race.
+ *
+ * The chart used to be a fixed 760px minimum and pan inside a scrolling box. On
+ * a phone that meant scrolling in two directions to read one race, which is the
+ * kind of thing that is fine in a design review and awful in a hand.
+ *
+ * So the axis shows as many laps as fit at a legible spacing, centred on
+ * wherever the replay is, and moves with it. Fewer laps on screen rather than
+ * thinner lines — and on a desktop the window is the whole race, so nothing
+ * changes there.
+ */
+export type LapWindow = { from: number; to: number };
 
-  if (maxLap <= 1) {
-    return MARGIN.left + innerWidth / 2;
+type LapScale = (lap: number) => number;
+
+function makeLapX({ from, to }: LapWindow): LapScale {
+  const innerWidth = VIEWBOX_WIDTH - MARGIN.left - MARGIN.right;
+  const span = to - from;
+
+  if (span <= 0) {
+    return () => MARGIN.left + innerWidth / 2;
   }
 
-  return MARGIN.left + ((lap - 1) / (maxLap - 1)) * innerWidth;
+  return (lap: number) => MARGIN.left + ((lap - from) / span) * innerWidth;
+}
+
+/** Laps per screen at a spacing a finger and an eye can both deal with. */
+const MIN_LAP_SPACING = 16;
+
+export function lapWindowFor(containerWidth: number, currentLap: number, maxLap: number): LapWindow {
+  if (containerWidth <= 0) return { from: 1, to: Math.max(2, maxLap) };
+
+  // The viewBox is scaled to the container, so a lap's spacing on screen is its
+  // spacing in viewBox units times that ratio.
+  const scale = containerWidth / VIEWBOX_WIDTH;
+  const usable = (VIEWBOX_WIDTH - MARGIN.left - MARGIN.right) * scale;
+  const fits = Math.max(6, Math.floor(usable / MIN_LAP_SPACING));
+
+  if (fits >= maxLap) return { from: 1, to: Math.max(2, maxLap) };
+
+  // Centred on the current lap, then pushed back inside the race at both ends
+  // so the window never runs off either edge.
+  const half = Math.floor(fits / 2);
+  let from = Math.max(1, currentLap - half);
+  const to = Math.min(maxLap, from + fits);
+  from = Math.max(1, to - fits);
+
+  return { from, to };
 }
 
 function getPositionY(position: number, maxPosition: number) {
@@ -74,12 +114,12 @@ function getPositionY(position: number, maxPosition: number) {
 
 function buildPath(
   positions: ReplayPosition[],
-  maxLap: number,
+  lapX: LapScale,
   maxPosition: number,
 ) {
   return positions
     .map((entry, index) => {
-      const x = getLapX(entry.lap, maxLap);
+      const x = lapX(entry.lap);
       const y = getPositionY(entry.position, maxPosition);
       return `${index === 0 ? "M" : "L"} ${x} ${y}`;
     })
@@ -169,8 +209,32 @@ export function RaceVisualizationCanvas({
   className?: string;
 }) {
   const { race, summary, laps, drivers } = visualization;
-  const lapTicks = getVisibleLapTicks(laps);
-  const activeLapX = useTransform(lapProgress, (p) => getLapX(currentLap + (nextLap - currentLap) * p, summary.maxLap));
+
+  // The chart measures itself so the window suits the space it actually has,
+  // rather than a breakpoint guessing at it.
+  const frame = useRef<HTMLDivElement>(null);
+  const [frameWidth, setFrameWidth] = useState(0);
+
+  useEffect(() => {
+    const element = frame.current;
+    if (!element) return;
+    const observer = new ResizeObserver(([entry]) => setFrameWidth(entry.contentRect.width));
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+
+  const lapWindow = useMemo(
+    () => lapWindowFor(frameWidth, currentLap, summary.maxLap || race.laps),
+    [frameWidth, currentLap, summary.maxLap, race.laps],
+  );
+  const lapX = useMemo(() => makeLapX(lapWindow), [lapWindow]);
+
+  // Only the ticks inside the window, or a windowed chart labels laps it is not
+  // showing.
+  const lapTicks = getVisibleLapTicks(
+    laps.filter((lap) => lap >= lapWindow.from && lap <= lapWindow.to),
+  );
+  const activeLapX = useTransform(lapProgress, (p) => lapX(currentLap + (nextLap - currentLap) * p));
   const retirementEventByDriver = useMemo(
     () => getRetirementLapByDriver(visualization.events),
     [visualization.events],
@@ -198,10 +262,10 @@ export function RaceVisualizationCanvas({
         const nextPoint = getPointForLap(entry.positions, isCarActive ? nextLap : currentLap);
         const markerPoint =
           retirementLap !== null ? getPointForLap(entry.positions, retirementLap) : null;
-        const fullPath = buildPath(visiblePositions, summary.maxLap, summary.maxPosition);
+        const fullPath = buildPath(visiblePositions, lapX, summary.maxPosition);
         const trail = buildPath(
           visiblePositions.filter((position) => position.lap <= currentLap),
-          summary.maxLap,
+          lapX,
           summary.maxPosition,
         );
         const markerOffset = getRetiredMarkerOffset(index);
@@ -222,9 +286,9 @@ export function RaceVisualizationCanvas({
     [
       currentLap,
       drivers,
+      lapX,
       nextLap,
       retirementEventByDriver,
-      summary.maxLap,
       summary.maxPosition,
     ],
   );
@@ -279,13 +343,11 @@ export function RaceVisualizationCanvas({
           cannot reach is unusable without a pointer, which is what axe's
           scrollable-region-focusable rule is about. The chart itself carries the
           label, so this is a scroll handle rather than a second announcement. */}
-      <div
-        className="mt-4 min-h-0 flex-1 overflow-x-auto"
-        tabIndex={0}
-        role="group"
-        aria-label={`${race.name} chart, scrollable`}
-      >
-        <div className="h-full min-w-[760px]">
+      {/* No min-width and no scrolling any more. The chart shows a window of
+          laps sized to this box, so it fits whatever space it is given rather
+          than making the reader pan a 760px canvas on a 390px screen. */}
+      <div ref={frame} className="mt-4 min-h-0 flex-1">
+        <div className="h-full">
           <svg
             viewBox={`0 0 ${VIEWBOX_WIDTH} ${VIEWBOX_HEIGHT}`}
             role="img"
@@ -356,7 +418,7 @@ export function RaceVisualizationCanvas({
 
             {/* Vertical lap grid lines */}
             {lapTicks.map((lap) => {
-              const x = getLapX(lap, summary.maxLap);
+              const x = lapX(lap);
 
               return (
                 <g key={`lap-${lap}`}>
@@ -392,7 +454,7 @@ export function RaceVisualizationCanvas({
                 should say why. Everything else is in the timeline below, which
                 is the place built for listing things. */}
             {chartEvents.map(({ event, kind, index: eventIndex }) => {
-              const cx = getLapX(event.lap, summary.maxLap);
+              const cx = lapX(event.lap);
               const color = getReplayEventMarkerColor(kind);
               const isRaceControl = RACE_CONTROL_KINDS.has(kind);
 
@@ -435,6 +497,7 @@ export function RaceVisualizationCanvas({
                   summary={summary}
                   currentLap={currentLap}
                   nextLap={nextLap}
+                  lapX={lapX}
                 />
               );
             })}
@@ -482,6 +545,7 @@ function AnimatedCar({
   summary,
   currentLap,
   nextLap,
+  lapX,
 }: {
   frame: DriverFrame;
   state?: DriverReplayState;
@@ -490,6 +554,7 @@ function AnimatedCar({
   summary: ReplaySummary;
   currentLap: number;
   nextLap: number;
+  lapX: LapScale;
 }) {
   const {
     entry,
@@ -508,7 +573,7 @@ function AnimatedCar({
   const last = positions[positions.length - 1];
 
   const x = useTransform(lapProgress, (p) => {
-    return getLapX(isCarActive ? currentLap + (nextLap - currentLap) * p : currentLap, summary.maxLap);
+    return lapX(isCarActive ? currentLap + (nextLap - currentLap) * p : currentLap);
   });
 
   const y = useTransform(lapProgress, (p) => {
@@ -565,7 +630,7 @@ function AnimatedCar({
       {isRetiredAtCurrentLap && markerPoint ? (
         <g
           transform={`translate(${
-            getLapX(markerPoint.lap, summary.maxLap) + markerOffset.x
+            lapX(markerPoint.lap) + markerOffset.x
           } ${getPositionY(markerPoint.position, summary.maxPosition) + markerOffset.y})`}
           className="opacity-90 transition-opacity duration-200 hover:opacity-100"
         >

@@ -12,8 +12,8 @@ import Link from 'next/link';
 export function SiteFooter() {
   return (
     <footer className="mt-16 border-t border-line">
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-6 py-8 text-sm text-muted sm:flex-row sm:items-center sm:justify-between">
-        <p>
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-3 px-6 py-8 text-sm text-muted sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+        <p className="max-w-prose leading-6">
           Race data from{' '}
           <a
             href="https://openf1.org"
@@ -28,7 +28,10 @@ export function SiteFooter() {
         {/* Standalone links rather than links in a sentence, so the WCAG
             exception for inline text does not apply and they need a real box.
             They were 20px tall — the height of their own text. */}
-        <div className="flex items-center gap-3">
+        {/* -mx-2 so the links' own padding does not push them in from the
+            page edge on a phone, where they sit under the attribution rather
+            than beside it. */}
+        <div className="-mx-2 flex items-center gap-1 sm:mx-0 sm:gap-3">
           <Link
             href="/about"
             className="tap inline-flex items-center rounded-md px-2 py-1.5 font-medium text-muted transition-colors hover:text-foreground"
