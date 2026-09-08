@@ -333,3 +333,85 @@ a {
     scroll-behavior: auto !important;
   }
 }
+
+/* ── Motion ───────────────────────────────────────────────────────────
+ *
+ * Two mechanisms, both native and both optional. Where the browser does not
+ * support them the page renders exactly as before — no polyfill, no library,
+ * no JavaScript.
+ */
+
+/* The overlay swallows clicks for the length of the transition, which loses a
+ * click on a page that was already interactive. */
+::view-transition {
+  pointer-events: none;
+}
+
+/* A race's title morphs from its card into the race page's heading. `default:
+ * none` on the pair keeps each named element out of every unrelated
+ * transition, so the blur below belongs to this morph and nothing else. */
+::view-transition-group(.race-morph) {
+  animation-duration: 320ms;
+}
+::view-transition-image-pair(.race-morph) {
+  animation-name: morph-blur;
+}
+@keyframes morph-blur {
+  30% {
+    filter: blur(2px);
+  }
+}
+
+/* The header is the one fixed reference point across a navigation. Animating
+ * it would make the whole viewport look like it moved. The old snapshot is
+ * hidden outright, since both headers are briefly present otherwise. */
+::view-transition-group(site-header) {
+  animation: none;
+  z-index: 100;
+}
+::view-transition-old(site-header) {
+  display: none;
+}
+::view-transition-new(site-header) {
+  animation: none;
+}
+
+/*
+ * Charts arrive as they are scrolled to, on a scroll-driven timeline — no
+ * observer, no client component, no state. The default state is the visible
+ * one, so a browser without `animation-timeline` shows a normal chart rather
+ * than a blank panel waiting for an animation that will never run.
+ */
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .reveal {
+      animation: reveal linear both;
+      animation-timeline: view();
+      /* Finishes by the time the panel is a third up the viewport; starting
+         before it is on screen means it is never caught mid-fade. */
+      animation-range: entry 0% cover 30%;
+    }
+  }
+}
+
+@keyframes reveal {
+  from {
+    opacity: 0;
+    translate: 0 12px;
+  }
+  to {
+    opacity: 1;
+    translate: none;
+  }
+}
+
+/* The `*` reset above cannot reach view-transition pseudo-elements: they are
+ * not in the document tree, so no selector of that shape matches them. */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation-duration: 0s !important;
+    animation-delay: 0s !important;
+  }
+}

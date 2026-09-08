@@ -8,6 +8,7 @@ import './entity';
 import './meeting';
 import './mutation';
 import './race';
+import './search';
 import './standings';
 
 export const schema = builder.toSchema();

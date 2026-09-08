@@ -5,7 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { PageContainer } from '@/components/ui/page-container';
 import { Skeleton } from '@/components/ui/skeleton';
-import { getDriverStandings, getFeaturedRace } from '@/lib/queries';
+import { SeasonStatus, type ScheduledRace } from '@/components/home/season-status';
+import { getDriverStandings, getFeaturedRace, getSeasonSchedule } from '@/lib/queries';
 
 // Reads through the schema, not around it. A server component could query
 // Drizzle directly and be quicker to write, but then GraphQL would be a facade
@@ -40,6 +41,10 @@ export default function Home() {
 
       {/* Each section streams on its own, so a slow standings query cannot hold
           up the featured race or the hero above it. */}
+      <Suspense fallback={<Skeleton className="mt-14 h-44 w-full" />}>
+        <SeasonProgress />
+      </Suspense>
+
       <Suspense fallback={<FeaturedSkeleton />}>
         <FeaturedRace />
       </Suspense>
@@ -49,6 +54,25 @@ export default function Home() {
       </Suspense>
     </PageContainer>
   );
+}
+
+/**
+ * Grands prix only. A sprint is a session inside a round, not a round of its
+ * own, so counting it would make a 24-race season read as 30.
+ */
+async function SeasonProgress() {
+  const { races } = await getSeasonSchedule(SEASON);
+
+  const scheduled: ScheduledRace[] = races.edges
+    .filter((edge) => edge.node.type === 'GRAND_PRIX')
+    .map((edge) => ({
+      slug: edge.node.slug,
+      date: edge.node.date,
+      name: edge.node.meeting?.name ?? edge.node.slug,
+      round: edge.node.meeting?.round ?? 0,
+    }));
+
+  return <SeasonStatus season={SEASON} races={scheduled} />;
 }
 
 async function FeaturedRace() {

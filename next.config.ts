@@ -20,16 +20,17 @@ const nextConfig: NextConfig = {
   // say to keep prefetch={true} for.
   partialPrefetching: true,
 
-  // The circuit maps in lib/circuit-data.ts are hotlinked from formula1.com.
-  // next/image refuses a remote host that is not listed here, so without this
-  // the circuit panel throws rather than degrading.
+  // No `images.remotePatterns`, deliberately. The entry that used to be here
+  // allowed media.formula1.com for the circuit maps in lib/circuit-data.ts —
+  // and that file was deleted in M6.4, so nothing has hotlinked anything since.
+  // An allowlist for a host no image is loaded from is a permission granted for
+  // no reason.
   //
-  // Hotlinking is the v1 behaviour, kept for now. M4 downloads images at
-  // ingest into Vercel Blob (see docs/decisions.md, "Images: downloaded at
-  // ingest"), and this entry goes away with it.
-  images: {
-    remotePatterns: [{ protocol: 'https', hostname: 'media.formula1.com' }],
-  },
+  // Driver headshot URLs are still ingested and stored, and are still displayed
+  // nowhere: they are not licensed for this project to republish, which /about
+  // says in as many words. Mirroring them into Vercel Blob would republish them
+  // from our own domain, which is further from that position rather than closer
+  // to it.
 };
 
 export default nextConfig;

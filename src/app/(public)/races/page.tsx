@@ -1,4 +1,4 @@
-import { Suspense } from 'react';
+import { Suspense, ViewTransition } from 'react';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -131,9 +131,13 @@ async function RaceLibrary({ searchParams }: { searchParams: SearchParams }) {
                     </span>
                     {node.type === 'SPRINT' ? <Badge>Sprint</Badge> : null}
                   </div>
-                  <h2 className="font-heading mt-2.5 text-xl font-bold tracking-tight">
-                    {node.meeting?.name ?? node.slug}
-                  </h2>
+                  {/* The same name on the race page's <h1>, so the title is
+                      one object that moves rather than two that swap. */}
+                  <ViewTransition name={`race-title-${node.slug}`} share="race-morph" default="none">
+                    <h2 className="font-heading mt-2.5 text-xl font-bold tracking-tight">
+                      {node.meeting?.name ?? node.slug}
+                    </h2>
+                  </ViewTransition>
                   <p className="mt-1.5 text-sm text-muted">
                     {node.meeting?.circuitName ?? node.meeting?.country ?? '—'} ·{' '}
                     <span className="tabular">{node.laps}</span> laps

@@ -1,4 +1,4 @@
-import { Suspense } from 'react';
+import { Suspense, ViewTransition } from 'react';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
@@ -113,9 +113,11 @@ async function RaceDetail({
           <p className="text-eyebrow font-semibold uppercase text-accent">
             {meeting ? `${meeting.season} · Round ${meeting.round}` : 'Season unknown'}
           </p>
-          <h1 className="font-heading mt-2.5 text-4xl font-bold tracking-tight sm:text-5xl">
-            {meeting?.name ?? race.slug}
-          </h1>
+          <ViewTransition name={`race-title-${race.slug}`} share="race-morph" default="none">
+            <h1 className="font-heading mt-2.5 text-4xl font-bold tracking-tight sm:text-5xl">
+              {meeting?.name ?? race.slug}
+            </h1>
+          </ViewTransition>
           <p className="mt-2.5 text-muted">
             {meeting?.circuitName ?? meeting?.country ?? '—'} ·{' '}
             <span className="tabular">{race.laps}</span> laps

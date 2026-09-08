@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { CommandPalette } from './command-palette';
 import { ThemeToggle } from './theme-toggle';
 
 const NAV_LINKS = [
@@ -7,6 +8,7 @@ const NAV_LINKS = [
   { href: '/drivers', label: 'Drivers' },
   { href: '/teams', label: 'Teams' },
   { href: '/circuits', label: 'Circuits' },
+  { href: '/compare', label: 'Compare' },
 ];
 
 /**
@@ -20,7 +22,12 @@ const NAV_LINKS = [
  */
 export function SiteHeader() {
   return (
-    <header className="sticky top-0 z-40 border-b border-line bg-background/85 backdrop-blur-md">
+    <header
+      className="sticky top-0 z-40 border-b border-line bg-background/85 backdrop-blur-md"
+      // Named so the view transition can pin it: a header that slides with the
+      // content removes the one fixed point the eye can hold on to.
+      style={{ viewTransitionName: 'site-header' }}
+    >
       <div className="mx-auto flex h-14 w-full max-w-6xl items-center gap-6 px-6">
         <Link
           href="/"
@@ -50,7 +57,8 @@ export function SiteHeader() {
           ))}
         </nav>
 
-        <div className="ml-auto flex items-center">
+        <div className="ml-auto flex items-center gap-2">
+          <CommandPalette />
           <ThemeToggle />
         </div>
       </div>

@@ -149,6 +149,12 @@ const EnvelopeSchema = z.object({
   }),
 });
 
+const CircuitTableSchema = z.object({
+  MRData: z.object({
+    CircuitTable: z.object({ Circuits: z.array(ErgastCircuitSchema) }),
+  }),
+});
+
 /**
  * One page of a race-scoped endpoint, with `total` so the caller knows whether
  * to ask for another.
@@ -209,6 +215,30 @@ async function getAllRecords<T>(
 
 const racesOf = (raw: unknown): Record<string, unknown> =>
   (raw ?? {}) as Record<string, unknown>;
+
+/**
+ * Every circuit a season visited.
+ *
+ * Its own endpoint, and its own envelope: Ergast nests most answers under a
+ * race, but `/{year}/circuits` nests under a CircuitTable, so this cannot go
+ * through `getPage`.
+ *
+ * Scoped to a season rather than fetching all ~77 circuits Ergast knows,
+ * because the circuits index would otherwise list places this database has no
+ * race for — a page promising Estoril and holding nothing about it. One
+ * request per season in the database keeps the list to what has actually been
+ * imported.
+ */
+export async function fetchSeasonCircuits(year: number): Promise<ErgastCircuit[]> {
+  const raw = await get(`/${year}/circuits.json`, { limit: PAGE_SIZE });
+  const parsed = CircuitTableSchema.safeParse(raw);
+  if (!parsed.success) {
+    throw new Error(`Ergast ${year} circuits returned an unrecognised envelope: ${parsed.error.issues[0].message}`);
+  }
+  // A season has at most ~24 circuits, comfortably inside one page, so there is
+  // no paging loop here to go wrong.
+  return parsed.data.MRData.CircuitTable.Circuits;
+}
 
 /** Every race of a season, with results, drivers, constructors and the circuit. */
 export async function fetchSeasonResults(year: number): Promise<ErgastRace[]> {

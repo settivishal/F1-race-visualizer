@@ -239,6 +239,19 @@ export const appConfig = pgTable('app_config', {
   hoursAfterRace: integer('hours_after_race').notNull().default(12),
 }, (t) => [check('app_config_single_row', sql`${t.id} = 1`)]);  // one row, enforced in SQL
 
+/**
+ * One row per rate-limited caller, holding a token bucket. Written on every
+ * limited request, so it is deliberately narrow: a key, a balance, and when
+ * the balance was last touched. Rows for callers who stop calling simply sit
+ * there costing a few bytes; there is no cleanup job, because a table with one
+ * row per recent IP is smaller than the index it would need to prune.
+ */
+export const rateLimits = pgTable('rate_limits', {
+  key: text('key').primaryKey(),
+  tokens: real('tokens').notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
   email: text('email').notNull().unique(),

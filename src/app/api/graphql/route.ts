@@ -6,6 +6,7 @@ import { useDisableIntrospection as disableIntrospection } from '@graphql-yoga/p
 import { createYoga } from 'graphql-yoga';
 import { auth } from '@/auth';
 import { createContext, type Session } from '@/graphql/context';
+import { clientKey, consume } from '@/lib/rate-limit';
 import { schema } from '@/graphql/schema';
 
 const isDev = process.env.NODE_ENV !== 'production';
@@ -67,10 +68,28 @@ const yoga = createYoga<{ request: Request }>({
 // against (NextRequest, context), and Yoga's instance is callable with a
 // different pair. Its .fetch is the Web-standard entry point and is what the
 // handler actually wants.
-export function GET(request: Request) {
+/**
+ * Depth and cost limits govern the shape of a query; this governs how many.
+ * 60 in a burst refilling at 2/second is generous for the command palette,
+ * which sends one debounced request per pause in typing, and closes the gap
+ * that made a public endpoint a free way to run a thousand queries a minute.
+ */
+const GRAPHQL_BUCKET = { capacity: 60, refillPerSecond: 2 };
+
+async function handle(request: Request) {
+  if (!(await consume(clientKey(request.headers, 'graphql'), GRAPHQL_BUCKET))) {
+    return new Response(
+      JSON.stringify({ errors: [{ message: 'Too many requests' }] }),
+      { status: 429, headers: { 'content-type': 'application/json', 'retry-after': '1' } },
+    );
+  }
   return yoga.fetch(request);
 }
 
+export function GET(request: Request) {
+  return handle(request);
+}
+
 export function POST(request: Request) {
-  return yoga.fetch(request);
+  return handle(request);
 }
