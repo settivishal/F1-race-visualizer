@@ -7,6 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { PageContainer } from '@/components/ui/page-container';
 import { SectionHeader } from '@/components/ui/section-header';
 import { Tabs } from '@/components/ui/tabs';
+import { UpcomingRace } from '@/components/schedule/upcoming-race';
 import { CircuitInfoPanel } from '@/components/replay/circuit-info-panel';
 import { AnalysisPanel } from './analysis-panel';
 import { RaceVisualizationPlayer } from '@/components/replay/race-visualization-player';
@@ -124,6 +125,29 @@ async function RaceDetail({
         />
       </div>
 
+      {/* Neither a scheduled race nor a cancelled one has anything to replay,
+          so tabs, a replay and a classification would all be empty furniture. */}
+      {race.status !== 'COMPLETED' ? (
+        <>
+          <div className="mt-8">
+            <UpcomingRace
+              date={race.date}
+              name={meeting?.name ?? race.slug}
+              cancelled={race.status === 'CANCELLED'}
+            />
+          </div>
+
+          <div className="mt-10">
+            <CircuitInfoPanel
+              circuit={meeting?.circuit ?? null}
+              circuitName={meeting?.circuitName ?? null}
+              country={meeting?.country ?? null}
+              laps={race.laps}
+            />
+          </div>
+        </>
+      ) : (
+        <>
       <div className="mt-8">
         <Tabs
           active={active}
@@ -214,6 +238,8 @@ async function RaceDetail({
         </table>
         </Card>
       </section>
+        </>
+      )}
     </>
   );
 }

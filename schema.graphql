@@ -117,6 +117,7 @@ type Lap {
 }
 
 type Meeting {
+  adminEdited: [String!]!
   circuit: Circuit
   circuitName: String
   country: String!
@@ -132,7 +133,7 @@ type Meeting {
 type Mutation {
   setRaceFeatured(featured: Boolean!, slug: String!): Race!
   triggerIngest(sessionKey: Int!): TriggerIngestResult!
-  updateRaceMetadata(circuitName: String, country: String, laps: Int, name: String, slug: String!): Race!
+  updateRaceMetadata(circuitName: String, country: String, laps: Int, name: String, release: [String!], slug: String!, status: String): Race!
 }
 
 type Pace {
@@ -147,6 +148,8 @@ type Pace {
 type PageInfo {
   endCursor: String
   hasNextPage: Boolean!
+  hasPreviousPage: Boolean!
+  startCursor: String
 }
 
 type PitStop {
@@ -156,23 +159,43 @@ type PitStop {
   team: Team
 }
 
+type PulseRound {
+  name: String!
+  round: Int!
+  slug: String
+  status: PulseRoundStatus!
+  teamColor: String
+  winnerCode: String
+}
+
+enum PulseRoundStatus {
+  CANCELLED
+  COMPLETED
+  SCHEDULED
+}
+
 type Query {
+  activeSeason: Int!
   circuit(ergastId: String!): Circuit
   circuits: [Circuit!]!
   constructorStandings(season: Int!): [ConstructorStanding!]!
   driver(code: String!): DriverProfile
   driverStandings(season: Int!): [DriverStanding!]!
   drivers(season: Int): [Driver!]!
+  featuredRace: Race
   ingestRuns(first: Int = 50): [IngestRun!]!
+  latestRace: Race
   race(slug: String!): Race
-  races(after: String, first: Int, search: String, season: Int): RaceConnection!
+  races(after: String, before: String, first: Int, search: String, season: Int): RaceConnection!
   search(query: String!): [SearchHit!]!
+  seasonPulse(season: Int!): [PulseRound!]!
   seasons: [Season!]!
   team(name: String!): TeamProfile
   teams: [Team!]!
 }
 
 type Race {
+  adminEdited: [String!]!
   analysis: RaceAnalysis!
   dataTier: DataTier!
   date: DateTime!
@@ -186,6 +209,7 @@ type Race {
   replay: RaceReplay!
   results: [RaceResult!]!
   slug: String!
+  status: RaceStatus!
   type: RaceType!
 }
 
@@ -241,6 +265,12 @@ type RaceResult {
   points: Float!
   status: DriverStatus!
   team: Team
+}
+
+enum RaceStatus {
+  CANCELLED
+  COMPLETED
+  SCHEDULED
 }
 
 enum RaceType {

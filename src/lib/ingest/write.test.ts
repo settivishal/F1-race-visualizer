@@ -197,3 +197,143 @@ describe('two upstreams, one race', () => {
     expect(await db.select().from(dbSchema.circuits)).toHaveLength(1);
   });
 });
+
+/**
+ * Numbers change: a champion runs 1. The driver row holds one number, so which
+ * import wins matters — and it used to be simply the last one, which meant
+ * backfilling 2018 after 2026 would put a driver back on the number they ran
+ * eight years ago, everywhere on the site.
+ */
+describe('a driver number belongs to a season', () => {
+  const withNumber = (seasonYear: number, slug: string, driverNumber: number): TransformedRace => ({
+    ...base,
+    meeting: { ...base.meeting, seasonYear, openf1MeetingKey: null },
+    race: { ...base.race, slug, date: new Date(`${seasonYear}-03-17T05:10:00Z`) },
+    lineup: [{
+      driverNumber, code: 'VER', name: 'Max Verstappen', country: 'NED',
+      headshotUrl: null, teamName: 'Red Bull Racing', teamColor: '#3671C6',
+    }],
+    results: [],
+  });
+
+  const stored = async () => {
+    const [row] = await db
+      .select({ number: dbSchema.drivers.number, season: dbSchema.drivers.numberSeason })
+      .from(dbSchema.drivers)
+      .where(eq(dbSchema.drivers.code, 'VER'));
+    return row;
+  };
+
+  it('takes the number from the newer season, whichever import runs last', async () => {
+    await writeRace(withNumber(2026, '2026-melbourne', 1), db);
+    await writeRace(withNumber(2018, '2018-melbourne', 33), db);
+
+    expect(await stored()).toEqual({ number: 1, season: 2026 });
+  });
+
+  it('still moves forward when the seasons arrive in order', async () => {
+    await writeRace(withNumber(2018, '2018-melbourne', 33), db);
+    expect(await stored()).toEqual({ number: 33, season: 2018 });
+
+    await writeRace(withNumber(2026, '2026-melbourne', 1), db);
+    expect(await stored()).toEqual({ number: 1, season: 2026 });
+  });
+
+  it('lets a re-import of the same season correct the number', async () => {
+    await writeRace(withNumber(2026, '2026-melbourne', 33), db);
+    await writeRace(withNumber(2026, '2026-melbourne', 1), db);
+
+    expect(await stored()).toEqual({ number: 1, season: 2026 });
+  });
+});
+
+/**
+ * Upstream is a default, not the truth.
+ *
+ * The admin editor for a meeting's name, country and circuit has existed since
+ * M3, and every edit it made was reverted by the next weekly import, because
+ * the upsert assigned those columns. The test that matters is therefore the
+ * second write, not the first.
+ */
+describe('an admin correction survives the next import', () => {
+  const meetingRow = async () => {
+    const [row] = await db
+      .select()
+      .from(dbSchema.meetings)
+      .where(eq(dbSchema.meetings.seasonYear, 2019));
+    return row;
+  };
+
+  it('keeps a pinned column and takes an unpinned one', async () => {
+    await writeRace(fromOpenF1, db);
+
+    // What an admin does: correct the country, and record that they did.
+    await db.update(dbSchema.meetings)
+      .set({ country: 'Malaysia', adminEdited: ['country'] })
+      .where(eq(dbSchema.meetings.seasonYear, 2019));
+
+    await writeRace(fromOpenF1, db);
+
+    const row = await meetingRow();
+    expect(row.country).toBe('Malaysia');
+    // The name was never pinned, so upstream still owns it.
+    expect(row.name).toBe('Australian Grand Prix');
+  });
+
+  it('hands a field back to upstream once the pin is released', async () => {
+    await writeRace(fromOpenF1, db);
+    await db.update(dbSchema.meetings)
+      .set({ country: 'Malaysia', adminEdited: ['country'] })
+      .where(eq(dbSchema.meetings.seasonYear, 2019));
+    await writeRace(fromOpenF1, db);
+
+    // Clearing the field in the admin drops it from the list. That is the undo.
+    await db.update(dbSchema.meetings)
+      .set({ adminEdited: [] })
+      .where(eq(dbSchema.meetings.seasonYear, 2019));
+    await writeRace(fromOpenF1, db);
+
+    expect((await meetingRow()).country).toBe('Australia');
+  });
+});
+
+describe('race status', () => {
+  const status = async () => {
+    const [row] = await db
+      .select({ status: dbSchema.races.status })
+      .from(dbSchema.races)
+      .where(eq(dbSchema.races.slug, '2019-melbourne'));
+    return row.status;
+  };
+
+  const withPositions: TransformedRace = {
+    ...fromOpenF1,
+    positions: [{ lap: 1, driverNumber: 44, position: 1, gap: null, lapTime: null,
+      sector1: null, sector2: null, sector3: null }],
+  };
+
+  it('is SCHEDULED until a race has positions, then COMPLETED', async () => {
+    await writeRace(fromOpenF1, db);
+    expect(await status()).toBe('SCHEDULED');
+
+    await writeRace(withPositions, db);
+    expect(await status()).toBe('COMPLETED');
+  });
+
+  it('never demotes a completed race, however empty a later import is', async () => {
+    await writeRace(withPositions, db);
+    // Upstream having a bad day is not a race un-happening.
+    await writeRace(fromOpenF1, db);
+    expect(await status()).toBe('COMPLETED');
+  });
+
+  it('keeps CANCELLED, which no import can ever produce', async () => {
+    await writeRace(withPositions, db);
+    await db.update(dbSchema.races)
+      .set({ status: 'CANCELLED', adminEdited: ['status'] })
+      .where(eq(dbSchema.races.slug, '2019-melbourne'));
+
+    await writeRace(withPositions, db);
+    expect(await status()).toBe('CANCELLED');
+  });
+});

@@ -1,6 +1,7 @@
-import { and, asc, eq, ilike, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, ilike, or, sql } from 'drizzle-orm';
 import { meetings, raceEvents, racePositions, raceResults, races } from '@/db/schema';
 import { builder } from '../builder';
+import type { Db } from '../context';
 import { RaceAnalysis, loadAnalysis } from './analysis';
 import { driverOfAssignment, teamOfAssignment } from './assignment';
 import { Driver, Team } from './entity';
@@ -168,6 +169,15 @@ const RaceReplay = builder.objectRef<ReplayShape>('RaceReplay').implement({
 // and a Meeting has races, so the two modules reference each other. Splitting
 // the ref from its fields breaks the cycle for the type checker, which cannot
 // infer a shape that depends on itself.
+/**
+ * A race that has not been run is not the same as one that was abandoned, and
+ * neither is the same as one whose import came back empty. `laps === 0` used to
+ * mean all three.
+ */
+const RaceStatus = builder.enumType('RaceStatus', {
+  values: ['SCHEDULED', 'COMPLETED', 'CANCELLED'] as const,
+});
+
 export const Race = builder.objectRef<RaceRow>('Race');
 
 Race.implement({
@@ -177,6 +187,10 @@ Race.implement({
     type: t.field({ type: RaceType, resolve: (r) => r.type }),
     laps: t.exposeInt('laps'),
     isFeatured: t.exposeBoolean('isFeatured'),
+    status: t.field({ type: RaceStatus, resolve: (race) => race.status }),
+    // Which columns an admin owns. Exposed so the editor can say so — a field
+    // pinned by accident and never shown is a stale value nothing can correct.
+    adminEdited: t.exposeStringList('adminEdited'),
     // How much of this race exists, so a client can say "this era published no
     // sector times" rather than rendering empty columns.
     dataTier: t.field({ type: DataTier, resolve: (r) => r.dataTier }),
@@ -284,6 +298,52 @@ builder.queryField('race', (t) =>
 );
 
 /**
+ * The newest race that has actually been run.
+ *
+ * `laps > 0` is the test, not a comparison against the clock. The calendar is
+ * stored whole, so the newest race by date is usually one nobody has driven —
+ * and these resolvers are read inside `use cache` scopes, where "now" is
+ * whenever the entry was built.
+ */
+const newestRunRace = (ctx: { db: Db }) =>
+  ctx.db.query.races.findFirst({
+    where: eq(races.status, 'COMPLETED'),
+    orderBy: [desc(races.date)],
+  });
+
+builder.queryField('latestRace', (t) =>
+  t.field({
+    type: Race,
+    nullable: true,
+    resolve: async (_root, _args, ctx) => (await newestRunRace(ctx)) ?? null,
+  }),
+);
+
+/**
+ * The race the site leads with: whichever one an admin flagged, else the
+ * newest one run.
+ *
+ * `races.is_featured`, its mutation and its admin control have all existed
+ * since M3 and nothing has ever read the flag. The home page instead fetched a
+ * hundred races and took the last by date — which the stored calendar turned
+ * into "a race in December that nobody has driven", and which was already
+ * arbitrary once the archive passed a hundred rows.
+ */
+builder.queryField('featuredRace', (t) =>
+  t.field({
+    type: Race,
+    nullable: true,
+    resolve: async (_root, _args, ctx) => {
+      const flagged = await ctx.db.query.races.findFirst({
+        where: and(eq(races.isFeatured, true), eq(races.status, 'COMPLETED')),
+        orderBy: [desc(races.date)],
+      });
+      return flagged ?? (await newestRunRace(ctx)) ?? null;
+    },
+  }),
+);
+
+/**
  * Keyset pagination on (date, id), not offset.
  *
  * An offset skips or repeats rows whenever the underlying set shifts between
@@ -308,16 +368,29 @@ const RaceEdge = builder.objectRef<{ node: RaceRow }>('RaceEdge').implement({
 });
 
 const PageInfo = builder
-  .objectRef<{ hasNextPage: boolean; endCursor: string | null }>('PageInfo')
+  .objectRef<{
+    hasNextPage: boolean;
+    hasPreviousPage: boolean;
+    startCursor: string | null;
+    endCursor: string | null;
+  }>('PageInfo')
   .implement({
     fields: (t) => ({
       hasNextPage: t.exposeBoolean('hasNextPage'),
+      // Paging was forward-only: a reader who took Next had no way back except
+      // the browser button, and no shareable URL for the page they were on.
+      hasPreviousPage: t.exposeBoolean('hasPreviousPage'),
+      startCursor: t.exposeString('startCursor', { nullable: true }),
       endCursor: t.exposeString('endCursor', { nullable: true }),
     }),
   });
 
 const RaceConnection = builder
-  .objectRef<{ edges: { node: RaceRow }[]; hasNextPage: boolean }>('RaceConnection')
+  .objectRef<{
+    edges: { node: RaceRow }[];
+    hasNextPage: boolean;
+    hasPreviousPage: boolean;
+  }>('RaceConnection')
   .implement({
     fields: (t) => ({
       edges: t.field({ type: [RaceEdge], resolve: (c) => c.edges }),
@@ -325,6 +398,8 @@ const RaceConnection = builder
         type: PageInfo,
         resolve: (c) => ({
           hasNextPage: c.hasNextPage,
+          hasPreviousPage: c.hasPreviousPage,
+          startCursor: c.edges.length ? encodeCursor(c.edges[0].node) : null,
           endCursor: c.edges.length ? encodeCursor(c.edges[c.edges.length - 1].node) : null,
         }),
       }),
@@ -339,6 +414,8 @@ builder.queryField('races', (t) =>
       search: t.arg.string(),
       first: t.arg.int(),
       after: t.arg.string(),
+      /** The page ending just before this row, for stepping back. */
+      before: t.arg.string(),
     },
     resolve: async (_root, args, ctx) => {
       // Bounded regardless of what the client asks for: `first` is an input,
@@ -351,24 +428,46 @@ builder.queryField('races', (t) =>
         const pattern = `%${args.search}%`;
         filters.push(or(ilike(races.slug, pattern), ilike(meetings.name, pattern)));
       }
+
+      // Stepping back is the same keyset walk in the other direction: take the
+      // rows before the cursor, newest first, then put them back in order. It
+      // stays a keyset rather than an offset for the reason above — a page
+      // boundary must not move when the week's race lands.
+      const backwards = args.before != null && args.after == null;
+
       if (args.after) {
         const cursor = decodeCursor(args.after);
         filters.push(
           sql`(${races.date}, ${races.id}) > (${cursor.date.toISOString()}, ${cursor.id})`,
         );
+      } else if (args.before) {
+        const cursor = decodeCursor(args.before);
+        filters.push(
+          sql`(${races.date}, ${races.id}) < (${cursor.date.toISOString()}, ${cursor.id})`,
+        );
       }
 
-      // One extra row answers hasNextPage without a second count query.
+      // One extra row answers "is there another page that way" without a second
+      // count query.
       const rows = await ctx.db.select({ race: races }).from(races)
         .innerJoin(meetings, eq(meetings.id, races.meetingId))
         .where(filters.length ? and(...filters) : undefined)
-        .orderBy(asc(races.date), asc(races.id))
+        .orderBy(
+          backwards ? desc(races.date) : asc(races.date),
+          backwards ? desc(races.id) : asc(races.id),
+        )
         .limit(limit + 1);
 
+      const hasMore = rows.length > limit;
       const page = rows.slice(0, limit);
+      if (backwards) page.reverse();
+
       return {
         edges: page.map((r) => ({ node: r.race })),
-        hasNextPage: rows.length > limit,
+        // Walking backwards, the extra row is evidence of a page *before* this
+        // one; forwards it is evidence of one after.
+        hasNextPage: backwards ? true : hasMore,
+        hasPreviousPage: backwards ? hasMore : args.after != null,
       };
     },
   }),

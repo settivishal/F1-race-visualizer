@@ -68,6 +68,12 @@ const CIRCUIT_FACTS: Record<string, { lengthKm: number; turns: number; firstGran
   istanbul: { lengthKm: 5.338, turns: 14, firstGrandPrix: 2005 },
   nurburgring: { lengthKm: 5.148, turns: 15, firstGrandPrix: 1951 },
   sakhir: { lengthKm: 3.543, turns: 11, firstGrandPrix: 2020 },
+  sepang: { lengthKm: 5.543, turns: 15, firstGrandPrix: 1999 },
+  // Madring is deliberately absent. Madrid's first grand prix is 2026 and its
+  // published length and corner count changed more than once during
+  // construction; a number here would be a guess rendered as a fact, which is
+  // the exact failure lib/circuit-data.ts existed to cause. It stays null and
+  // the page shows nothing until someone confirms it.
   jeddah_corniche: { lengthKm: 6.174, turns: 27, firstGrandPrix: 2021 },
 };
 

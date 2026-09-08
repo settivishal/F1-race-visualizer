@@ -1,5 +1,5 @@
-import { asc, eq } from 'drizzle-orm';
-import { circuits, meetings, races, seasons } from '@/db/schema';
+import { asc, desc, eq } from 'drizzle-orm';
+import { appConfig, circuits, meetings, races, seasons } from '@/db/schema';
 import { builder } from '../builder';
 import { Race } from './race';
 
@@ -51,6 +51,7 @@ Meeting.implement({
       },
     }),
     season: t.exposeInt('seasonYear'),
+    adminEdited: t.exposeStringList('adminEdited'),
     startDate: t.field({ type: 'DateTime', resolve: (m) => m.startDate }),
     // Upstream's shape, passed through unread. Nothing in this codebase
     // depends on its keys, so modelling it as types would be inventing a
@@ -84,5 +85,40 @@ builder.queryField('seasons', (t) =>
     type: [Season],
     resolve: (_root, _args, ctx) =>
       ctx.db.select({ year: seasons.year }).from(seasons).orderBy(asc(seasons.year)),
+  }),
+);
+
+/**
+ * The season the site is currently about.
+ *
+ * One source of truth, and it is the one the ingest already obeys:
+ * `app_config.active_season` is what the cron walks looking for races to
+ * import. Before this, the home page and the standings default each held their
+ * own hardcoded year, so the site could be — and was — a season behind the job
+ * feeding it, with nothing failing to say so.
+ *
+ * The fallback is the newest season that has a race, not the calendar year. In
+ * January the calendar year is a season nothing has happened in yet, and an
+ * empty home page is a worse answer than a slightly stale one.
+ */
+builder.queryField('activeSeason', (t) =>
+  t.int({
+    resolve: async (_root, _args, ctx) => {
+      const [config] = await ctx.db
+        .select({ season: appConfig.activeSeason })
+        .from(appConfig)
+        .where(eq(appConfig.id, 1))
+        .limit(1);
+      if (config) return config.season;
+
+      const [newest] = await ctx.db
+        .selectDistinct({ year: meetings.seasonYear })
+        .from(meetings)
+        .innerJoin(races, eq(races.meetingId, meetings.id))
+        .orderBy(desc(meetings.seasonYear))
+        .limit(1);
+
+      return newest?.year ?? new Date().getUTCFullYear();
+    },
   }),
 );

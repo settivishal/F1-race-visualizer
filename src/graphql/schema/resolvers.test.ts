@@ -1,3 +1,4 @@
+import { eq } from 'drizzle-orm';
 import { PGlite } from '@electric-sql/pglite';
 import { execute, parse } from 'graphql';
 import { drizzle } from 'drizzle-orm/pglite';
@@ -67,6 +68,9 @@ beforeAll(async () => {
   const [race] = await db.insert(dbSchema.races).values({
     meetingId: meeting.id, type: 'GRAND_PRIX', slug: '2025-test',
     date: new Date('2025-03-02T14:00:00Z'), laps: 3, openf1SessionKey: 1,
+    // These rows are inserted directly rather than through writeRace, so the
+    // status the ingest would have derived has to be stated here.
+    status: 'COMPLETED',
   }).returning();
 
   // Lap 2 is deliberately absent and lap 3 has one car in P2 with no P1: both
@@ -89,6 +93,7 @@ beforeAll(async () => {
   const [sprint] = await db.insert(dbSchema.races).values({
     meetingId: meeting.id, type: 'SPRINT', slug: '2025-test-sprint',
     date: new Date('2025-03-01T14:00:00Z'), laps: 2, openf1SessionKey: 2,
+    status: 'COMPLETED',
   }).returning();
 
   await db.insert(dbSchema.raceResults).values([
@@ -112,6 +117,115 @@ beforeAll(async () => {
     { raceId: race.id, lap: 2, assignmentId: null, type: 'SAFETY_CAR', details: 'Safety car deployed' },
     { raceId: race.id, lap: 3, assignmentId: norSeat.id, type: 'RETIREMENT', details: 'Engine' },
   ]);
+});
+
+describe('featuredRace', () => {
+  it('is the newest race that has been run, not the newest race', async () => {
+    // The calendar is stored whole, so the newest row by date is normally one
+    // nobody has driven. `laps > 0` is the test rather than the clock, because
+    // these resolvers are read from cache entries built at some other time.
+    // Its own meeting: (meeting_id, type) is unique, so a season cannot hold
+    // two grands prix in one round.
+    const [later] = await db.insert(dbSchema.meetings).values({
+      seasonYear: 2025, round: 2, name: 'Scheduled Grand Prix', country: 'Testland',
+      startDate: new Date('2030-01-01T00:00:00Z'), openf1MeetingKey: 2,
+    }).returning();
+    await db.insert(dbSchema.races).values({
+      meetingId: later.id, type: 'GRAND_PRIX', slug: '2025-scheduled',
+      date: new Date('2030-01-01T00:00:00Z'), laps: 0, openf1SessionKey: 99,
+      status: 'SCHEDULED',
+    });
+
+    const data = await run<{ featuredRace: { slug: string } }>(
+      `query { featuredRace { slug } }`,
+    );
+    expect(data.featuredRace.slug).toBe('2025-test');
+
+    await db.delete(dbSchema.races).where(eq(dbSchema.races.slug, '2025-scheduled'));
+    await db.delete(dbSchema.meetings).where(eq(dbSchema.meetings.id, later.id));
+  });
+
+  it('prefers the flagged race, which is the only thing that reads is_featured', async () => {
+    await db.update(dbSchema.races)
+      .set({ isFeatured: true })
+      .where(eq(dbSchema.races.slug, '2025-test-sprint'));
+
+    const data = await run<{ featuredRace: { slug: string } }>(
+      `query { featuredRace { slug } }`,
+    );
+    expect(data.featuredRace.slug).toBe('2025-test-sprint');
+
+    await db.update(dbSchema.races).set({ isFeatured: false });
+  });
+});
+
+describe('seasonPulse', () => {
+  it('gives one entry per round with its winner, grands prix only', async () => {
+    const data = await run<{
+      seasonPulse: { round: number; winnerCode: string | null; teamColor: string | null }[];
+    }>(`query { seasonPulse(season: 2025) { round winnerCode teamColor } }`);
+
+    // One round in the fixture, won by Leclerc. The sprint in the same meeting
+    // is a session inside it, not a round of its own.
+    expect(data.seasonPulse).toHaveLength(1);
+    expect(data.seasonPulse[0]).toMatchObject({ round: 1, winnerCode: 'LEC' });
+    // The per-season livery, not the team's fallback colour.
+    expect(data.seasonPulse[0].teamColor).toBe('#E8002D');
+  });
+});
+
+describe('races paging', () => {
+  const page = (args: string) => run<{
+    races: {
+      edges: { node: { slug: string } }[];
+      pageInfo: {
+        hasNextPage: boolean; hasPreviousPage: boolean;
+        startCursor: string | null; endCursor: string | null;
+      };
+    };
+  }>(`query { races(${args}) {
+        edges { node { slug } }
+        pageInfo { hasNextPage hasPreviousPage startCursor endCursor }
+      } }`);
+
+  it('walks back to exactly the page it came from', async () => {
+    // The fixture holds the sprint and the grand prix, in that date order.
+    const first = await page('first: 1');
+    expect(first.races.edges.map((e) => e.node.slug)).toEqual(['2025-test-sprint']);
+    expect(first.races.pageInfo).toMatchObject({ hasNextPage: true, hasPreviousPage: false });
+
+    const second = await page(`first: 1, after: "${first.races.pageInfo.endCursor}"`);
+    expect(second.races.edges.map((e) => e.node.slug)).toEqual(['2025-test']);
+    expect(second.races.pageInfo).toMatchObject({ hasNextPage: false, hasPreviousPage: true });
+
+    // Stepping back is a keyset walk in the other direction, so the rows have
+    // to come back in reading order rather than the order they were fetched.
+    const back = await page(`first: 1, before: "${second.races.pageInfo.startCursor}"`);
+    expect(back.races.edges.map((e) => e.node.slug)).toEqual(['2025-test-sprint']);
+    expect(back.races.pageInfo).toMatchObject({ hasNextPage: true, hasPreviousPage: false });
+  });
+});
+
+describe('activeSeason', () => {
+  it('falls back to the newest season that has a race when nothing is configured', async () => {
+    // The fixture inserts no app_config row, which is also the state of a fresh
+    // database — and the case that must not answer with the calendar year, since
+    // in January that is a season with nothing in it.
+    const data = await run<{ activeSeason: number }>(`query { activeSeason }`);
+    expect(data.activeSeason).toBe(2025);
+  });
+
+  it('prefers the configured season, which is the one the cron imports', async () => {
+    await db.insert(dbSchema.appConfig).values({
+      id: 1, ingestEnabled: true, runDays: ['mon'], activeSeason: 2026, hoursAfterRace: 12,
+    });
+
+    const data = await run<{ activeSeason: number }>(`query { activeSeason }`);
+    expect(data.activeSeason).toBe(2026);
+
+    // Left as it was found: the other suites in this file share the database.
+    await db.delete(dbSchema.appConfig);
+  });
 });
 
 describe('race', () => {

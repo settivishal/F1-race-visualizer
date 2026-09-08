@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { untilLabel } from './season-status';
+import { untilLabel } from '@/lib/schedule';
 
 const at = (minutesFromNow: number) => new Date(NOW + minutesFromNow * 60_000).toISOString();
 const NOW = Date.parse('2026-03-01T12:00:00Z');

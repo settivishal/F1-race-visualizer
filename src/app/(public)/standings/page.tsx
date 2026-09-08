@@ -6,7 +6,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { PageContainer } from '@/components/ui/page-container';
 import { SectionHeader } from '@/components/ui/section-header';
 import { Skeleton } from '@/components/ui/skeleton';
-import { getSeasonStandings } from '@/lib/queries';
+import { getActiveSeason, getSeasonStandings } from '@/lib/queries';
 
 export const metadata = {
   title: 'Standings — F1 Race Visualizer',
@@ -14,8 +14,6 @@ export const metadata = {
 };
 
 type SearchParams = Promise<{ [key: string]: string | string[] | undefined }>;
-
-const DEFAULT_SEASON = 2025;
 
 /**
  * The championship tables.
@@ -51,7 +49,8 @@ async function Standings({ searchParams }: { searchParams: SearchParams }) {
 
   const seasonParam = first(params.season);
   const parsedSeason = seasonParam ? Number(seasonParam) : NaN;
-  const season = Number.isInteger(parsedSeason) ? parsedSeason : DEFAULT_SEASON;
+  // `?season=` still wins; only the default follows the configured season.
+  const season = Number.isInteger(parsedSeason) ? parsedSeason : await getActiveSeason();
 
   const { driverStandings, constructorStandings, seasons } = await getSeasonStandings(season);
 

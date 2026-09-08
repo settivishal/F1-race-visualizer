@@ -122,6 +122,9 @@ export async function updateMetadataAction(
       // Not coalesced to null: an empty string is a meaningful instruction to
       // clear the circuit name, which is the one nullable field of the three.
       circuitName: String(formData.get('circuitName') ?? ''),
+      status: String(formData.get('status') ?? '') || null,
+      // Checkboxes the admin ticked to hand a field back to the ingest.
+      release: formData.getAll('release').map(String),
     });
   } catch (error) {
     return { ok: false, message: messageOf(error) };
@@ -188,6 +191,8 @@ const UPDATE_METADATA = /* GraphQL */ `
     $name: String
     $country: String
     $circuitName: String
+    $status: String
+    $release: [String!]
   ) {
     updateRaceMetadata(
       slug: $slug
@@ -195,6 +200,8 @@ const UPDATE_METADATA = /* GraphQL */ `
       name: $name
       country: $country
       circuitName: $circuitName
+      status: $status
+      release: $release
     ) {
       slug
       laps
@@ -268,8 +275,12 @@ export async function updateConfigAction(
       set: { ingestEnabled, runDays: [...runDays], activeSeason, hoursAfterRace },
     });
 
-  // No cache invalidation: this changes when the cron runs, not what any page
-  // renders.
+  // The active season is now read by the home page and the standings default
+  // (Query.activeSeason), so this does change what a page renders. `updateTag`
+  // rather than `revalidateTag` for the reason above: an admin who just changed
+  // the season should see it, not last season served stale while it refreshes.
+  updateTag('settings');
+
   return { ok: true, message: 'Settings saved.' };
 }
 

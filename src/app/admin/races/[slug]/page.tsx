@@ -49,6 +49,9 @@ async function EditForm({ params }: { params: Promise<{ slug: string }> }) {
 
   if (!race) notFound();
 
+  const racePinned = race.adminEdited;
+  const meetingPinned = race.meeting?.adminEdited ?? [];
+
   return (
     <div className="mt-5">
       <SectionHeader
@@ -60,26 +63,59 @@ async function EditForm({ params }: { params: Promise<{ slug: string }> }) {
         <ActionForm action={updateMetadataAction} className="space-y-4">
           <input type="hidden" name="slug" value={race.slug} />
 
-          <Input
+          <Field
             label="Meeting name"
             name="name"
+            column="name"
+            pinned={meetingPinned}
             defaultValue={race.meeting?.name ?? ''}
             hint="What every page shows as the title of the weekend."
           />
-          <Input label="Country" name="country" defaultValue={race.meeting?.country ?? ''} />
-          <Input
+          <Field
+            label="Country"
+            name="country"
+            column="country"
+            pinned={meetingPinned}
+            defaultValue={race.meeting?.country ?? ''}
+            hint="Upstream files a relocated race under its original country — this is where that gets corrected."
+          />
+          <Field
             label="Circuit name"
             name="circuitName"
+            column="circuit_name"
+            pinned={meetingPinned}
             defaultValue={race.meeting?.circuitName ?? ''}
             hint="Leave empty to clear it — this is the one field that may be blank."
           />
-          <Input
+          <Field
             label="Laps"
             name="laps"
+            column="laps"
+            pinned={racePinned}
             inputMode="numeric"
             defaultValue={String(race.laps)}
             hint="The scheduled distance. The replay derives its own lap list from the data."
           />
+
+          <label className="block">
+            <span className="mb-1.5 block text-eyebrow font-semibold uppercase text-muted">
+              Status
+            </span>
+            <select
+              name="status"
+              defaultValue={race.status}
+              className="w-full rounded-md border border-line bg-panel px-3 py-2 text-sm text-foreground"
+            >
+              <option value="SCHEDULED">Scheduled — not yet run</option>
+              <option value="COMPLETED">Completed — has a result</option>
+              <option value="CANCELLED">Cancelled — did not take place</option>
+            </select>
+            <span className="mt-1.5 block text-sm text-muted">
+              The ingest sets the first two from the data. Cancelled is only ever
+              yours to set: no upstream publishes it.
+            </span>
+            <PinNote column="status" pinned={racePinned} />
+          </label>
 
           <div className="flex items-center gap-3 pt-1">
             <Button type="submit">Save</Button>
@@ -101,11 +137,63 @@ async function EditForm({ params }: { params: Promise<{ slug: string }> }) {
   );
 }
 
+/**
+ * A field, with whether the ingest is still allowed to touch it.
+ *
+ * The whole point of `admin_edited` is that an import stops overwriting a
+ * column once someone has set it — which means a field pinned by accident goes
+ * stale silently and nothing upstream can correct it. So every pinned field
+ * says so, and offers the way back.
+ */
+function Field({
+  label,
+  name,
+  column,
+  pinned,
+  defaultValue,
+  hint,
+  inputMode,
+}: {
+  label: string;
+  name: string;
+  column: string;
+  pinned: string[];
+  defaultValue: string;
+  hint?: string;
+  inputMode?: 'numeric';
+}) {
+  return (
+    <div>
+      <Input
+        label={label}
+        name={name}
+        defaultValue={defaultValue}
+        hint={hint}
+        inputMode={inputMode}
+      />
+      <PinNote column={column} pinned={pinned} />
+    </div>
+  );
+}
+
+function PinNote({ column, pinned }: { column: string; pinned: string[] }) {
+  if (!pinned.includes(column)) return null;
+
+  return (
+    <label className="mt-1.5 flex items-center gap-2 text-sm text-muted">
+      <input type="checkbox" name="release" value={column} className="accent-accent" />
+      <span>
+        Yours — the ingest leaves this alone. Tick to hand it back to upstream.
+      </span>
+    </label>
+  );
+}
+
 const ADMIN_RACE = /* GraphQL */ `
   query AdminRace($slug: String!) {
     race(slug: $slug) {
-      id slug laps type isFeatured openf1SessionKey
-      meeting { name country circuitName round season }
+      id slug laps type status isFeatured adminEdited openf1SessionKey
+      meeting { name country circuitName round season adminEdited }
     }
   }
 `;

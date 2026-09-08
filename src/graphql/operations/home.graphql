@@ -55,11 +55,95 @@ query SeasonSchedule($season: Int!) {
         slug
         date
         type
+        status
         meeting {
           name
           round
         }
       }
     }
+  }
+}
+
+# The season the site is currently about, from app_config — the same value the
+# ingest cron walks. See Query.activeSeason.
+query ActiveSeason {
+  activeSeason
+}
+
+# The hero's scrubbable chart. Deliberately narrow: lap and position only, and
+# no gaps, lap times or sector columns — RaceReplay pulls all of those and is
+# roughly ten times this over the wire. The teaser draws lines and nothing else.
+query HeroReplay {
+  featuredRace {
+    slug
+    laps
+    meeting {
+      name
+      round
+      season
+      circuitName
+    }
+    replay {
+      summary {
+        maxLap
+        maxPosition
+      }
+      drivers {
+        driver {
+          code
+        }
+        team {
+          color
+        }
+        positions {
+          lap
+          position
+        }
+      }
+    }
+  }
+}
+
+# The race just run: the podium, the fastest lap and the grid each driver
+# started from, which is what makes the biggest mover computable.
+query LatestResult {
+  latestRace {
+    slug
+    date
+    type
+    meeting {
+      name
+      round
+      season
+      circuitName
+      country
+    }
+    results {
+      finalPosition
+      fastestLap
+      points
+      status
+      driver {
+        code
+        name
+      }
+      team {
+        name
+        color
+      }
+    }
+  }
+}
+
+# One entry per round, for the season strip.
+query SeasonPulse($season: Int!) {
+  seasonPulse(season: $season) {
+    round
+    name
+    slug
+    status
+    winnerCode
+    teamColor
   }
 }
