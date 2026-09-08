@@ -213,9 +213,12 @@ export function RaceVisualizationPlayer({
             a third of an empty card under the last driver. */}
         <div className="pb-10">
           <div className="grid w-full items-start gap-5 lg:grid-cols-[22rem_minmax(0,1fr)]">
-            {/* Sticky so the running order stays on screen while you read the
-                chart, which is what the extra height was accidentally doing. */}
-            <div className="max-h-[800px] lg:sticky lg:top-20">
+            {/* min-w-0 on both columns, and it is not cosmetic. A grid child
+                defaults to `min-width: auto`, which refuses to shrink below its
+                content — so the canvas's `min-w-[760px]` propagated up through
+                the shared column and stretched this tower to 802px on a 390px
+                screen, taking the page with it. */}
+            <div className="min-w-0 max-h-[800px] lg:sticky lg:top-20">
               <LiveTimingTower
                 visualization={visualization}
                 currentLap={currentLap}
@@ -225,9 +228,11 @@ export function RaceVisualizationPlayer({
             {/* The height cap belongs to the canvas, not to the column: with
                 the story below it inside the column, capping the column would
                 have shrunk the canvas to make room. */}
-            <div className="flex flex-col">
+            <div className="flex min-w-0 flex-col">
               <RaceVisualizationCanvas
-                className="min-h-[600px] max-h-[800px] flex-1"
+                // Shorter on a phone: at 600px the chart is the whole viewport
+                // and you pan a window you cannot see around.
+                className="min-h-[22rem] sm:min-h-[600px] max-h-[800px] flex-1"
                 visualization={visualization}
                 currentLap={currentLap}
                 nextLap={nextLap}

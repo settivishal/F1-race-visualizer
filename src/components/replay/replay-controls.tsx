@@ -89,7 +89,7 @@ export function ReplayControls({
             onClick={onPrevious}
             disabled={!canStepBackward}
             aria-label="Previous lap"
-            className="h-8 w-8 flex items-center justify-center rounded-full border border-white/15 bg-white/10 text-white transition hover:bg-white/20 disabled:opacity-30"
+            className="tap h-8 w-8 flex items-center justify-center rounded-full border border-white/15 bg-white/10 text-white transition hover:bg-white/20 disabled:opacity-30"
           >
             <PrevIcon />
           </button>
@@ -97,7 +97,7 @@ export function ReplayControls({
             type="button"
             onClick={onPlayPause}
             aria-label={isPlaying ? "Pause replay" : "Play replay"}
-            className="h-8 w-8 flex items-center justify-center rounded-full bg-accent-fill text-on-accent transition hover:bg-accent-strong active:brightness-90"
+            className="tap h-8 w-8 flex items-center justify-center rounded-full bg-accent-fill text-on-accent transition hover:bg-accent-strong active:brightness-90"
           >
             {isPlaying ? <PauseIcon /> : <PlayIcon />}
           </button>
@@ -106,7 +106,7 @@ export function ReplayControls({
             onClick={onNext}
             disabled={!canStepForward}
             aria-label="Next lap"
-            className="h-8 w-8 flex items-center justify-center rounded-full border border-white/15 bg-white/10 text-white transition hover:bg-white/20 disabled:opacity-30"
+            className="tap h-8 w-8 flex items-center justify-center rounded-full border border-white/15 bg-white/10 text-white transition hover:bg-white/20 disabled:opacity-30"
           >
             <NextIcon />
           </button>
@@ -114,7 +114,7 @@ export function ReplayControls({
             type="button"
             onClick={onRestart}
             aria-label="Restart replay"
-            className="h-8 w-8 flex items-center justify-center rounded-full border border-white/15 bg-white/10 text-white transition hover:bg-white/20"
+            className="tap h-8 w-8 flex items-center justify-center rounded-full border border-white/15 bg-white/10 text-white transition hover:bg-white/20"
           >
             <RestartIcon />
           </button>
@@ -127,7 +127,7 @@ export function ReplayControls({
                   key={option}
                   type="button"
                   onClick={() => onChangeSpeed(option)}
-                  className={`rounded-full px-2.5 py-1 text-eyebrow font-bold uppercase transition ${
+                  className={`tap inline-flex items-center rounded-full px-2.5 py-1 text-eyebrow font-bold uppercase transition ${
                     isActive
                       ? "bg-accent-fill text-on-accent hover:bg-accent-strong"
                       : "border border-white/15 bg-white/10 text-white/70 hover:bg-white/20 hover:text-white"

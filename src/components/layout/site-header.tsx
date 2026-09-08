@@ -45,7 +45,10 @@ export function SiteHeader() {
           </span>
         </Link>
 
-        <nav aria-label="Main" className="flex items-center gap-1">
+        {/* The row, from md up. Below that it was 477px of links in a 390px
+            viewport — every page on the site scrolled sideways by exactly the
+            difference, and it was always this element. */}
+        <nav aria-label="Main" className="hidden items-center gap-1 md:flex">
           {NAV_LINKS.map((link) => (
             <Link
               key={link.href}
@@ -60,6 +63,47 @@ export function SiteHeader() {
         <div className="ml-auto flex items-center gap-2">
           <CommandPalette />
           <ThemeToggle />
+
+          {/* A <details>, not a client component: a disclosure is what this
+              element is for, and it needs no JavaScript, no ARIA of our own and
+              no state to be keyboard and screen-reader operable. What it does
+              not bring is Escape-to-close or a focus trap, neither of which a
+              nav panel needs the way a modal does. */}
+          <details className="group relative md:hidden">
+            <summary
+              className="flex h-11 w-11 cursor-pointer list-none items-center justify-center rounded-md text-muted transition-colors hover:bg-panel hover:text-foreground [&::-webkit-details-marker]:hidden"
+              aria-label="Menu"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                aria-hidden
+                className="h-5 w-5"
+              >
+                {/* Three lines closed, a cross open — the state is the icon. */}
+                <path d="M4 7h16M4 12h16M4 17h16" className="group-open:hidden" />
+                <path d="M6 6l12 12M18 6L6 18" className="hidden group-open:block" />
+              </svg>
+            </summary>
+
+            <nav
+              aria-label="Main"
+              className="absolute right-0 top-full z-50 mt-2 w-56 overflow-hidden rounded-xl border border-line bg-background shadow-lg"
+            >
+              {NAV_LINKS.map((link) => (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className="flex min-h-11 items-center border-b border-line/60 px-4 text-sm font-medium text-foreground last:border-0 hover:bg-panel"
+                >
+                  {link.label}
+                </Link>
+              ))}
+            </nav>
+          </details>
         </div>
       </div>
     </header>
