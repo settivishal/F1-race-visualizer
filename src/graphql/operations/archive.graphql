@@ -64,17 +64,17 @@ query TeamProfile($name: String!) {
   }
 }
 
-query ArchiveIndex {
+query ArchiveIndex($season: Int) {
   seasons {
     year
   }
-  drivers {
+  drivers(season: $season) {
     id
     code
     name
     country
   }
-  teams {
+  teams(season: $season) {
     id
     name
     color

@@ -5,14 +5,16 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { PageContainer } from '@/components/ui/page-container';
 import { SectionHeader } from '@/components/ui/section-header';
 import { Skeleton } from '@/components/ui/skeleton';
-import { getArchiveIndex } from '@/lib/queries';
+import { getActiveSeason, getArchiveIndex } from '@/lib/queries';
 
 export const metadata = {
   title: 'Circuits — F1 Race Visualizer',
   description: 'Every circuit that has held a race in the archive.',
 };
 
-export default function CircuitsPage() {
+type SearchParams = Promise<{ [key: string]: string | string[] | undefined }>;
+
+export default function CircuitsPage({ searchParams }: { searchParams: SearchParams }) {
   return (
     <PageContainer>
       <SectionHeader
@@ -22,27 +24,45 @@ export default function CircuitsPage() {
       />
       <div className="mt-8">
         <Suspense fallback={<GridSkeleton />}>
-          <CircuitGrid />
+          <CircuitGrid searchParams={searchParams} />
         </Suspense>
       </div>
     </PageContainer>
   );
 }
 
-async function CircuitGrid() {
-  const { circuits } = await getArchiveIndex();
+async function CircuitGrid({ searchParams }: { searchParams: SearchParams }) {
+  const params = await searchParams;
+  const raw = Array.isArray(params.season) ? params.season[0] : params.season;
+  const parsed = raw ? Number(raw) : NaN;
+  const season = raw === 'all'
+    ? null
+    : Number.isInteger(parsed)
+      ? parsed
+      : await getActiveSeason();
+
+  const { circuits } = await getArchiveIndex(season);
 
   if (circuits.length === 0) {
     return (
-      <EmptyState
-        title="No circuits yet"
-        description="Circuits arrive with the archive import — OpenF1 publishes a name, not a place."
-      />
+      <>
+        <div className="mt-6">
+          <EmptyState
+            title={season === null ? 'Nothing imported yet' : `No circuits in ${season}`}
+            description={
+              season === null
+                ? 'Import a season and they appear here.'
+                : 'That season has not been imported, or nothing has been matched to it yet.'
+            }
+          />
+        </div>
+      </>
     );
   }
 
   return (
-    <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+    <>
+      <ul className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
       {circuits.map((circuit) => (
         <li key={circuit.id}>
           <Link href={`/circuits/${circuit.ergastId}`} className="block rounded-xl">
@@ -56,6 +76,7 @@ async function CircuitGrid() {
         </li>
       ))}
     </ul>
+    </>
   );
 }
 
