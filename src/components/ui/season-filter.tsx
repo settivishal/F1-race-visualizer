@@ -32,7 +32,7 @@ export function SeasonFilter({
       aria-current={isActive ? 'page' : undefined}
       className={`tabular rounded-full px-3.5 py-1.5 text-sm font-semibold transition-colors ${
         isActive
-          ? 'bg-accent text-on-accent'
+          ? 'bg-accent-fill text-on-accent'
           : 'border border-line text-muted hover:border-line-strong hover:text-foreground'
       }`}
     >
