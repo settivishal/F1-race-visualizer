@@ -268,8 +268,12 @@ export async function updateConfigAction(
       set: { ingestEnabled, runDays: [...runDays], activeSeason, hoursAfterRace },
     });
 
-  // No cache invalidation: this changes when the cron runs, not what any page
-  // renders.
+  // The active season is now read by the home page and the standings default
+  // (Query.activeSeason), so this does change what a page renders. `updateTag`
+  // rather than `revalidateTag` for the reason above: an admin who just changed
+  // the season should see it, not last season served stale while it refreshes.
+  updateTag('settings');
+
   return { ok: true, message: 'Settings saved.' };
 }
 

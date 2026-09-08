@@ -9,7 +9,7 @@ import { fetchRaceLaps, fetchRacePitStops, fetchSeasonResults } from './ergast';
 import { transformArchiveRace } from './ergast-transform';
 import {
   fetchDrivers, fetchLaps, fetchMeetings, fetchPits, fetchPositions,
-  fetchRaceControl, fetchSessionResults, fetchSessions, fetchStints, fetchWeather,
+  fetchRaceControl, fetchSessionByKey, fetchSessionResults, fetchSessions, fetchStints, fetchWeather,
 } from './openf1';
 import { deriveRounds, isScoredSession, transformRace } from './transform';
 import type { RaceBundle, TransformedRace } from './types';
@@ -123,7 +123,7 @@ export async function ingestArchiveRace(
 
 /** Everything one session needs. Ten calls, all paced by the client's throttle. */
 export async function fetchRaceBundle(sessionKey: number): Promise<RaceBundle> {
-  const [firstSession] = await fetchSessionsByKey(sessionKey);
+  const [firstSession] = await fetchSessionByKey(sessionKey);
   if (!firstSession) throw new Error(`session ${sessionKey} not found`);
   if (!isScoredSession(firstSession)) {
     throw new Error(`session ${sessionKey} is ${firstSession.session_name}, not a scored session`);
@@ -149,16 +149,6 @@ export async function fetchRaceBundle(sessionKey: number): Promise<RaceBundle> {
     meeting, session: firstSession, round,
     drivers: ldrivers, laps, positions, pits, stints: stintList, raceControl, results, weather,
   };
-}
-
-async function fetchSessionsByKey(sessionKey: number) {
-  // /sessions has no by-key filter in our client, and the year is unknown
-  // until we have the session — so this walks the seasons OpenF1 covers.
-  for (const year of [2025, 2024, 2023]) {
-    const found = (await fetchSessions(year)).filter((s) => s.session_key === sessionKey);
-    if (found.length > 0) return found;
-  }
-  return [];
 }
 
 /**

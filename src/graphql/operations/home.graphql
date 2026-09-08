@@ -63,3 +63,9 @@ query SeasonSchedule($season: Int!) {
     }
   }
 }
+
+# The season the site is currently about, from app_config — the same value the
+# ingest cron walks. See Query.activeSeason.
+query ActiveSeason {
+  activeSeason
+}

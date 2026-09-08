@@ -114,6 +114,28 @@ beforeAll(async () => {
   ]);
 });
 
+describe('activeSeason', () => {
+  it('falls back to the newest season that has a race when nothing is configured', async () => {
+    // The fixture inserts no app_config row, which is also the state of a fresh
+    // database — and the case that must not answer with the calendar year, since
+    // in January that is a season with nothing in it.
+    const data = await run<{ activeSeason: number }>(`query { activeSeason }`);
+    expect(data.activeSeason).toBe(2025);
+  });
+
+  it('prefers the configured season, which is the one the cron imports', async () => {
+    await db.insert(dbSchema.appConfig).values({
+      id: 1, ingestEnabled: true, runDays: ['mon'], activeSeason: 2026, hoursAfterRace: 12,
+    });
+
+    const data = await run<{ activeSeason: number }>(`query { activeSeason }`);
+    expect(data.activeSeason).toBe(2026);
+
+    // Left as it was found: the other suites in this file share the database.
+    await db.delete(dbSchema.appConfig);
+  });
+});
+
 describe('race', () => {
   it('resolves a driver and team through the assignment, which the schema never exposes', async () => {
     const data = await run<{ race: { positions: { driver: { code: string }; team: { name: string; color: string } }[] } }>(`

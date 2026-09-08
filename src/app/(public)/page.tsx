@@ -6,21 +6,22 @@ import { Card } from '@/components/ui/card';
 import { PageContainer } from '@/components/ui/page-container';
 import { Skeleton } from '@/components/ui/skeleton';
 import { SeasonStatus, type ScheduledRace } from '@/components/home/season-status';
-import { getDriverStandings, getFeaturedRace, getSeasonSchedule } from '@/lib/queries';
+import { getActiveSeason, getDriverStandings, getFeaturedRace, getSeasonSchedule } from '@/lib/queries';
 
 // Reads through the schema, not around it. A server component could query
 // Drizzle directly and be quicker to write, but then GraphQL would be a facade
 // over one path rather than the data layer — and the resolvers, the loaders and
 // the query budget would go unexercised by the page people actually load.
 
-const SEASON = 2025;
-
 export default function Home() {
   return (
     <PageContainer className="py-14">
       <section className="max-w-3xl">
+        {/* Not the season: the shell prerenders, so it cannot await one, and
+            the season status below already names the year. Two places saying it
+            is how they come to disagree. */}
         <p className="text-eyebrow font-bold uppercase text-accent">
-          {SEASON} season
+          Formula 1, replayed
         </p>
         <h1 className="font-heading mt-3 text-4xl font-bold leading-[1.05] tracking-tight sm:text-6xl">
           Every position change,
@@ -61,7 +62,8 @@ export default function Home() {
  * own, so counting it would make a 24-race season read as 30.
  */
 async function SeasonProgress() {
-  const { races } = await getSeasonSchedule(SEASON);
+  const season = await getActiveSeason();
+  const { races } = await getSeasonSchedule(season);
 
   const scheduled: ScheduledRace[] = races.edges
     .filter((edge) => edge.node.type === 'GRAND_PRIX')
@@ -72,7 +74,7 @@ async function SeasonProgress() {
       round: edge.node.meeting?.round ?? 0,
     }));
 
-  return <SeasonStatus season={SEASON} races={scheduled} />;
+  return <SeasonStatus season={season} races={scheduled} />;
 }
 
 async function FeaturedRace() {
@@ -108,7 +110,8 @@ async function FeaturedRace() {
 }
 
 async function Standings() {
-  const { driverStandings } = await getDriverStandings(SEASON);
+  const season = await getActiveSeason();
+  const { driverStandings } = await getDriverStandings(season);
 
   if (driverStandings.length === 0) {
     return null;
@@ -131,7 +134,7 @@ async function Standings() {
       <Card className="mt-4 overflow-x-auto p-0">
         <table className="w-full min-w-[34rem] text-left text-sm">
           <caption className="sr-only">
-            {SEASON} drivers&rsquo; championship standings
+            {season} drivers&rsquo; championship standings
           </caption>
           <thead>
             <tr className="border-b border-line text-eyebrow uppercase text-muted">
