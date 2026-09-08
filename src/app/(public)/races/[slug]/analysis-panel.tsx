@@ -1,6 +1,7 @@
 import { LapTimeChart, type LapTimeSeries } from "@/components/analysis/lap-time-chart";
 import { PaceTable, type PaceRow } from "@/components/analysis/pace-table";
 import { StrategyChart, type StrategyRow } from "@/components/analysis/strategy-chart";
+import { HeadToHeadSection } from "./head-to-head-section";
 import { getRaceAnalysis } from "@/lib/queries";
 
 const FALLBACK_COLOR = "#8892a0";
@@ -17,7 +18,15 @@ const FALLBACK_COLOR = "#8892a0";
  * are the five that set the race's pace rather than the first five the database
  * returned.
  */
-export async function AnalysisPanel({ slug }: { slug: string }) {
+export async function AnalysisPanel({
+  slug,
+  driverA,
+  driverB,
+}: {
+  slug: string;
+  driverA: string | null;
+  driverB: string | null;
+}) {
   const { race } = await getRaceAnalysis(slug);
   if (!race) return null;
 
@@ -112,6 +121,17 @@ export async function AnalysisPanel({ slug }: { slug: string }) {
           ) : (
             <StrategyChart rows={strategyRows} totalLaps={race.laps} />
           )}
+        </div>
+      </section>
+
+      <section className="reveal">
+        <AnalysisHeading
+          eyebrow="Head to head"
+          title="Two drivers, lap by lap"
+          description="Who was in front, for how long, and what it cost in pace. Pick any two who started."
+        />
+        <div className="mt-5">
+          <HeadToHeadSection slug={slug} driverA={driverA} driverB={driverB} />
         </div>
       </section>
 
