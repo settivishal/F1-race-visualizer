@@ -260,12 +260,14 @@ html:has(:root.light) {
   }
 }
 
-body {
-  min-height: 100vh;
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-body), system-ui, sans-serif;
-  -webkit-font-smoothing: antialiased;
+@layer base {
+  body {
+    min-height: 100vh;
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-body), system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
 }
 
 /* Form controls do not inherit the page font on their own. This was in v1 and
@@ -319,9 +321,11 @@ body {
 
 /* Numbers that change in place — lap times, gaps, positions — must not reflow
    as digits swap. */
-.tabular {
-  font-variant-numeric: tabular-nums;
-  font-feature-settings: "tnum" 1;
+@layer components {
+  .tabular {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+  }
 }
 
 /* ---------------------------------------------------------------------------
@@ -335,34 +339,42 @@ body {
    breakpoint, and the page title needs one. Spacing stays at the call site: the
    margin above a heading is layout, not type.
 --------------------------------------------------------------------------- */
-.type-page-title {
-  font-family: var(--font-heading);
-  font-size: 1.875rem;
-  line-height: 1.15;
-  font-weight: 700;
-  letter-spacing: -0.025em;
-}
-
-@media (width >= 40rem) {
+@layer components {
   .type-page-title {
-    font-size: 2.25rem;
+    font-family: var(--font-heading);
+    font-size: 1.875rem;
+    line-height: 1.15;
+    font-weight: 700;
+    letter-spacing: -0.025em;
   }
 }
 
-.type-section-title {
-  font-family: var(--font-heading);
-  font-size: 1.5rem;
-  line-height: 1.2;
-  font-weight: 700;
-  letter-spacing: -0.025em;
+@layer components {
+  @media (width >= 40rem) {
+    .type-page-title {
+      font-size: 2.25rem;
+    }
+  }
 }
 
-.type-card-title {
-  font-family: var(--font-heading);
-  font-size: 1.25rem;
-  line-height: 1.25;
-  font-weight: 700;
-  letter-spacing: -0.025em;
+@layer components {
+  .type-section-title {
+    font-family: var(--font-heading);
+    font-size: 1.5rem;
+    line-height: 1.2;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+  }
+}
+
+@layer components {
+  .type-card-title {
+    font-family: var(--font-heading);
+    font-size: 1.25rem;
+    line-height: 1.25;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+  }
 }
 
 /* ---------------------------------------------------------------------------
@@ -372,10 +384,12 @@ body {
    light/dark palette classes. Mixing against `transparent` and `currentColor`
    means each tone is derived from its token and needs no per-theme spelling.
 --------------------------------------------------------------------------- */
-.tone {
-  border-color: color-mix(in oklab, var(--tone) 32%, transparent);
-  background-color: color-mix(in oklab, var(--tone) 12%, transparent);
-  color: color-mix(in oklab, var(--tone) 82%, var(--foreground));
+@layer components {
+  .tone {
+    border-color: color-mix(in oklab, var(--tone) 32%, transparent);
+    background-color: color-mix(in oklab, var(--tone) 12%, transparent);
+    color: color-mix(in oklab, var(--tone) 82%, var(--foreground));
+  }
 }
 
 .tone-green { --tone: var(--flag-green); }
@@ -457,14 +471,16 @@ body {
  * one, so a browser without `animation-timeline` shows a normal chart rather
  * than a blank panel waiting for an animation that will never run.
  */
-@supports (animation-timeline: view()) {
-  @media (prefers-reduced-motion: no-preference) {
-    .reveal {
-      animation: reveal linear both;
-      animation-timeline: view();
-      /* Finishes by the time the panel is a third up the viewport; starting
-         before it is on screen means it is never caught mid-fade. */
-      animation-range: entry 0% cover 30%;
+@layer components {
+  @supports (animation-timeline: view()) {
+    @media (prefers-reduced-motion: no-preference) {
+      .reveal {
+        animation: reveal linear both;
+        animation-timeline: view();
+        /* Finishes by the time the panel is a third up the viewport; starting
+           before it is on screen means it is never caught mid-fade. */
+        animation-range: entry 0% cover 30%;
+      }
     }
   }
 }
