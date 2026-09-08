@@ -1131,3 +1131,219 @@ can stand behind. A missing figure is now simply absent rather than guessed.
 **Considered:** keeping the file as an overlay keyed by circuit id. That is what the seed
 script is, minus the fallback and minus a second copy of the same numbers living in the
 application bundle — the values belong in the row the page already reads.
+
+---
+
+## 2026-09-08 — The season the site is about is configuration, not a constant
+
+**Decided:** `Query.activeSeason` reads `app_config.active_season`, and the home page and
+the standings default follow it. The two hardcoded constants are deleted.
+
+This was not a tidying exercise. `app_config.active_season` had been 2025 since the winter,
+and the ingest cron obeys it — so from March onward the job ran every morning against a
+season with nothing left to import, answered "up to date", and wrote no row to
+`ingest_runs`, because a skip writes none. Correct code, correct schedule, six months of
+importing nothing, and no error anywhere. Meanwhile `page.tsx` and `standings/page.tsx` each
+held their own opinion that it was 2025, so even fixing the config would have left the site
+disagreeing with the job feeding it.
+
+Three places held a view about what year it was and only one of them was editable without a
+deploy.
+
+**Fallback:** the newest season that has a race, not the calendar year. In January the
+calendar year is a season nothing has happened in, and an empty home page is a worse answer
+than a slightly stale one.
+
+**Set it through `/admin/settings`, not the database.** The action calls
+`updateTag('settings')`; writing the row directly does not, so the home page keeps serving
+the old season from cache until the entry expires. That cost a redeploy to discover.
+
+---
+
+## 2026-09-08 — A session is resolved by key, not by walking a list of years
+
+**Decided:** `fetchSessionByKey` asks OpenF1 for `/sessions?session_key=N`. The year loop in
+`run.ts` is deleted.
+
+Resolving a session used to mean fetching whole seasons from the hardcoded list
+`[2025, 2024, 2023]` and filtering for the key. Every 2026 import failed with "session not
+found" while the API had the data all along — Monza's race has 678 position rows and answers
+to that URL directly. The weekly cron calls the same function, so it would have failed the
+same way in March and reported nothing wrong.
+
+A list of years is a bug with a date on it. This one was written in a codebase that already
+knew it would be importing 2026.
+
+---
+
+## 2026-09-08 — The whole calendar is stored, and a race has a status
+
+**Decided:** the backfill imports every scored session of a season, run or not. A race that
+has not happened is a meeting, a date and an entry list with no positions. `races.status` is
+`SCHEDULED | COMPLETED | CANCELLED`.
+
+`laps === 0` had been carrying three meanings at once — not yet run, cancelled, and imported
+but empty — so the two 2026 rounds abandoned in April rendered as *upcoming*, counting down
+to a date months past.
+
+Storing the calendar is what gives the season progress bar a denominator and the countdown a
+target. Without it the home page said "15 of 15 rounds complete, season complete" in the
+middle of a season.
+
+**`laps === 0` is the test for "not run", not a comparison against the clock.** These render
+inside `use cache` scopes with a day's life, so a server-side reading of "now" would be baked
+into the cache entry and go stale. The lap count is a fact about the data and cannot.
+
+**Status only moves forward.** An import can promote a race to COMPLETED and never demote
+one: a re-import that fetches nothing means upstream is having a bad day, not that a race
+un-happened. CANCELLED never comes from an import at all.
+
+**A cancelled race keeps its round**, badged and struck through rather than hidden. The 2026
+season did schedule a Bahrain round; a calendar that hides it is a calendar that never
+existed. It is excluded from "rounds remaining", because no points will be scored there.
+
+---
+
+## 2026-09-08 — Upstream is a default; an admin correction wins and persists
+
+**Decided:** `meetings.admin_edited` and `races.admin_edited` are `text[]` columns naming the
+columns a person has set by hand. The ingest checks the list before overwriting anything.
+
+The admin editor for a meeting's name, country, circuit and laps has existed since M3, and
+every edit it made was reverted by the next weekly import, because the upsert assigned those
+columns. The editor was a lie for its entire life, and nothing surfaced that.
+
+Upstream gets races wrong in ways no feed models. 2026 abandoned two rounds mid-season, and
+the round that replaced one of them is still filed as "Bahrain Grand Prix" in "Bahrain" while
+being held at Sepang. Somebody has to be able to say otherwise and have it stick.
+
+**One array per table, not an override column beside every field.** It protects any column
+including ones not written yet, and clearing a field in the admin drops it from the array so
+upstream takes over again — that is the undo, and it stores no history.
+
+**The risk, and what answers it:** a field pinned by accident goes stale silently and nothing
+upstream can correct it. So the admin shows which fields are pinned and offers the way back.
+Without that this trades a visible bug for an invisible one.
+
+---
+
+## 2026-09-08 — A driver number belongs to a season
+
+**Decided:** `drivers.number_season` records where the stored number came from, and an
+import takes the incoming number only from a season at least as recent.
+
+`drivers.number` is one column per driver and the upsert assigned it, so the number the site
+showed was whichever race imported last. It looked correct only because 2026 happened to be
+imported after 2025 — the 2018-2022 backfill would have put Verstappen back on 33 across the
+whole site. The columns either side of it, `headshot_url` and `ergast_driver_id`, were
+already careful not to be clobbered; this one was not.
+
+Driver names had the same shape and are fixed the same way: normalised at ingest, so
+OpenF1's "Kimi ANTONELLI" and Ergast's "Kimi Antonelli" agree and it stops mattering which
+import ran last. Only ALL-CAPS tokens are touched, which leaves "Kimi Räikkönen" and
+"Antonio Giovinazzi" alone and handles "ZHOU Guanyu" — surname first — correctly.
+
+---
+
+## 2026-09-08 — Health is "a race ran and is not imported", not "the last run is old"
+
+**Decided:** `/api/health` reports races whose date passed more than 48 hours ago and are
+still SCHEDULED, an active season with no races at all, and a most-recent ingest run that
+failed. A scheduled workflow asks production daily and fails when the answer is no.
+
+The obvious check is the wrong one. Between races there is legitimately nothing to import
+for a fortnight, and over winter for months — a staleness threshold either cries wolf or is
+loose enough to catch nothing. It would not have caught the six-month failure either, because
+that job was succeeding.
+
+Storing the whole calendar is what makes the real question askable without calling upstream:
+a race that has been run and is not in the database.
+
+**503, not 200 with a flag**, so a monitor does not have to parse a body. **Public**, because
+requiring a secret means the check cannot run from anywhere, which is most of its value — and
+it exposes which season is configured and which races are missing, operational facts about a
+site whose whole content is public race data.
+
+---
+
+## 2026-09-08 — Unlayered CSS was silently beating every utility
+
+**Decided:** every hand-written rule lives in `@layer base` or `@layer components`. Two e2e
+tests assert that a utility still wins.
+
+`button, input, select, textarea { color: inherit }` and `a { color: inherit }` were written
+as plain CSS after `@import "tailwindcss"`. Unlayered CSS outranks every layered rule
+whatever its specificity, so both had been overriding `text-on-accent` on every button and
+link on the site — the primary button rendered the page foreground on red instead of white,
+for months, and looked deliberate. axe found it; no person had.
+
+The design-system classes added later had the same shape. `.type-page-title` sets a font size
+and weight, so `<h1 className="type-page-title text-2xl">` would have ignored the utility.
+Nothing had tried it yet.
+
+**The failure has no symptom** other than a class that quietly does nothing, which is why
+this is a test rather than a convention. A media query around a class is still unlayered if
+the class is — the page title's responsive step needed wrapping separately.
+
+**Related:** one accent cannot be both text on a dark ground and a fill behind white.
+`#ff2016` is 5.2:1 as text and 3.8:1 as a fill, and darkening it fixes one while breaking the
+other, so `--accent-fill` is its own token. The chart panel is a fixed dark surface in both
+themes and gets `--on-track-accent`, because the theme's accent lands on it at 3.7:1 in light
+mode. `--subtle` was under AA in both themes and was darkened.
+
+---
+
+## 2026-09-08 — `race:${slug}` is deleted rather than made to work
+
+**Decided:** cached race reads carry the broad `race` tag only.
+
+The narrow tag was written on three reads with a comment saying a single re-import should not
+evict the season, and nothing ever invalidated it — a targeting ability no caller could use.
+
+Reinstating it means splitting the taxonomy: per-race pages under a narrow tag, lists under a
+broad one, and every write choosing correctly between them. The failure mode of choosing
+wrong is a page that should have been dropped and was not. Stale data is worse than the
+rebuild this saves, and an ingest imports one race a week.
+
+**Also deliberately absent:** `serverActions.allowedOrigins`. Next already compares a Server
+Action's Origin against the Host; the option exists for proxy and CDN domains where those
+legitimately differ, and nothing sits in front of this site. A hardcoded production domain
+would be a value to maintain that protects nothing, on a config where every preview
+deployment has a different hostname.
+
+---
+
+## 2026-09-08 — Reversal: images are not mirrored into Vercel Blob
+
+**Reverses:** "2026-09-02 — Images: downloaded at ingest into Vercel Blob", and the closing
+paragraph of "2026-09-07 — `lib/circuit-data.ts` is retired", which said the images were
+going there in M7.
+
+**Decided:** driver headshots stay stored as upstream URLs and displayed nowhere. Nothing is
+copied into Blob.
+
+Two things were true when M7.5 came to be built and neither had been checked when the
+original decision was made.
+
+There are no hotlinks left to move off. `lib/circuit-data.ts` was the only thing loading a
+remote image and M6.4 deleted it; nothing in `src/` renders an `<img>` or a `next/image` at
+all. The `images.remotePatterns` entry that allowed `media.formula1.com` was removed as dead
+configuration.
+
+And `/about` already says, in its own words, that headshot URLs "are stored but not displayed
+anywhere on the site: those images are not offered under a licence that would let this
+project republish them". Downloading them and serving them from our own domain is *more*
+republication than hotlinking, not less. The original decision was about optimisation and
+bandwidth and never considered the licence.
+
+**What would change this:** Wikimedia has CC BY-SA team logos and circuit diagrams, and
+`/about` already carries that style of attribution. That is a product decision about what the
+site shows, not a plumbing task, and it has not been taken.
+
+**Also deferred with it:** `next/dynamic` for the replay islands, on the grounds that the
+premise had gone stale. The replay and `framer-motion` are one 168K chunk that the
+client-reference manifest shows is pulled in by `/races/[slug]` alone — the bundler already
+scopes it to the only route that renders it. The remaining win is that `?view=analysis` still
+ships the replay's JS, and Next's own guide is explicit that `next/dynamic` from a Server
+Component does not code-split, so collecting it means a client boundary whose only job is to
+defer the secondary tab.
