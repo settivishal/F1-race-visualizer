@@ -1,7 +1,9 @@
 import { Suspense } from 'react';
+import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { PageContainer } from '@/components/ui/page-container';
+import { SectionHeader } from '@/components/ui/section-header';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getArchiveIndex, getDriverProfile, getTeamProfile } from '@/lib/queries';
 
@@ -39,13 +41,13 @@ type Side = { label: string; sub: string | null; color: string | null; totals: T
 export default function ComparePage({ searchParams }: { searchParams: Promise<Search> }) {
   return (
     <PageContainer>
-      <header className="mt-5">
-        <p className="text-eyebrow font-semibold uppercase text-accent">Head to head</p>
-        <h1 className="font-heading mt-2.5 text-4xl font-bold tracking-tight sm:text-5xl">Compare</h1>
-        <p className="mt-2.5 max-w-2xl text-muted">
-          Two drivers or two constructors, over one season or every season in the archive.
-        </p>
-      </header>
+      <div className="mt-5">
+        <SectionHeader
+          eyebrow="Head to head"
+          title="Compare"
+          description="Two drivers or two constructors, over one season or every season in the archive."
+        />
+      </div>
 
       <Suspense fallback={<Skeleton className="mt-8 h-64 w-full" />}>
         <CompareBody searchParams={searchParams} />
@@ -99,12 +101,7 @@ async function CompareBody({ searchParams }: { searchParams: Promise<Search> }) 
             ))}
           </Picker>
 
-          <button
-            type="submit"
-            className="h-10 rounded-md bg-accent px-4 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-strong"
-          >
-            Compare
-          </button>
+          <Button type="submit">Compare</Button>
         </form>
       </Card>
 

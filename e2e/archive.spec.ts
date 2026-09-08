@@ -46,6 +46,8 @@ test('an archive race says what its era did not publish', async ({ page }) => {
     timeout: 30_000,
   });
   // The absence is stated, and the columns that would have held dashes are gone.
-  await expect(page.getByText(/sector times and gaps were not published/i)).toBeVisible();
+  // Gaps are no longer mentioned: `gap` is null on every row of every race, so
+  // the column went and the notice stopped claiming it was an era thing.
+  await expect(page.getByText(/sector times were not published/i)).toBeVisible();
   await expect(page.getByText('S1', { exact: true })).toHaveCount(0);
 });

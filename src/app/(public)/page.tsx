@@ -94,7 +94,7 @@ async function FeaturedRace() {
             </Badge>
             {race.type === 'SPRINT' ? <Badge>Sprint</Badge> : null}
           </div>
-          <p className="font-heading mt-4 text-3xl font-bold tracking-tight sm:text-4xl">
+          <p className="type-page-title mt-4">
             {race.meeting?.name ?? race.slug}
           </p>
           <p className="mt-2 text-muted">
@@ -117,7 +117,7 @@ async function Standings() {
   return (
     <section className="mt-14">
       <div className="flex items-end justify-between gap-4">
-        <h2 className="font-heading text-2xl font-bold tracking-tight">
+        <h2 className="type-section-title">
           Drivers&rsquo; championship
         </h2>
         <Link

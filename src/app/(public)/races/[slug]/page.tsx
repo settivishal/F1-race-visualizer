@@ -1,10 +1,11 @@
-import { Suspense, ViewTransition } from 'react';
+import { Suspense } from 'react';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PageContainer } from '@/components/ui/page-container';
+import { SectionHeader } from '@/components/ui/section-header';
 import { Tabs } from '@/components/ui/tabs';
 import { CircuitInfoPanel } from '@/components/replay/circuit-info-panel';
 import { AnalysisPanel } from './analysis-panel';
@@ -108,23 +109,20 @@ async function RaceDetail({
 
   return (
     <>
-      <header className="mt-5 flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <p className="text-eyebrow font-semibold uppercase text-accent">
-            {meeting ? `${meeting.season} · Round ${meeting.round}` : 'Season unknown'}
-          </p>
-          <ViewTransition name={`race-title-${race.slug}`} share="race-morph" default="none">
-            <h1 className="font-heading mt-2.5 text-4xl font-bold tracking-tight sm:text-5xl">
-              {meeting?.name ?? race.slug}
-            </h1>
-          </ViewTransition>
-          <p className="mt-2.5 text-muted">
-            {meeting?.circuitName ?? meeting?.country ?? '—'} ·{' '}
-            <span className="tabular">{race.laps}</span> laps
-          </p>
-        </div>
-        {race.type === 'SPRINT' ? <Badge>Sprint</Badge> : null}
-      </header>
+      <div className="mt-5">
+        <SectionHeader
+          eyebrow={meeting ? `${meeting.season} · Round ${meeting.round}` : 'Season unknown'}
+          title={meeting?.name ?? race.slug}
+          viewTransitionName={`race-title-${race.slug}`}
+          description={
+            <>
+              {meeting?.circuitName ?? meeting?.country ?? '—'} ·{' '}
+              <span className="tabular">{race.laps}</span> laps
+            </>
+          }
+          actions={race.type === 'SPRINT' ? <Badge>Sprint</Badge> : null}
+        />
+      </div>
 
       <div className="mt-8">
         <Tabs
@@ -162,7 +160,7 @@ async function RaceDetail({
       )}
 
       <section className="mt-10">
-        <h2 className="font-heading text-2xl font-bold tracking-tight">Classification</h2>
+        <h2 className="type-section-title">Classification</h2>
         <Card className="mt-4 overflow-x-auto p-0">
         <table className="w-full min-w-[34rem] text-left text-sm">
           <caption className="sr-only">
@@ -269,9 +267,14 @@ function AnalysisSkeleton() {
  */
 function ReplaySkeleton() {
   return (
-    <div className="space-y-4">
-      <Skeleton className="h-[26rem] w-full rounded-xl" />
-      <Skeleton className="h-24 w-full rounded-xl" />
+    // The tower's rail and the canvas column, matching the player's own grid,
+    // so the page does not jump sideways when the replay arrives.
+    <div className="grid gap-5 lg:grid-cols-[22rem_minmax(0,1fr)]">
+      <Skeleton className="h-[26rem] w-full rounded-xl lg:h-[38rem]" />
+      <div className="space-y-3">
+        <Skeleton className="h-[26rem] w-full rounded-xl lg:h-[30rem]" />
+        <Skeleton className="h-24 w-full rounded-xl" />
+      </div>
       <p className="sr-only" role="status">
         Loading replay
       </p>

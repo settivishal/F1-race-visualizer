@@ -134,7 +134,7 @@ async function RaceLibrary({ searchParams }: { searchParams: SearchParams }) {
                   {/* The same name on the race page's <h1>, so the title is
                       one object that moves rather than two that swap. */}
                   <ViewTransition name={`race-title-${node.slug}`} share="race-morph" default="none">
-                    <h2 className="font-heading mt-2.5 text-xl font-bold tracking-tight">
+                    <h2 className="type-card-title mt-2.5">
                       {node.meeting?.name ?? node.slug}
                     </h2>
                   </ViewTransition>

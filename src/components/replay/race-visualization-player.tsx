@@ -1,13 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { RaceStoryPanel } from "./race-story-panel";
 import { RaceVisualizationCanvas } from "./race-visualization-canvas";
 import {
   buildDriverReplayState,
   buildRaceControlByLap,
-  summarizeDriverReplayState,
 } from "./replay-state";
 import { ReplayControls } from "./replay-controls";
 import { LiveTimingTower } from "./live-timing-tower";
@@ -77,9 +76,15 @@ export function RaceVisualizationPlayer({
       ),
     [currentLap, visualization.drivers],
   );
-  const trafficSummary = useMemo(
-    () => summarizeDriverReplayState(driverReplayStates),
-    [driverReplayStates],
+  // Hoisted out of the controls so the timeline's markers and the scrubber
+  // are the same action rather than two copies of it.
+  const jumpToLap = useCallback(
+    (lap: number) => {
+      setIsPlaying(false);
+      lapProgress.set(0);
+      setCurrentLapIndex(Math.max(0, laps.findIndex((entry) => entry === lap)));
+    },
+    [laps, lapProgress],
   );
 
   useEffect(() => {
@@ -198,18 +203,31 @@ export function RaceVisualizationPlayer({
           Home returns to lap one. The live timing tower lists the running order
           for the current lap as text.
         </p>
-        <div className="overflow-x-auto pb-10">
-          <div className="grid w-full items-stretch gap-5 lg:grid-cols-[22rem_minmax(0,1fr)]">
-            <div className="h-full max-h-[800px]">
+        {/* No overflow-x here. It used to wrap the whole grid, so anything
+            narrower than tower + chart minimum scrolled the tower and the
+            timeline sideways along with the chart. The chart owns its own
+            horizontal scroll; the rest of the page should reflow.
+
+            items-start rather than stretch: the right column is now canvas plus
+            timeline plus strip, and a stretched tower grew to match it, leaving
+            a third of an empty card under the last driver. */}
+        <div className="pb-10">
+          <div className="grid w-full items-start gap-5 lg:grid-cols-[22rem_minmax(0,1fr)]">
+            {/* Sticky so the running order stays on screen while you read the
+                chart, which is what the extra height was accidentally doing. */}
+            <div className="max-h-[800px] lg:sticky lg:top-20">
               <LiveTimingTower
                 visualization={visualization}
                 currentLap={currentLap}
               />
             </div>
 
-            <div className="h-full flex flex-col min-h-[600px] max-h-[800px]">
+            {/* The height cap belongs to the canvas, not to the column: with
+                the story below it inside the column, capping the column would
+                have shrunk the canvas to make room. */}
+            <div className="flex flex-col">
               <RaceVisualizationCanvas
-                className="h-full flex-1"
+                className="min-h-[600px] max-h-[800px] flex-1"
                 visualization={visualization}
                 currentLap={currentLap}
                 nextLap={nextLap}
@@ -251,29 +269,30 @@ export function RaceVisualizationPlayer({
                         Math.min(current + 1, Math.max(0, laps.length - 1)),
                       );
                     }}
-                    onJumpToLap={(lap) => {
-                      setIsPlaying(false);
-                      lapProgress.set(0);
-                      const nextIndex = Math.max(0, laps.findIndex((entry) => entry === lap));
-                      setCurrentLapIndex(nextIndex);
-                    }}
+                    onJumpToLap={jumpToLap}
                     onChangeSpeed={(nextSpeed) => setSpeed(nextSpeed)}
                   />
                 }
               />
+
+              {/* Under the canvas and inside its column, so the timeline shares
+                  the canvas's width and the story reads as part of the
+                  instrument rather than as a section below it. */}
+              {storyPanel ? (
+                <div className="mt-5 shrink-0">
+                  <RaceStoryPanel
+                    visualization={visualization}
+                    currentLap={currentLap}
+                    raceControl={activeRaceControl}
+                    driverStates={driverReplayStates}
+                    onJumpToLap={jumpToLap}
+                  />
+                </div>
+              ) : null}
             </div>
 
           </div>
         </div>
-
-        {storyPanel ? (
-          <RaceStoryPanel 
-            visualization={visualization} 
-            currentLap={currentLap} 
-            raceControl={activeRaceControl}
-            trafficSummary={trafficSummary}
-          />
-        ) : null}
       </div>
     </MotionConfig>
   );
