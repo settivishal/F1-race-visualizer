@@ -44,8 +44,8 @@ const HOME_LINEUP = /* GraphQL */ `
 `;
 
 const RACE_LIBRARY = /* GraphQL */ `
-  query RaceLibrary($season: Int, $search: String, $first: Int, $after: String) {
-    races(season: $season, search: $search, first: $first, after: $after) {
+  query RaceLibrary($season: Int, $search: String, $first: Int, $after: String, $before: String) {
+    races(season: $season, search: $search, first: $first, after: $after, before: $before) {
       edges {
         cursor
         node {
@@ -53,7 +53,7 @@ const RACE_LIBRARY = /* GraphQL */ `
           meeting { name country circuitName round season }
         }
       }
-      pageInfo { hasNextPage endCursor }
+      pageInfo { hasNextPage hasPreviousPage startCursor endCursor }
     }
     seasons { year }
   }
@@ -154,6 +154,7 @@ export async function getRaceLibrary(
   season: number | null,
   search: string | null,
   after: string | null,
+  before: string | null = null,
 ) {
   'use cache';
   cacheTag('race');
@@ -162,8 +163,12 @@ export async function getRaceLibrary(
   return executeQuery<RaceLibraryQuery, Record<string, unknown>>(RACE_LIBRARY, {
     season,
     search,
-    first: 24,
+    // A season is at most 31 scored sessions, so asking for 40 puts a whole one
+    // on a single page and the pagination controls never appear for the view
+    // almost everyone is looking at. Only "all seasons" pages.
+    first: season === null ? 24 : 40,
     after,
+    before,
   });
 }
 

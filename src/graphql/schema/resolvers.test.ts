@@ -114,6 +114,38 @@ beforeAll(async () => {
   ]);
 });
 
+describe('races paging', () => {
+  const page = (args: string) => run<{
+    races: {
+      edges: { node: { slug: string } }[];
+      pageInfo: {
+        hasNextPage: boolean; hasPreviousPage: boolean;
+        startCursor: string | null; endCursor: string | null;
+      };
+    };
+  }>(`query { races(${args}) {
+        edges { node { slug } }
+        pageInfo { hasNextPage hasPreviousPage startCursor endCursor }
+      } }`);
+
+  it('walks back to exactly the page it came from', async () => {
+    // The fixture holds the sprint and the grand prix, in that date order.
+    const first = await page('first: 1');
+    expect(first.races.edges.map((e) => e.node.slug)).toEqual(['2025-test-sprint']);
+    expect(first.races.pageInfo).toMatchObject({ hasNextPage: true, hasPreviousPage: false });
+
+    const second = await page(`first: 1, after: "${first.races.pageInfo.endCursor}"`);
+    expect(second.races.edges.map((e) => e.node.slug)).toEqual(['2025-test']);
+    expect(second.races.pageInfo).toMatchObject({ hasNextPage: false, hasPreviousPage: true });
+
+    // Stepping back is a keyset walk in the other direction, so the rows have
+    // to come back in reading order rather than the order they were fetched.
+    const back = await page(`first: 1, before: "${second.races.pageInfo.startCursor}"`);
+    expect(back.races.edges.map((e) => e.node.slug)).toEqual(['2025-test-sprint']);
+    expect(back.races.pageInfo).toMatchObject({ hasNextPage: true, hasPreviousPage: false });
+  });
+});
+
 describe('activeSeason', () => {
   it('falls back to the newest season that has a race when nothing is configured', async () => {
     // The fixture inserts no app_config row, which is also the state of a fresh

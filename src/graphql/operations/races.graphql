@@ -1,8 +1,8 @@
 # The race library. `search` and `season` are resolver arguments rather than
 # client-side filters: the database is better at filtering than the browser is,
 # and a filtered result set the server produced is one the cache can hold.
-query RaceLibrary($season: Int, $search: String, $first: Int, $after: String) {
-  races(season: $season, search: $search, first: $first, after: $after) {
+query RaceLibrary($season: Int, $search: String, $first: Int, $after: String, $before: String) {
+  races(season: $season, search: $search, first: $first, after: $after, before: $before) {
     edges {
       cursor
       node {
@@ -23,6 +23,8 @@ query RaceLibrary($season: Int, $search: String, $first: Int, $after: String) {
     }
     pageInfo {
       hasNextPage
+      hasPreviousPage
+      startCursor
       endCursor
     }
   }
