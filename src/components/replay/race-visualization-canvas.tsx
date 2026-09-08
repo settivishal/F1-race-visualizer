@@ -19,12 +19,15 @@ const VIEWBOX_WIDTH = 1120;
 const VIEWBOX_HEIGHT = 640;
 const MARGIN = {
   top: 80,
-  right: 120,
+  // The driver badges ride the playhead rather than sitting at the right edge,
+  // so this only has to clear the last lap label.
+  right: 56,
   // The last row sits exactly on top + innerHeight, so its label needs room
   // below the plot or it is clipped by the container — P18 was rendering as a
   // half-height label on an eighteen-car race.
   bottom: 96,
-  left: 176,
+  // "P18" is four characters. 176 spent a sixth of the chart's width on it.
+  left: 96,
 };
 
 /**
@@ -235,29 +238,36 @@ export function RaceVisualizationCanvas({
     // instrument on a light page, the way a video player does. It is the one
     // surface here that does not follow the theme.
     <div className={cn("flex flex-col overflow-hidden rounded-xl border border-line-strong bg-track p-5 text-white shadow-lg", className)}>
-      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-5 border-b border-white/10 px-4 pb-5">
-        <div className="max-w-md md:max-w-xl flex-1">
-          <p className="text-eyebrow font-bold uppercase text-accent">Visualization Engine</p>
-          <h3 className="font-heading mt-2 break-words text-2xl font-bold leading-tight tracking-tight text-white sm:text-3xl">
-            {race.season} R{race.round} • {race.name}
-          </h3>
-          <div className="mt-3.5 flex flex-wrap gap-2 text-xs">
-            <span className="tabular rounded-md border border-white/10 bg-white/5 px-2.5 py-1 font-semibold text-white/90">
-              {summary.driverCount} Drivers
-            </span>
-            <span className="tabular rounded-md border border-white/10 bg-white/5 px-2.5 py-1 font-semibold text-white/90">
-              {summary.maxLap || race.laps} Laps
-            </span>
-            <span className="tabular rounded-md border border-white/10 bg-white/5 px-2.5 py-1 font-semibold text-white/90">
-              {/* What the chart draws, not what the race recorded — a "186
-                  Events" chip above five visible markers reads as a bug. The
-                  full count is the timeline's business. */}
-              {chartEvents.length} Flags
-            </span>
+      <div className="border-b border-white/10 px-4 pb-5">
+        <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
+          {/* min-w-0 so a long race name wraps instead of pushing the controls
+              off; the chips used to live in here and inherited the squeeze. */}
+          <div className="min-w-0 max-w-xl flex-1">
+            <p className="text-eyebrow font-bold uppercase text-accent">Visualization Engine</p>
+            <h3 className="font-heading mt-2 break-words text-2xl font-bold leading-tight tracking-tight text-white sm:text-3xl">
+              {race.season} R{race.round} • {race.name}
+            </h3>
+          </div>
+          <div className="flex flex-col items-start gap-3 md:flex-shrink-0 md:items-end">
+            {controls ? <div>{controls}</div> : null}
           </div>
         </div>
-        <div className="flex flex-col items-start md:items-end gap-3 flex-shrink-0">
-          {controls ? <div>{controls}</div> : null}
+
+        {/* Their own row, full width. In the title's column they were sharing
+            space with a flex-shrink-0 sibling and wrapped one-then-two. */}
+        <div className="mt-3.5 flex flex-wrap gap-2 text-xs">
+          <span className="tabular rounded-md border border-white/10 bg-white/5 px-2.5 py-1 font-semibold text-white/90">
+            {summary.driverCount} Drivers
+          </span>
+          <span className="tabular rounded-md border border-white/10 bg-white/5 px-2.5 py-1 font-semibold text-white/90">
+            {summary.maxLap || race.laps} Laps
+          </span>
+          <span className="tabular rounded-md border border-white/10 bg-white/5 px-2.5 py-1 font-semibold text-white/90">
+            {/* What the chart draws, not what the race recorded — a "186
+                Events" chip above five visible markers reads as a bug. The
+                full count is the timeline's business. */}
+            {chartEvents.length} Flags
+          </span>
         </div>
       </div>
 

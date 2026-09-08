@@ -203,9 +203,19 @@ export function RaceVisualizationPlayer({
           Home returns to lap one. The live timing tower lists the running order
           for the current lap as text.
         </p>
-        <div className="overflow-x-auto pb-10">
-          <div className="grid w-full items-stretch gap-5 lg:grid-cols-[22rem_minmax(0,1fr)]">
-            <div className="h-full max-h-[800px]">
+        {/* No overflow-x here. It used to wrap the whole grid, so anything
+            narrower than tower + chart minimum scrolled the tower and the
+            timeline sideways along with the chart. The chart owns its own
+            horizontal scroll; the rest of the page should reflow.
+
+            items-start rather than stretch: the right column is now canvas plus
+            timeline plus strip, and a stretched tower grew to match it, leaving
+            a third of an empty card under the last driver. */}
+        <div className="pb-10">
+          <div className="grid w-full items-start gap-5 lg:grid-cols-[22rem_minmax(0,1fr)]">
+            {/* Sticky so the running order stays on screen while you read the
+                chart, which is what the extra height was accidentally doing. */}
+            <div className="max-h-[800px] lg:sticky lg:top-20">
               <LiveTimingTower
                 visualization={visualization}
                 currentLap={currentLap}
