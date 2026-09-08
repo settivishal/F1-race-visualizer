@@ -74,7 +74,7 @@ export function RaceStoryPanel({
         onJumpToLap={onJumpToLap}
       />
 
-      <div className="flex flex-wrap items-start gap-x-5 gap-y-3 rounded-xl border border-line bg-panel px-5 py-4">
+      <div className="flex flex-wrap items-start gap-x-5 gap-y-3 rounded-xl border border-line bg-panel px-4 py-4 sm:px-5">
         <span
           className={`shrink-0 rounded-full px-3 py-1 text-eyebrow font-bold uppercase ${getReplayEventTone(
             raceControl.status === "green" ? "green" : raceControl.status,
@@ -105,14 +105,16 @@ export function RaceStoryPanel({
 
         {traffic ? <p className="text-sm text-muted">{traffic}</p> : null}
 
-        <div className="flex flex-wrap gap-1.5">
+        {/* Scrolls rather than wraps: five filters wrapping to three rows on a
+            phone took more height than the thing they filter. */}
+        <div className="-mx-4 flex w-[calc(100%+2rem)] gap-1.5 overflow-x-auto px-4 pb-1 sm:mx-0 sm:w-auto sm:flex-wrap sm:overflow-visible sm:px-0">
           {FILTERS.map((option) => (
             <button
               key={option.id}
               type="button"
               onClick={() => setFilter(option.id)}
               aria-pressed={filter === option.id}
-              className={`tap inline-flex items-center rounded-full px-3 py-1 text-eyebrow font-bold uppercase transition-colors ${
+              className={`tap inline-flex shrink-0 items-center rounded-full px-3 py-1 text-eyebrow font-bold uppercase transition-colors ${
                 filter === option.id
                   ? "bg-accent-fill text-on-accent"
                   : "border border-line text-muted hover:border-line-strong hover:text-foreground"

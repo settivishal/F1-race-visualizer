@@ -390,7 +390,16 @@ html:has(:root.light) {
 --------------------------------------------------------------------------- */
 @layer components {
   @media (pointer: coarse) {
+    /* Height only. `.tap` also set a min-width, which turned every text pill
+       into a wide capsule — the replay's speed selector went from one row of
+       four to three rows of circles. A pill's width should come from its label;
+       what a finger needs is the vertical room. */
     .tap {
+      min-height: 2.75rem;
+    }
+
+    /* For a square control — an icon button — where both axes are the target. */
+    .tap-square {
       min-height: 2.75rem;
       min-width: 2.75rem;
     }
