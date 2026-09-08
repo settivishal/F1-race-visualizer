@@ -46,6 +46,18 @@ async function main() {
   if (failed > 0) process.exitCode = 1;
 }
 
+/**
+ * Every scored session of a season, run or not.
+ *
+ * A mid-season year is mostly races that have not happened yet, and importing
+ * one writes a meeting, a race row with its date, and the entry list — but no
+ * positions, since there are none. That is a *scheduled* race, and the site
+ * wants it: it is what gives the season progress bar its denominator and the
+ * countdown something to count down to.
+ *
+ * A race with a future date and no positions is how the UI tells the two
+ * apart; nothing here needs a status column to say so.
+ */
 async function scoredSessionsOf(year: number) {
   const sessions = await fetchSessions(year);
   return sessions

@@ -12,6 +12,7 @@ import type {
   RaceHeaderQuery,
   RaceLibraryQuery,
   RaceSlugsQuery,
+  ActiveSeasonQuery,
   SeasonScheduleQuery,
   SeasonStandingsQuery,
 } from '@/graphql/generated/graphql';
@@ -299,6 +300,31 @@ export async function getTeamProfile(name: string) {
   cacheLife('days');
 
   return executeQuery<TeamProfileQuery, { name: string }>(TEAM_PROFILE, { name });
+}
+
+const ACTIVE_SEASON = /* GraphQL */ `
+  query ActiveSeason {
+    activeSeason
+  }
+`;
+
+/**
+ * Which season the site is about, from `app_config` rather than a constant.
+ *
+ * Tagged `settings` as well as `race`: changing the season in the admin has to
+ * drop this, or the home page keeps last season for a day. `updateConfigAction`
+ * revalidates that tag.
+ */
+export async function getActiveSeason(): Promise<number> {
+  'use cache';
+  cacheTag('race', 'settings');
+  cacheLife('days');
+
+  const { activeSeason } = await executeQuery<ActiveSeasonQuery, Record<string, unknown>>(
+    ACTIVE_SEASON,
+    {},
+  );
+  return activeSeason;
 }
 
 const SEASON_SCHEDULE = /* GraphQL */ `

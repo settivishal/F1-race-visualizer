@@ -197,3 +197,52 @@ describe('two upstreams, one race', () => {
     expect(await db.select().from(dbSchema.circuits)).toHaveLength(1);
   });
 });
+
+/**
+ * Numbers change: a champion runs 1. The driver row holds one number, so which
+ * import wins matters — and it used to be simply the last one, which meant
+ * backfilling 2018 after 2026 would put a driver back on the number they ran
+ * eight years ago, everywhere on the site.
+ */
+describe('a driver number belongs to a season', () => {
+  const withNumber = (seasonYear: number, slug: string, driverNumber: number): TransformedRace => ({
+    ...base,
+    meeting: { ...base.meeting, seasonYear, openf1MeetingKey: null },
+    race: { ...base.race, slug, date: new Date(`${seasonYear}-03-17T05:10:00Z`) },
+    lineup: [{
+      driverNumber, code: 'VER', name: 'Max Verstappen', country: 'NED',
+      headshotUrl: null, teamName: 'Red Bull Racing', teamColor: '#3671C6',
+    }],
+    results: [],
+  });
+
+  const stored = async () => {
+    const [row] = await db
+      .select({ number: dbSchema.drivers.number, season: dbSchema.drivers.numberSeason })
+      .from(dbSchema.drivers)
+      .where(eq(dbSchema.drivers.code, 'VER'));
+    return row;
+  };
+
+  it('takes the number from the newer season, whichever import runs last', async () => {
+    await writeRace(withNumber(2026, '2026-melbourne', 1), db);
+    await writeRace(withNumber(2018, '2018-melbourne', 33), db);
+
+    expect(await stored()).toEqual({ number: 1, season: 2026 });
+  });
+
+  it('still moves forward when the seasons arrive in order', async () => {
+    await writeRace(withNumber(2018, '2018-melbourne', 33), db);
+    expect(await stored()).toEqual({ number: 33, season: 2018 });
+
+    await writeRace(withNumber(2026, '2026-melbourne', 1), db);
+    expect(await stored()).toEqual({ number: 1, season: 2026 });
+  });
+
+  it('lets a re-import of the same season correct the number', async () => {
+    await writeRace(withNumber(2026, '2026-melbourne', 33), db);
+    await writeRace(withNumber(2026, '2026-melbourne', 1), db);
+
+    expect(await stored()).toEqual({ number: 1, season: 2026 });
+  });
+});

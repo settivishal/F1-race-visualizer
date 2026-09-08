@@ -157,6 +157,7 @@ type PitStop {
 }
 
 type Query {
+  activeSeason: Int!
   circuit(ergastId: String!): Circuit
   circuits: [Circuit!]!
   constructorStandings(season: Int!): [ConstructorStanding!]!

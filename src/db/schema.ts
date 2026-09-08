@@ -57,6 +57,12 @@ export const drivers = pgTable('drivers', {
   ergastDriverId: text('ergast_driver_id').unique(),
   name: text('name').notNull(),
   number: integer('number'),
+  // The season the stored number came from. Numbers change — a champion runs 1
+  // — and the driver row holds one, so an import has to know whether the number
+  // it is carrying is newer than the one already there. Without this the rule
+  // was last-write-wins, and backfilling 2018 would have put Verstappen back on
+  // 33 across the whole site.
+  numberSeason: integer('number_season'),
   country: text('country'),
   headshotUrl: text('headshot_url'),             // our Vercel Blob URL
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

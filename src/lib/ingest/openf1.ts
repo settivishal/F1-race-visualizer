@@ -169,6 +169,14 @@ async function getList<T>(
 
 export const fetchSessions = (year: number) => getList('/sessions', { year }, SessionSchema);
 export const fetchMeetings = (year: number) => getList('/meetings', { year }, MeetingSchema);
+/**
+ * One session by its key. `/sessions` takes `session_key` directly, which is
+ * worth having as its own call: the alternative — and what run.ts used to do —
+ * is to fetch whole seasons looking for it, from a hardcoded list of years that
+ * silently stops finding anything the January after it was written.
+ */
+export const fetchSessionByKey = (sessionKey: number) =>
+  getList('/sessions', { session_key: sessionKey }, SessionSchema);
 export const fetchDrivers = (sessionKey: number) =>
   getList('/drivers', { session_key: sessionKey }, DriverSchema);
 export const fetchLaps = (sessionKey: number) =>
