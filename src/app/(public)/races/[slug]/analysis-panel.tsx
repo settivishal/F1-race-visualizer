@@ -81,7 +81,7 @@ export async function AnalysisPanel({ slug }: { slug: string }) {
 
   return (
     <div className="space-y-12">
-      <section>
+      <section className="reveal">
         <AnalysisHeading
           eyebrow="Pace"
           title="Lap times"
@@ -92,7 +92,7 @@ export async function AnalysisPanel({ slug }: { slug: string }) {
         </div>
       </section>
 
-      <section>
+      <section className="reveal">
         <AnalysisHeading
           eyebrow="Strategy"
           title="Tyres"
@@ -115,7 +115,7 @@ export async function AnalysisPanel({ slug }: { slug: string }) {
         </div>
       </section>
 
-      <section>
+      <section className="reveal">
         <AnalysisHeading
           eyebrow="Summary"
           title="Race pace"
