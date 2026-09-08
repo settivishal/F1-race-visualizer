@@ -22,6 +22,8 @@ export type StoryMoment = {
   kind: StoryKind;
   /** The classified event kind, for colour. Derived moments have no event. */
   eventKind: ReplayEventKind;
+  /** Places gained, on a moment derived from the lap order. */
+  places?: number;
 };
 
 /**
@@ -122,6 +124,7 @@ function fromPositions(entry: ReplayEntry): StoryMoment[] {
       description: `${entry.driver.name} moves from P${previous.position} to P${current.position}.`,
       kind: "overtake",
       eventKind: "overtake",
+      places: gained,
     });
   }
 
@@ -159,6 +162,36 @@ export function buildStoryMoments(visualization: ReplayView): StoryMoment[] {
       const previous = moments[index - 1];
       return !previous || previous.title !== moment.title || previous.lap !== moment.lap;
     });
+}
+
+export type Significance = "major" | "minor";
+
+/** A gain worth a marker of its own, once single-place changes are set aside. */
+const MAJOR_GAIN = 3;
+
+/**
+ * Whether a moment earns a marker by default.
+ *
+ * The archive files an OVERTAKE per position change, so a normal race carries
+ * well over a hundred of them — 186 on the 53 laps of Japan 2024. Drawing them
+ * all put the chart behind a curtain of dashed lines and packed the timeline
+ * into one unbroken band. They are not wrong, they are just not all worth a
+ * person's attention at once, and the filters still bring them back.
+ *
+ * Shared by the timeline and the canvas so the two cannot disagree about what
+ * the notable moments of a race were.
+ */
+export function significanceOf(moment: StoryMoment): Significance {
+  // Derived gains are checked first: they carry eventKind "overtake" too, for
+  // colour, and would otherwise all be dismissed as minor before being counted.
+  if (moment.places !== undefined) {
+    return moment.places >= MAJOR_GAIN ? "major" : "minor";
+  }
+
+  // An archive OVERTAKE row: one position, no places counted.
+  if (moment.eventKind === "overtake") return "minor";
+
+  return "major";
 }
 
 /** The last moment at or before the current lap — what the replay is showing. */

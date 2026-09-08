@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { getReplayEventTone, type DriverReplayState, type ReplayRaceControl } from "./replay-state";
 import { RaceStoryTimeline } from "./race-story-timeline";
-import { activeMomentAt, buildStoryMoments, type StoryKind } from "./story-moments";
+import { activeMomentAt, buildStoryMoments, significanceOf, type StoryKind } from "./story-moments";
 import type { ReplayView } from "./types";
 
 /**
@@ -20,11 +20,19 @@ import type { ReplayView } from "./types";
  * instead of a page.
  */
 
-const FILTERS: { id: StoryKind | "all"; label: string }[] = [
-  { id: "all", label: "All" },
+type FilterId = StoryKind | "key" | "all";
+
+/**
+ * "Key moments" leads and is the default. The archive files an overtake per
+ * position change, so "all" on a normal race is a hundred and eighty markers —
+ * everything is there, but nothing is legible. See `significanceOf`.
+ */
+const FILTERS: { id: FilterId; label: string }[] = [
+  { id: "key", label: "Key moments" },
   { id: "control", label: "Race control" },
   { id: "strategy", label: "Pit stops" },
   { id: "overtake", label: "Position swings" },
+  { id: "all", label: "All" },
 ];
 
 export function RaceStoryPanel({
@@ -41,13 +49,14 @@ export function RaceStoryPanel({
   driverStates: Map<string, DriverReplayState>;
   onJumpToLap: (lap: number) => void;
 }) {
-  const [filter, setFilter] = useState<StoryKind | "all">("all");
+  const [filter, setFilter] = useState<FilterId>("key");
 
   const moments = useMemo(() => buildStoryMoments(visualization), [visualization]);
-  const shown = useMemo(
-    () => (filter === "all" ? moments : moments.filter((moment) => moment.kind === filter)),
-    [filter, moments],
-  );
+  const shown = useMemo(() => {
+    if (filter === "all") return moments;
+    if (filter === "key") return moments.filter((moment) => significanceOf(moment) === "major");
+    return moments.filter((moment) => moment.kind === filter);
+  }, [filter, moments]);
   const active = useMemo(() => activeMomentAt(shown, currentLap), [shown, currentLap]);
 
   const traffic = useMemo(

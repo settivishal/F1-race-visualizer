@@ -39,9 +39,11 @@ function formatSector(val: number | null | undefined): string {
 export const TIMING_TOWER_ID = 'replay-timing-tower';
 
 export function LiveTimingTower({ visualization, currentLap }: TimingTowerProps) {
-  // A fact about the era, not about this import — see races.data_tier. Sectors
-  // and gap strings arrive together, from the same feed, so they appear and
-  // disappear together too.
+  // A fact about the era, not about this import — see races.data_tier.
+  //
+  // There is no gap column. `gap` is null on every row of every race: neither
+  // upstream publishes a per-lap gap (transform.ts, ergast-transform.ts), so
+  // the column rendered a header over nothing for four seasons.
   const hasTimingDetail = visualization.race.dataTier === 'FULL';
 
   const standings = useMemo(() => {
@@ -81,7 +83,6 @@ export function LiveTimingTower({ visualization, currentLap }: TimingTowerProps)
         currentStandings.push({
           entry,
           position: currentPos.position,
-          gap: currentPos.gap,
           sector1: currentPos.sector1,
           sector2: currentPos.sector2,
           sector3: currentPos.sector3,
@@ -108,16 +109,15 @@ export function LiveTimingTower({ visualization, currentLap }: TimingTowerProps)
 
       {hasTimingDetail ? null : (
         <p className="border-b border-line bg-panel-strong/30 px-5 py-2 text-[11px] leading-relaxed text-muted">
-          Sector times and gaps were not published for {visualization.race.season}. Positions
-          and lap times are the whole record for this era.
+          Sector times were not published for {visualization.race.season}. Positions and lap
+          times are the whole record for this era.
         </p>
       )}
 
       <div className="flex-1 overflow-y-auto px-2 py-2 hide-scrollbar">
         <div className="flex gap-1 text-eyebrow uppercase font-semibold text-muted mb-2 px-2">
-          <div className="w-6">Pos</div>
+          <div className="w-8">Pos</div>
           <div className="flex-1">Driver</div>
-          {hasTimingDetail ? <div className="w-10 text-right">Gap</div> : null}
           <div className="w-14 text-right">Lap</div>
           {hasTimingDetail ? (
             <>
@@ -140,7 +140,7 @@ export function LiveTimingTower({ visualization, currentLap }: TimingTowerProps)
                 transition={{ type: "spring", stiffness: 300, damping: 30 }}
                 className="group flex items-center gap-1 rounded-md px-2 py-1.5 text-xs transition-colors hover:bg-panel-strong"
               >
-                <div className="tabular w-6 font-mono font-medium text-muted">
+                <div className="tabular w-8 font-mono font-medium text-muted">
                   {standing.position}
                 </div>
                 <div className="flex-1 flex items-center gap-2 overflow-hidden">
@@ -153,12 +153,6 @@ export function LiveTimingTower({ visualization, currentLap }: TimingTowerProps)
                       and every other selector here is a styling class. */}
                   <span data-testid="tower-driver" className="font-semibold text-foreground truncate">{standing.entry.driver.code}</span>
                 </div>
-                {hasTimingDetail ? (
-                  <div className="tabular w-10 truncate text-right font-mono text-[11px] text-muted">
-                    {standing.gap === "LEADER" ? "Lap" : standing.gap}
-                  </div>
-                ) : null}
-                
                 {/* The lap time has been ingested since M1 and displayed
                     nowhere. It is the number the sectors add up to, so it
                     belongs beside them. */}

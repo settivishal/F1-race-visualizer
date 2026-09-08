@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { clusterMoments } from './race-story-timeline';
-import { activeMomentAt, buildStoryMoments, describeMoment, type StoryMoment } from './story-moments';
+import {
+  activeMomentAt, buildStoryMoments, describeMoment, significanceOf, type StoryMoment,
+} from './story-moments';
 import type { ReplayView } from './types';
 
 describe('describeMoment', () => {
@@ -133,6 +135,54 @@ describe('buildStoryMoments', () => {
       }),
     );
     expect(moments.map((moment) => moment.lap)).toEqual([2, 9]);
+  });
+});
+
+describe('significanceOf', () => {
+  it('keeps what changed the race', () => {
+    const major = buildStoryMoments(
+      view({
+        events: [
+          { lap: 5, type: 'SAFETY_CAR', details: 'Safety car deployed' },
+          { lap: 9, type: 'RETIREMENT', details: 'Engine' },
+          { lap: 12, type: 'PIT_STOP', details: 'Box' },
+          { lap: 44, type: 'FASTEST_LAP', details: '1:24.125' },
+        ],
+      }),
+    );
+    expect(major.map(significanceOf)).toEqual(['major', 'major', 'major', 'major']);
+  });
+
+  it('sets aside the per-position overtakes that make up most of a race', () => {
+    const [overtake] = buildStoryMoments(
+      view({
+        events: [{
+          lap: 2, type: 'OVERTAKE', details: 'P17 to P16',
+          driver: { id: 'd9', code: 'GAS', name: 'Pierre Gasly', number: 10 },
+        }],
+      }),
+    );
+    expect(significanceOf(overtake)).toBe('minor');
+  });
+
+  it('judges a derived gain by how far through the field it went', () => {
+    const moments = buildStoryMoments(
+      view({
+        drivers: [{
+          id: 'd1', code: 'LEC', name: 'Charles Leclerc',
+          positions: [
+            { lap: 1, position: 10 },
+            { lap: 2, position: 8 },   // two places
+            { lap: 3, position: 4 },   // four places
+          ],
+        }],
+      }),
+    );
+    // Both are moments; only the four-place move is a key one. The derived
+    // gains carry eventKind "overtake" for colour, so this also pins that the
+    // place count is read before that shortcut.
+    expect(moments.map((moment) => [moment.places, significanceOf(moment)]))
+      .toEqual([[2, 'minor'], [4, 'major']]);
   });
 });
 
