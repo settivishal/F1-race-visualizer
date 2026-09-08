@@ -1,4 +1,4 @@
-import { and, asc, eq, ilike, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, ilike, or, sql } from 'drizzle-orm';
 import { meetings, raceEvents, racePositions, raceResults, races } from '@/db/schema';
 import { builder } from '../builder';
 import { RaceAnalysis, loadAnalysis } from './analysis';
@@ -308,16 +308,29 @@ const RaceEdge = builder.objectRef<{ node: RaceRow }>('RaceEdge').implement({
 });
 
 const PageInfo = builder
-  .objectRef<{ hasNextPage: boolean; endCursor: string | null }>('PageInfo')
+  .objectRef<{
+    hasNextPage: boolean;
+    hasPreviousPage: boolean;
+    startCursor: string | null;
+    endCursor: string | null;
+  }>('PageInfo')
   .implement({
     fields: (t) => ({
       hasNextPage: t.exposeBoolean('hasNextPage'),
+      // Paging was forward-only: a reader who took Next had no way back except
+      // the browser button, and no shareable URL for the page they were on.
+      hasPreviousPage: t.exposeBoolean('hasPreviousPage'),
+      startCursor: t.exposeString('startCursor', { nullable: true }),
       endCursor: t.exposeString('endCursor', { nullable: true }),
     }),
   });
 
 const RaceConnection = builder
-  .objectRef<{ edges: { node: RaceRow }[]; hasNextPage: boolean }>('RaceConnection')
+  .objectRef<{
+    edges: { node: RaceRow }[];
+    hasNextPage: boolean;
+    hasPreviousPage: boolean;
+  }>('RaceConnection')
   .implement({
     fields: (t) => ({
       edges: t.field({ type: [RaceEdge], resolve: (c) => c.edges }),
@@ -325,6 +338,8 @@ const RaceConnection = builder
         type: PageInfo,
         resolve: (c) => ({
           hasNextPage: c.hasNextPage,
+          hasPreviousPage: c.hasPreviousPage,
+          startCursor: c.edges.length ? encodeCursor(c.edges[0].node) : null,
           endCursor: c.edges.length ? encodeCursor(c.edges[c.edges.length - 1].node) : null,
         }),
       }),
@@ -339,6 +354,8 @@ builder.queryField('races', (t) =>
       search: t.arg.string(),
       first: t.arg.int(),
       after: t.arg.string(),
+      /** The page ending just before this row, for stepping back. */
+      before: t.arg.string(),
     },
     resolve: async (_root, args, ctx) => {
       // Bounded regardless of what the client asks for: `first` is an input,
@@ -351,24 +368,46 @@ builder.queryField('races', (t) =>
         const pattern = `%${args.search}%`;
         filters.push(or(ilike(races.slug, pattern), ilike(meetings.name, pattern)));
       }
+
+      // Stepping back is the same keyset walk in the other direction: take the
+      // rows before the cursor, newest first, then put them back in order. It
+      // stays a keyset rather than an offset for the reason above — a page
+      // boundary must not move when the week's race lands.
+      const backwards = args.before != null && args.after == null;
+
       if (args.after) {
         const cursor = decodeCursor(args.after);
         filters.push(
           sql`(${races.date}, ${races.id}) > (${cursor.date.toISOString()}, ${cursor.id})`,
         );
+      } else if (args.before) {
+        const cursor = decodeCursor(args.before);
+        filters.push(
+          sql`(${races.date}, ${races.id}) < (${cursor.date.toISOString()}, ${cursor.id})`,
+        );
       }
 
-      // One extra row answers hasNextPage without a second count query.
+      // One extra row answers "is there another page that way" without a second
+      // count query.
       const rows = await ctx.db.select({ race: races }).from(races)
         .innerJoin(meetings, eq(meetings.id, races.meetingId))
         .where(filters.length ? and(...filters) : undefined)
-        .orderBy(asc(races.date), asc(races.id))
+        .orderBy(
+          backwards ? desc(races.date) : asc(races.date),
+          backwards ? desc(races.id) : asc(races.id),
+        )
         .limit(limit + 1);
 
+      const hasMore = rows.length > limit;
       const page = rows.slice(0, limit);
+      if (backwards) page.reverse();
+
       return {
         edges: page.map((r) => ({ node: r.race })),
-        hasNextPage: rows.length > limit,
+        // Walking backwards, the extra row is evidence of a page *before* this
+        // one; forwards it is evidence of one after.
+        hasNextPage: backwards ? true : hasMore,
+        hasPreviousPage: backwards ? hasMore : args.after != null,
       };
     },
   }),

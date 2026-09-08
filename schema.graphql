@@ -147,6 +147,8 @@ type Pace {
 type PageInfo {
   endCursor: String
   hasNextPage: Boolean!
+  hasPreviousPage: Boolean!
+  startCursor: String
 }
 
 type PitStop {
@@ -166,7 +168,7 @@ type Query {
   drivers(season: Int): [Driver!]!
   ingestRuns(first: Int = 50): [IngestRun!]!
   race(slug: String!): Race
-  races(after: String, first: Int, search: String, season: Int): RaceConnection!
+  races(after: String, before: String, first: Int, search: String, season: Int): RaceConnection!
   search(query: String!): [SearchHit!]!
   seasons: [Season!]!
   team(name: String!): TeamProfile

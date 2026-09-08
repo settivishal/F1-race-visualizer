@@ -8,7 +8,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { PageContainer } from '@/components/ui/page-container';
 import { SectionHeader } from '@/components/ui/section-header';
 import { Skeleton } from '@/components/ui/skeleton';
-import { getRaceLibrary } from '@/lib/queries';
+import { getActiveSeason, getRaceLibrary } from '@/lib/queries';
 
 export const metadata = {
   title: 'Races — F1 Race Visualizer',
@@ -60,30 +60,70 @@ async function RaceLibrary({ searchParams }: { searchParams: SearchParams }) {
 
   const seasonParam = first(params.season);
   const parsedSeason = seasonParam ? Number(seasonParam) : NaN;
-  const season = Number.isInteger(parsedSeason) ? parsedSeason : null;
+  // `?season=all` is explicit, because the default is no longer "everything":
+  // landing on the current season is what almost everyone wants, and it fits a
+  // single page, which is what makes the pagination controls disappear.
+  const season = seasonParam === 'all'
+    ? null
+    : Number.isInteger(parsedSeason)
+      ? parsedSeason
+      : await getActiveSeason();
 
   const search = first(params.q)?.trim() || null;
   const after = first(params.after) ?? null;
+  const before = first(params.before) ?? null;
 
-  const { races, seasons } = await getRaceLibrary(season, search, after);
+  const { races, seasons } = await getRaceLibrary(season, search, after, before);
+
+  // Carried on every link so a filter survives paging and vice versa.
+  const context = {
+    ...(season === null ? { season: 'all' } : { season: String(season) }),
+    ...(search ? { q: search } : {}),
+  };
 
   const fieldClasses =
     'h-10 w-full rounded-md border border-line bg-panel px-3 text-sm text-foreground transition-[border-color] hover:border-line-strong';
 
   return (
     <>
-      <form method="get" className="mt-8 flex flex-wrap items-end gap-3">
-        <label className="flex flex-col gap-1.5">
-          <span className="text-eyebrow font-semibold uppercase text-muted">Season</span>
-          <select name="season" defaultValue={season ?? ''} className={fieldClasses}>
-            <option value="">All seasons</option>
-            {seasons.map((entry) => (
-              <option key={entry.year} value={entry.year}>
-                {entry.year}
-              </option>
-            ))}
-          </select>
-        </label>
+      {/* Links, not a select with a Filter button. A year is a destination,
+          and a destination is an href — it filters on click, needs no
+          JavaScript, and each season is a URL someone can send. */}
+      <nav aria-label="Season" className="mt-8 flex flex-wrap gap-1.5">
+        {[...seasons].reverse().map((entry) => {
+          const isActive = season === entry.year;
+          return (
+            <Link
+              key={entry.year}
+              href={{ pathname: '/races', query: { season: String(entry.year), ...(search ? { q: search } : {}) } }}
+              aria-current={isActive ? 'page' : undefined}
+              className={`tabular rounded-full px-3.5 py-1.5 text-sm font-semibold transition-colors ${
+                isActive
+                  ? 'bg-accent text-on-accent'
+                  : 'border border-line text-muted hover:border-line-strong hover:text-foreground'
+              }`}
+            >
+              {entry.year}
+            </Link>
+          );
+        })}
+        <Link
+          href={{ pathname: '/races', query: { season: 'all', ...(search ? { q: search } : {}) } }}
+          aria-current={season === null ? 'page' : undefined}
+          className={`rounded-full px-3.5 py-1.5 text-sm font-semibold transition-colors ${
+            season === null
+              ? 'bg-accent text-on-accent'
+              : 'border border-line text-muted hover:border-line-strong hover:text-foreground'
+          }`}
+        >
+          All seasons
+        </Link>
+      </nav>
+
+      <form method="get" className="mt-4 flex flex-wrap items-end gap-3">
+        {/* The season rides along as a hidden field, so searching does not
+            silently throw away the year the reader chose. */}
+        <input type="hidden" name="season" value={season === null ? 'all' : String(season)} />
 
         <label className="flex min-w-56 flex-1 flex-col gap-1.5">
           <span className="text-eyebrow font-semibold uppercase text-muted">Search</span>
@@ -97,7 +137,7 @@ async function RaceLibrary({ searchParams }: { searchParams: SearchParams }) {
         </label>
 
         <Button type="submit" variant="secondary">
-          Filter
+          Search
         </Button>
       </form>
 
@@ -159,23 +199,27 @@ async function RaceLibrary({ searchParams }: { searchParams: SearchParams }) {
         </ul>
       )}
 
-      {races.pageInfo.hasNextPage && races.pageInfo.endCursor ? (
-        <div className="mt-8 flex justify-center">
-          <Link
-            href={{
-              pathname: '/races',
-              query: {
-                ...(season ? { season: String(season) } : {}),
-                ...(search ? { q: search } : {}),
-                after: races.pageInfo.endCursor,
-              },
-            }}
-            className="rounded-md"
-          >
-            <Button variant="secondary">Next page</Button>
-          </Link>
+      {races.pageInfo.hasPreviousPage || races.pageInfo.hasNextPage ? (
+        <div className="mt-8 flex justify-center gap-3">
+          {races.pageInfo.hasPreviousPage && races.pageInfo.startCursor ? (
+            <Link
+              href={{ pathname: '/races', query: { ...context, before: races.pageInfo.startCursor } }}
+              className="rounded-md"
+            >
+              <Button variant="secondary">← Previous</Button>
+            </Link>
+          ) : null}
+          {races.pageInfo.hasNextPage && races.pageInfo.endCursor ? (
+            <Link
+              href={{ pathname: '/races', query: { ...context, after: races.pageInfo.endCursor } }}
+              className="rounded-md"
+            >
+              <Button variant="secondary">Next →</Button>
+            </Link>
+          ) : null}
         </div>
       ) : null}
+
     </>
   );
 }
