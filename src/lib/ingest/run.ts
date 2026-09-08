@@ -174,7 +174,8 @@ export async function writeRace(
   return db.transaction(async (tx) => {
     let rows = 0;
 
-    await tx.insert(seasons).values({ year: race.meeting.seasonYear }).onConflictDoNothing();
+    const season = race.meeting.seasonYear;
+    await tx.insert(seasons).values({ year: season }).onConflictDoNothing();
 
     // The circuit, where the source knows one. Ergast does; OpenF1 does not, so
     // an OpenF1 import leaves whatever is already linked alone.
@@ -290,13 +291,21 @@ export async function writeRace(
       const [driverRow] = await tx.insert(drivers)
         .values({
           code: entry.code, name: entry.name, number: entry.driverNumber,
+          numberSeason: season,
           country: entry.country, headshotUrl: entry.headshotUrl,
           ergastDriverId: entry.ergastDriverId ?? null,
         })
         .onConflictDoUpdate({
           target: drivers.code,
           set: {
-            name: entry.name, number: entry.driverNumber, country: entry.country,
+            name: entry.name, country: entry.country,
+            // Numbers change, and the row holds one. Take the incoming number
+            // only from a season at least as recent as the one that set the
+            // stored value, so importing an older race cannot roll it back.
+            number: sqlNewerSeason('number', drivers.number, drivers.numberSeason, season),
+            numberSeason: sqlNewerSeason(
+              'number_season', drivers.numberSeason, drivers.numberSeason, season,
+            ),
             headshotUrl: sqlCoalesce('headshot_url', drivers.headshotUrl),
             ergastDriverId: sqlCoalesce('ergast_driver_id', drivers.ergastDriverId),
             updatedAt: new Date(),
@@ -434,6 +443,27 @@ function sqlExcluded(column: string) {
  */
 function sqlCoalesce(column: string, stored: AnyColumn) {
   return sql`coalesce(excluded."${sql.raw(column)}", ${stored})`;
+}
+
+/**
+ * The incoming value, but only from a season at least as new as the one that
+ * set what is stored. An older import keeps its hands off.
+ *
+ * `excluded` is the row that failed to insert, so `excluded.number` is what
+ * this import is carrying. A null `number_season` means the stored value
+ * predates this rule and has no provenance, so the incoming one wins.
+ */
+function sqlNewerSeason(
+  column: string,
+  stored: AnyColumn,
+  storedSeason: AnyColumn,
+  season: number,
+) {
+  return sql`case
+    when ${storedSeason} is null or ${storedSeason} <= ${season}
+      then excluded."${sql.raw(column)}"
+    else ${stored}
+  end`;
 }
 
 /** The stored value, or the incoming one where nothing is stored yet. */
