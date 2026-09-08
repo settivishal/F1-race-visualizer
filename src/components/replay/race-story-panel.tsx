@@ -114,7 +114,7 @@ export function RaceStoryPanel({
               aria-pressed={filter === option.id}
               className={`rounded-full px-3 py-1 text-eyebrow font-bold uppercase transition-colors ${
                 filter === option.id
-                  ? "bg-accent text-on-accent"
+                  ? "bg-accent-fill text-on-accent"
                   : "border border-line text-muted hover:border-line-strong hover:text-foreground"
               }`}
             >

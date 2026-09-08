@@ -191,7 +191,7 @@ type Query {
   seasonPulse(season: Int!): [PulseRound!]!
   seasons: [Season!]!
   team(name: String!): TeamProfile
-  teams: [Team!]!
+  teams(season: Int): [Team!]!
 }
 
 type Race {

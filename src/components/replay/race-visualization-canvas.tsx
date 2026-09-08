@@ -243,7 +243,7 @@ export function RaceVisualizationCanvas({
           {/* min-w-0 so a long race name wraps instead of pushing the controls
               off; the chips used to live in here and inherited the squeeze. */}
           <div className="min-w-0 max-w-xl flex-1">
-            <p className="text-eyebrow font-bold uppercase text-accent">Visualization Engine</p>
+            <p className="text-eyebrow font-bold uppercase text-on-track-accent">Visualization Engine</p>
             <h3 className="font-heading mt-2 break-words text-2xl font-bold leading-tight tracking-tight text-white sm:text-3xl">
               {race.season} R{race.round} • {race.name}
             </h3>
@@ -275,7 +275,16 @@ export function RaceVisualizationCanvas({
           an `h-auto` SVG keeps its intrinsic height, the column overflows the
           card's max height, and the bottom of the chart is cropped — which is
           what cut P18 in half on an eighteen-car race. */}
-      <div className="mt-4 min-h-0 flex-1 overflow-x-auto">
+      {/* Focusable because it scrolls: a region a mouse can pan and a keyboard
+          cannot reach is unusable without a pointer, which is what axe's
+          scrollable-region-focusable rule is about. The chart itself carries the
+          label, so this is a scroll handle rather than a second announcement. */}
+      <div
+        className="mt-4 min-h-0 flex-1 overflow-x-auto"
+        tabIndex={0}
+        role="group"
+        aria-label={`${race.name} chart, scrollable`}
+      >
         <div className="h-full min-w-[760px]">
           <svg
             viewBox={`0 0 ${VIEWBOX_WIDTH} ${VIEWBOX_HEIGHT}`}
@@ -440,7 +449,10 @@ export function RaceVisualizationCanvas({
         </p>
         {/* The race-control label lives in the story strip directly below;
             printing it here as well said the same thing twice on one screen. */}
-        <p className="text-accent">
+        {/* on-track-accent, not accent: this panel is a fixed dark surface in
+            both themes, and the theme's own accent lands on it at 3.7:1 in
+            light mode. */}
+        <p className="text-on-track-accent">
           Lap {currentLap}
           {nextLap !== currentLap ? ` → ${nextLap}` : ""}
         </p>

@@ -28,6 +28,18 @@ import type {
  * `headers()` or `searchParams` — the restriction follows the call stack, so a
  * page reads those itself and passes the values down as arguments.
  *
+ * One `race` tag, not a tag per race. These reads used to carry `race:${slug}`
+ * as well, with a comment saying a single re-import should not evict the
+ * season — and nothing ever invalidated it, so it was a targeting ability no
+ * caller could use.
+ *
+ * Reinstating it would mean splitting the taxonomy: per-race pages under a
+ * narrow tag, the library and the home page under a broad one, and every write
+ * choosing correctly between them. The failure mode of choosing wrong is a page
+ * that should have been dropped and was not — stale data, which is worse than
+ * the cost this saves. An ingest imports one race a week; rebuilding the race
+ * pages on demand after it is cheap.
+ *
  * Tags are what the ingest job will invalidate. `cacheLife('days')` is the
  * safety net underneath: races change weekly, so a day is short enough that
  * nothing goes stale for long even if a revalidation is missed, and long
@@ -205,9 +217,7 @@ export async function getRaceLibrary(
 
 export async function getRaceHeader(slug: string) {
   'use cache';
-  // Tagged twice: the broad tag so an ingest can invalidate every race at once,
-  // and the narrow one so a single re-import does not evict the season.
-  cacheTag('race', `race:${slug}`);
+  cacheTag('race');
   cacheLife('days');
 
   return executeQuery<RaceHeaderQuery, { slug: string }>(RACE_HEADER, { slug });
@@ -243,7 +253,7 @@ const RACE_REPLAY = /* GraphQL */ `
  */
 export async function getRaceReplay(slug: string) {
   'use cache';
-  cacheTag('race', `race:${slug}`);
+  cacheTag('race');
   cacheLife('days');
 
   return executeQuery<RaceReplayQuery, { slug: string }>(RACE_REPLAY, { slug });
@@ -282,7 +292,7 @@ const RACE_ANALYSIS = /* GraphQL */ `
  */
 export async function getRaceAnalysis(slug: string) {
   'use cache';
-  cacheTag('race', `race:${slug}`);
+  cacheTag('race');
   cacheLife('days');
 
   return executeQuery<RaceAnalysisQuery, { slug: string }>(RACE_ANALYSIS, { slug });
@@ -395,20 +405,28 @@ export async function getSeasonSchedule(season: number) {
 }
 
 const ARCHIVE_INDEX = /* GraphQL */ `
-  query ArchiveIndex {
+  query ArchiveIndex($season: Int) {
     seasons { year }
-    drivers { id code name country }
-    teams { id name color }
+    drivers(season: $season) { id code name country }
+    teams(season: $season) { id name color }
     circuits { id ergastId name locality country }
   }
 `;
 
-export async function getArchiveIndex() {
+/**
+ * Everyone and everything in the archive, optionally narrowed to one season.
+ *
+ * The argument keys the cache entry, so the unfiltered call that
+ * `generateStaticParams` and the sitemap depend on is a separate entry from
+ * whatever a visitor is browsing — and those two must stay unfiltered, since a
+ * page that exists only in 2019 still needs to be built.
+ */
+export async function getArchiveIndex(season: number | null = null) {
   'use cache';
   cacheTag('race');
   cacheLife('days');
 
-  return executeQuery<ArchiveIndexQuery, Record<string, unknown>>(ARCHIVE_INDEX, {});
+  return executeQuery<ArchiveIndexQuery, { season: number | null }>(ARCHIVE_INDEX, { season });
 }
 
 const CIRCUIT_PROFILE = /* GraphQL */ `

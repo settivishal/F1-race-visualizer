@@ -20,6 +20,15 @@ const nextConfig: NextConfig = {
   // say to keep prefetch={true} for.
   partialPrefetching: true,
 
+  // No `serverActions.allowedOrigins`, deliberately. Next compares a Server
+  // Action's Origin against the Host and rejects a mismatch on its own; the
+  // option exists for proxy and CDN domains, where the two legitimately differ
+  // (see node_modules/next/dist/docs/01-app/02-guides/server-actions.md). This
+  // site is served directly by Vercel with nothing in front of it, so the
+  // default check already holds — and a hardcoded production domain here would
+  // be a value to maintain that protects nothing, on a config where every
+  // preview deployment has a different hostname.
+
   // No `images.remotePatterns`, deliberately. The entry that used to be here
   // allowed media.formula1.com for the circuit maps in lib/circuit-data.ts —
   // and that file was deleted in M6.4, so nothing has hotlinked anything since.

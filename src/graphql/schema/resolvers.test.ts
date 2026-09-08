@@ -119,6 +119,33 @@ beforeAll(async () => {
   ]);
 });
 
+describe('archive index filtering', () => {
+  it('narrows drivers, teams and circuits to one season', async () => {
+    const inSeason = await run<{
+      drivers: { code: string }[]; teams: { name: string }[]; circuits: { name: string }[];
+    }>(`query { drivers(season: 2025) { code } teams(season: 2025) { name } circuits { name } }`);
+
+    expect(inSeason.drivers.map((d) => d.code).sort()).toEqual(['LEC', 'NOR']);
+    expect(inSeason.teams.map((t) => t.name).sort()).toEqual(['Ferrari', 'McLaren']);
+    // Circuits take no season: the meetings.circuit_id link is Ergast-only, so
+    // filtering would answer "none" for every OpenF1 season.
+    expect(inSeason.circuits.map((c) => c.name)).toEqual(['Test Circuit']);
+  });
+
+  it('returns nothing for a season with no races, rather than everything', async () => {
+    // The bug this replaces: no season argument at all, so every page listed
+    // the whole archive whatever the reader had selected.
+    const empty = await run<{ drivers: unknown[]; teams: unknown[] }>(`query { drivers(season: 1999) { code } teams(season: 1999) { name } }`);
+
+    expect(empty).toEqual({ drivers: [], teams: [] });
+  });
+
+  it('still lists everything with no season, which generateStaticParams needs', async () => {
+    const all = await run<{ teams: { name: string }[] }>(`query { teams { name } }`);
+    expect(all.teams.length).toBeGreaterThanOrEqual(2);
+  });
+});
+
 describe('featuredRace', () => {
   it('is the newest race that has been run, not the newest race', async () => {
     // The calendar is stored whole, so the newest row by date is normally one

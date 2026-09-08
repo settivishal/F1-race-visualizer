@@ -97,7 +97,7 @@ export function ReplayControls({
             type="button"
             onClick={onPlayPause}
             aria-label={isPlaying ? "Pause replay" : "Play replay"}
-            className="h-8 w-8 flex items-center justify-center rounded-full bg-accent text-on-accent transition hover:bg-accent-strong active:brightness-90"
+            className="h-8 w-8 flex items-center justify-center rounded-full bg-accent-fill text-on-accent transition hover:bg-accent-strong active:brightness-90"
           >
             {isPlaying ? <PauseIcon /> : <PlayIcon />}
           </button>
@@ -129,7 +129,7 @@ export function ReplayControls({
                   onClick={() => onChangeSpeed(option)}
                   className={`rounded-full px-2.5 py-1 text-eyebrow font-bold uppercase transition ${
                     isActive
-                      ? "bg-accent text-on-accent hover:bg-accent-strong"
+                      ? "bg-accent-fill text-on-accent hover:bg-accent-strong"
                       : "border border-white/15 bg-white/10 text-white/70 hover:bg-white/20 hover:text-white"
                   }`}
                 >
@@ -243,7 +243,7 @@ export function ReplayControls({
                   onClick={() => onChangeSpeed(option)}
                   className={
                     option === speed
-                      ? "rounded-full bg-accent px-4 py-2 text-eyebrow font-semibold uppercase text-on-accent"
+                      ? "rounded-full bg-accent-fill px-4 py-2 text-eyebrow font-semibold uppercase text-on-accent"
                       : "rounded-full border border-line bg-panel px-4 py-2 text-eyebrow font-semibold uppercase text-foreground transition-colors hover:bg-panel-strong"
                   }
                 >

@@ -224,12 +224,39 @@ builder.queryField('team', (t) =>
 builder.queryField('teams', (t) =>
   t.field({
     type: [Team],
-    resolve: (_root, _args, ctx) => ctx.db.select().from(teams).orderBy(asc(teams.name)),
+    // Same shape as `drivers(season:)`: without it the index lists every
+    // constructor ever imported, which on a site about the current season is
+    // eighteen teams for a ten-team grid.
+    args: { season: t.arg.int() },
+    resolve: async (_root, args, ctx) => {
+      if (args.season == null) {
+        return ctx.db.select().from(teams).orderBy(asc(teams.name));
+      }
+      const rows = await ctx.db
+        .selectDistinct({ team: teams })
+        .from(teams)
+        .innerJoin(teamSeasons, eq(teamSeasons.teamId, teams.id))
+        .where(eq(teamSeasons.seasonYear, args.season))
+        .orderBy(asc(teams.name));
+      return rows.map((row) => row.team);
+    },
   }),
 );
 
 // ── Circuit ───────────────────────────────────────────────────────────
 
+/**
+ * Every circuit, and deliberately no season argument.
+ *
+ * A circuit belongs to a season through `meetings.circuit_id`, and that column
+ * is only written by an Ergast import — OpenF1 publishes a circuit *name*, not
+ * an identity we can match a row on. Every season from 2023 is OpenF1-only, so
+ * a season filter here answers "no circuits in 2026", which is worse than
+ * listing them all.
+ *
+ * Drivers and teams do take a season, because both are linked through
+ * `team_seasons`, which every import writes.
+ */
 builder.queryField('circuits', (t) =>
   t.field({
     type: [Circuit],

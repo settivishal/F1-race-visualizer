@@ -136,8 +136,12 @@ export function CommandPalette() {
           <path d="m20 20-3.5-3.5" strokeLinecap="round" />
         </svg>
         <span className="hidden sm:inline">Search</span>
-        {/* Hidden on touch, where there is no ⌘K to press. */}
-        <kbd className="hidden rounded border border-line px-1.5 py-0.5 font-mono text-[10px] text-subtle sm:inline">
+        {/* Hidden on touch, where there is no ⌘K to press.
+
+            `text-muted`, not `text-subtle`: subtle on panel is 3.4:1, which axe
+            flags on every page the header renders — and a keyboard hint nobody
+            can read is the one label that has to be legible. */}
+        <kbd className="hidden rounded border border-line px-1.5 py-0.5 font-mono text-[10px] text-muted sm:inline">
           ⌘K
         </kbd>
       </button>
