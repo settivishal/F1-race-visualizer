@@ -395,20 +395,28 @@ export async function getSeasonSchedule(season: number) {
 }
 
 const ARCHIVE_INDEX = /* GraphQL */ `
-  query ArchiveIndex {
+  query ArchiveIndex($season: Int) {
     seasons { year }
-    drivers { id code name country }
-    teams { id name color }
+    drivers(season: $season) { id code name country }
+    teams(season: $season) { id name color }
     circuits { id ergastId name locality country }
   }
 `;
 
-export async function getArchiveIndex() {
+/**
+ * Everyone and everything in the archive, optionally narrowed to one season.
+ *
+ * The argument keys the cache entry, so the unfiltered call that
+ * `generateStaticParams` and the sitemap depend on is a separate entry from
+ * whatever a visitor is browsing — and those two must stay unfiltered, since a
+ * page that exists only in 2019 still needs to be built.
+ */
+export async function getArchiveIndex(season: number | null = null) {
   'use cache';
   cacheTag('race');
   cacheLife('days');
 
-  return executeQuery<ArchiveIndexQuery, Record<string, unknown>>(ARCHIVE_INDEX, {});
+  return executeQuery<ArchiveIndexQuery, { season: number | null }>(ARCHIVE_INDEX, { season });
 }
 
 const CIRCUIT_PROFILE = /* GraphQL */ `
