@@ -166,6 +166,7 @@ type Query {
   ingestRuns(first: Int = 50): [IngestRun!]!
   race(slug: String!): Race
   races(after: String, first: Int, search: String, season: Int): RaceConnection!
+  search(query: String!): [SearchHit!]!
   seasons: [Season!]!
   team(name: String!): TeamProfile
   teams: [Team!]!
@@ -258,6 +259,20 @@ type ReplaySummary {
   lapCount: Int!
   maxLap: Int!
   maxPosition: Int!
+}
+
+type SearchHit {
+  href: String!
+  kind: SearchKind!
+  subtitle: String
+  title: String!
+}
+
+enum SearchKind {
+  CIRCUIT
+  DRIVER
+  RACE
+  TEAM
 }
 
 type Season {
