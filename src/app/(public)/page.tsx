@@ -172,7 +172,9 @@ async function TitleRace() {
 
   if (driverStandings.length === 0) return null;
 
-  const notRun = races.edges.filter((edge) => edge.node.laps === 0);
+  // Cancelled rounds are not "remaining": no points will be scored at a race
+  // that is not going to happen.
+  const notRun = races.edges.filter((edge) => edge.node.status === 'SCHEDULED');
   const remaining = {
     grandsPrix: notRun.filter((edge) => edge.node.type === 'GRAND_PRIX').length,
     sprints: notRun.filter((edge) => edge.node.type === 'SPRINT').length,

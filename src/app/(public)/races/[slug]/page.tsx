@@ -125,13 +125,16 @@ async function RaceDetail({
         />
       </div>
 
-      {/* No laps means the race has not been run — the calendar is stored
-          whole, so this is a scheduled row rather than a broken one. Tabs, a
-          replay and a classification would all be empty furniture. */}
-      {race.laps === 0 ? (
+      {/* Neither a scheduled race nor a cancelled one has anything to replay,
+          so tabs, a replay and a classification would all be empty furniture. */}
+      {race.status !== 'COMPLETED' ? (
         <>
           <div className="mt-8">
-            <UpcomingRace date={race.date} name={meeting?.name ?? race.slug} />
+            <UpcomingRace
+              date={race.date}
+              name={meeting?.name ?? race.slug}
+              cancelled={race.status === 'CANCELLED'}
+            />
           </div>
 
           <div className="mt-10">

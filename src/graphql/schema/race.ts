@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gt, ilike, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, ilike, or, sql } from 'drizzle-orm';
 import { meetings, raceEvents, racePositions, raceResults, races } from '@/db/schema';
 import { builder } from '../builder';
 import type { Db } from '../context';
@@ -169,6 +169,15 @@ const RaceReplay = builder.objectRef<ReplayShape>('RaceReplay').implement({
 // and a Meeting has races, so the two modules reference each other. Splitting
 // the ref from its fields breaks the cycle for the type checker, which cannot
 // infer a shape that depends on itself.
+/**
+ * A race that has not been run is not the same as one that was abandoned, and
+ * neither is the same as one whose import came back empty. `laps === 0` used to
+ * mean all three.
+ */
+const RaceStatus = builder.enumType('RaceStatus', {
+  values: ['SCHEDULED', 'COMPLETED', 'CANCELLED'] as const,
+});
+
 export const Race = builder.objectRef<RaceRow>('Race');
 
 Race.implement({
@@ -178,6 +187,10 @@ Race.implement({
     type: t.field({ type: RaceType, resolve: (r) => r.type }),
     laps: t.exposeInt('laps'),
     isFeatured: t.exposeBoolean('isFeatured'),
+    status: t.field({ type: RaceStatus, resolve: (race) => race.status }),
+    // Which columns an admin owns. Exposed so the editor can say so — a field
+    // pinned by accident and never shown is a stale value nothing can correct.
+    adminEdited: t.exposeStringList('adminEdited'),
     // How much of this race exists, so a client can say "this era published no
     // sector times" rather than rendering empty columns.
     dataTier: t.field({ type: DataTier, resolve: (r) => r.dataTier }),
@@ -294,7 +307,7 @@ builder.queryField('race', (t) =>
  */
 const newestRunRace = (ctx: { db: Db }) =>
   ctx.db.query.races.findFirst({
-    where: gt(races.laps, 0),
+    where: eq(races.status, 'COMPLETED'),
     orderBy: [desc(races.date)],
   });
 
@@ -322,7 +335,7 @@ builder.queryField('featuredRace', (t) =>
     nullable: true,
     resolve: async (_root, _args, ctx) => {
       const flagged = await ctx.db.query.races.findFirst({
-        where: and(eq(races.isFeatured, true), gt(races.laps, 0)),
+        where: and(eq(races.isFeatured, true), eq(races.status, 'COMPLETED')),
         orderBy: [desc(races.date)],
       });
       return flagged ?? (await newestRunRace(ctx)) ?? null;

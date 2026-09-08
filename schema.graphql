@@ -117,6 +117,7 @@ type Lap {
 }
 
 type Meeting {
+  adminEdited: [String!]!
   circuit: Circuit
   circuitName: String
   country: String!
@@ -132,7 +133,7 @@ type Meeting {
 type Mutation {
   setRaceFeatured(featured: Boolean!, slug: String!): Race!
   triggerIngest(sessionKey: Int!): TriggerIngestResult!
-  updateRaceMetadata(circuitName: String, country: String, laps: Int, name: String, slug: String!): Race!
+  updateRaceMetadata(circuitName: String, country: String, laps: Int, name: String, release: [String!], slug: String!, status: String): Race!
 }
 
 type Pace {
@@ -162,8 +163,15 @@ type PulseRound {
   name: String!
   round: Int!
   slug: String
+  status: PulseRoundStatus!
   teamColor: String
   winnerCode: String
+}
+
+enum PulseRoundStatus {
+  CANCELLED
+  COMPLETED
+  SCHEDULED
 }
 
 type Query {
@@ -187,6 +195,7 @@ type Query {
 }
 
 type Race {
+  adminEdited: [String!]!
   analysis: RaceAnalysis!
   dataTier: DataTier!
   date: DateTime!
@@ -200,6 +209,7 @@ type Race {
   replay: RaceReplay!
   results: [RaceResult!]!
   slug: String!
+  status: RaceStatus!
   type: RaceType!
 }
 
@@ -255,6 +265,12 @@ type RaceResult {
   points: Float!
   status: DriverStatus!
   team: Team
+}
+
+enum RaceStatus {
+  CANCELLED
+  COMPLETED
+  SCHEDULED
 }
 
 enum RaceType {

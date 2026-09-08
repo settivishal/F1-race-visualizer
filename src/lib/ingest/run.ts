@@ -208,10 +208,10 @@ export async function writeRace(
       .onConflictDoUpdate({
         target: [meetings.seasonYear, meetings.round],
         set: {
-          name: meetingValues.name,
-          country: meetingValues.country,
-          circuitName: meetingValues.circuitName,
-          startDate: meetingValues.startDate,
+          name: sqlAdminWins('name', meetings.name, meetings.adminEdited),
+          country: sqlAdminWins('country', meetings.country, meetings.adminEdited),
+          circuitName: sqlAdminWins('circuit_name', meetings.circuitName, meetings.adminEdited),
+          startDate: sqlAdminWins('start_date', meetings.startDate, meetings.adminEdited),
           // Each of these is only known to one source. Coalescing keeps what
           // the other source wrote instead of blanking it on every re-import.
           weather: sqlCoalesce('weather', meetings.weather),
@@ -223,14 +223,27 @@ export async function writeRace(
       .returning();
 
     const [raceRow] = await tx.insert(races)
-      .values({ ...race.race, meetingId: meetingRow.id })
+      .values({
+        ...race.race,
+        meetingId: meetingRow.id,
+        status: race.positions.length > 0 ? 'COMPLETED' : 'SCHEDULED',
+      })
       .onConflictDoUpdate({
         target: races.slug,
         set: {
           meetingId: meetingRow.id,
           type: race.race.type,
-          date: race.race.date,
-          laps: race.race.laps,
+          date: sqlAdminWins('date', races.date, races.adminEdited),
+          laps: sqlAdminWins('laps', races.laps, races.adminEdited),
+          // Status only ever moves forward. An admin's word wins outright;
+          // otherwise an import can promote a race to COMPLETED but never
+          // demote one, because a re-import that fetches nothing means upstream
+          // is having a bad day, not that a race un-happened.
+          status: sql`case
+            when 'status' = any(${races.adminEdited}) then ${races.status}
+            when excluded."status" = 'COMPLETED' then 'COMPLETED'
+            else ${races.status}
+          end`,
           dataTier: race.race.dataTier ?? 'FULL',
           openf1SessionKey: sqlCoalesce('openf1_session_key', races.openf1SessionKey),
           ergastRound: sqlCoalesce('ergast_round', races.ergastRound),
@@ -443,6 +456,30 @@ function sqlExcluded(column: string) {
  */
 function sqlCoalesce(column: string, stored: AnyColumn) {
   return sql`coalesce(excluded."${sql.raw(column)}", ${stored})`;
+}
+
+/**
+ * The incoming value, unless an admin has set this column by hand.
+ *
+ * The site already had an admin editor for a meeting's name, country, circuit
+ * and laps — and every edit was silently reverted by the next weekly import,
+ * because the upsert assigned those columns. Which made the editor a lie.
+ *
+ * Upstream is a default, not the truth. It gets a race wrong in ways no feed
+ * models: 2026 abandoned two rounds mid-season, and the round that replaced one
+ * of them is still filed as "Bahrain Grand Prix" in "Bahrain" while being held
+ * at Sepang. Somebody has to be able to say otherwise and have it stick.
+ *
+ * One array per table rather than an override column beside every field: this
+ * protects any column, including ones not written yet, and clearing a field in
+ * the admin drops it from the array so upstream takes over again. That is the
+ * undo, and it needs no history.
+ */
+function sqlAdminWins(column: string, stored: AnyColumn, edited: AnyColumn) {
+  return sql`case
+    when ${sql.raw(`'${column}'`)} = any(${edited}) then ${stored}
+    else excluded."${sql.raw(column)}"
+  end`;
 }
 
 /**

@@ -36,6 +36,20 @@
       "when": 1788878417821,
       "tag": "0004_even_zaran",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1788884412893,
+      "tag": "0005_daffy_the_enforcers",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1788884412894,
+      "tag": "0006_normalise_driver_names",
+      "breakpoints": true
     }
   ]
 }

@@ -36,7 +36,9 @@ query AdminRace($slug: String!) {
     slug
     laps
     type
+    status
     isFeatured
+    adminEdited
     openf1SessionKey
     meeting {
       name
@@ -44,6 +46,7 @@ query AdminRace($slug: String!) {
       circuitName
       round
       season
+      adminEdited
     }
   }
 }

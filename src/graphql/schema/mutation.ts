@@ -1,6 +1,9 @@
 import { desc, eq } from 'drizzle-orm';
 import { ingestRace } from '@/lib/ingest/run';
 import { ingestRuns, meetings, races } from '@/db/schema';
+
+const RACE_STATUSES = ['SCHEDULED', 'COMPLETED', 'CANCELLED'] as const;
+type RaceStatusValue = (typeof RACE_STATUSES)[number];
 import { builder } from '../builder';
 import { requireSession } from '../context';
 import { Race } from './race';
@@ -145,6 +148,13 @@ builder.mutationType({
         name: t.arg.string(),
         country: t.arg.string(),
         circuitName: t.arg.string(),
+        status: t.arg.string(),
+        /**
+         * Columns to hand back to upstream. A field an admin no longer wants to
+         * own is removed from `admin_edited`, and the next import overwrites it
+         * — which is the undo, and why no previous value needs storing.
+         */
+        release: t.arg.stringList(),
       },
       resolve: async (_root, args, ctx) => {
         requireSession(ctx);
@@ -154,31 +164,77 @@ builder.mutationType({
         });
         if (!race) throw new Error(`No race with slug ${args.slug}`);
 
+        const released = new Set(args.release ?? []);
+
+        /**
+         * Every column an admin sets is recorded, because the ingest reads that
+         * list to decide what it may overwrite. Without it the edit lasts until
+         * the next weekly import and no longer — which is what this editor did
+         * for its whole life before now.
+         */
+        const pin = (existing: string[], columns: string[]) => {
+          const next = new Set(existing);
+          for (const column of columns) next.add(column);
+          for (const column of released) next.delete(column);
+          return [...next];
+        };
+
+        const racePatch: Partial<typeof races.$inferInsert> = {};
+        const racePinned: string[] = [];
+
         if (typeof args.laps === 'number') {
           if (args.laps < 1) throw new Error('laps must be at least 1');
+          racePatch.laps = args.laps;
+          racePinned.push('laps');
+        }
+
+        if (typeof args.status === 'string' && args.status) {
+          if (!RACE_STATUSES.includes(args.status as RaceStatusValue)) {
+            throw new Error(`status must be one of ${RACE_STATUSES.join(', ')}`);
+          }
+          racePatch.status = args.status as RaceStatusValue;
+          racePinned.push('status');
+        }
+
+        if (Object.keys(racePatch).length > 0 || released.size > 0) {
           await ctx.db
             .update(races)
-            .set({ laps: args.laps, updatedAt: new Date() })
+            .set({
+              ...racePatch,
+              adminEdited: pin(race.adminEdited, racePinned),
+              updatedAt: new Date(),
+            })
             .where(eq(races.id, race.id));
         }
 
         const meetingPatch: Partial<typeof meetings.$inferInsert> = {};
+        const meetingPinned: string[] = [];
         if (typeof args.name === 'string' && args.name.trim()) {
           meetingPatch.name = args.name.trim();
+          meetingPinned.push('name');
         }
         if (typeof args.country === 'string' && args.country.trim()) {
           meetingPatch.country = args.country.trim();
+          meetingPinned.push('country');
         }
         // circuitName is the one nullable column of the three, so an empty
         // string is a meaningful instruction to clear it rather than a no-op.
         if (typeof args.circuitName === 'string') {
           meetingPatch.circuitName = args.circuitName.trim() || null;
+          meetingPinned.push('circuit_name');
         }
 
-        if (Object.keys(meetingPatch).length > 0) {
+        if (Object.keys(meetingPatch).length > 0 || released.size > 0) {
+          const meeting = await ctx.db.query.meetings.findFirst({
+            where: eq(meetings.id, race.meetingId),
+          });
           await ctx.db
             .update(meetings)
-            .set({ ...meetingPatch, updatedAt: new Date() })
+            .set({
+              ...meetingPatch,
+              adminEdited: pin(meeting?.adminEdited ?? [], meetingPinned),
+              updatedAt: new Date(),
+            })
             .where(eq(meetings.id, race.meetingId));
         }
 

@@ -55,7 +55,7 @@ query SeasonSchedule($season: Int!) {
         slug
         date
         type
-        laps
+        status
         meeting {
           name
           round
@@ -142,6 +142,7 @@ query SeasonPulse($season: Int!) {
     round
     name
     slug
+    status
     winnerCode
     teamColor
   }
