@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { CommandPalette } from './command-palette';
 import { ThemeToggle } from './theme-toggle';
 
 const NAV_LINKS = [
@@ -7,6 +8,7 @@ const NAV_LINKS = [
   { href: '/drivers', label: 'Drivers' },
   { href: '/teams', label: 'Teams' },
   { href: '/circuits', label: 'Circuits' },
+  { href: '/compare', label: 'Compare' },
 ];
 
 /**
@@ -50,7 +52,8 @@ export function SiteHeader() {
           ))}
         </nav>
 
-        <div className="ml-auto flex items-center">
+        <div className="ml-auto flex items-center gap-2">
+          <CommandPalette />
           <ThemeToggle />
         </div>
       </div>
