@@ -22,7 +22,7 @@ export const metadata = {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="mt-12 max-w-2xl">
-      <h2 className="font-heading text-xl font-bold tracking-tight text-foreground">{title}</h2>
+      <h2 className="type-card-title text-foreground">{title}</h2>
       <div className="mt-3 flex flex-col gap-3 text-base leading-7 text-muted">{children}</div>
     </section>
   );

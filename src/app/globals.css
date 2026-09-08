@@ -291,6 +291,47 @@ a {
 }
 
 /* ---------------------------------------------------------------------------
+   Type scale
+
+   The token block above starts a scale and defines one entry, so every heading
+   below eyebrow size was still picked per call site — twelve distinct h1-h3
+   class combinations, several of them near-misses of each other.
+
+   Classes rather than `--text-*` tokens because a token cannot carry a
+   breakpoint, and the page title needs one. Spacing stays at the call site: the
+   margin above a heading is layout, not type.
+--------------------------------------------------------------------------- */
+.type-page-title {
+  font-family: var(--font-heading);
+  font-size: 1.875rem;
+  line-height: 1.15;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+}
+
+@media (width >= 40rem) {
+  .type-page-title {
+    font-size: 2.25rem;
+  }
+}
+
+.type-section-title {
+  font-family: var(--font-heading);
+  font-size: 1.5rem;
+  line-height: 1.2;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+}
+
+.type-card-title {
+  font-family: var(--font-heading);
+  font-size: 1.25rem;
+  line-height: 1.25;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+}
+
+/* ---------------------------------------------------------------------------
    Race control tones
 
    One rule plus a modifier per signal, rather than nine hand-written pairs of

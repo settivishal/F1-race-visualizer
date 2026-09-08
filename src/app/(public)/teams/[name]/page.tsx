@@ -2,6 +2,7 @@ import { Suspense } from 'react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { PageContainer } from '@/components/ui/page-container';
+import { SectionHeader } from '@/components/ui/section-header';
 import { Skeleton } from '@/components/ui/skeleton';
 import { RecordTable, StatRow } from '@/components/archive/record-table';
 import { getArchiveIndex, getTeamProfile } from '@/lib/queries';
@@ -64,16 +65,16 @@ async function TeamDetail({ params }: { params: Promise<{ name: string }> }) {
           style={{ backgroundColor: team.color ?? 'var(--muted)' }}
           aria-hidden
         />
-        <div>
-          <p className="text-eyebrow font-semibold uppercase text-accent">Constructor</p>
-          <h1 className="font-heading mt-2.5 text-4xl font-bold tracking-tight sm:text-5xl">
-            {team.name}
-          </h1>
-          <p className="mt-2.5 text-muted">
-            {drivers.length > 0
-              ? drivers.map((driver) => driver.name).join(' · ')
-              : 'No drivers recorded'}
-          </p>
+        <div className="min-w-0 flex-1">
+          <SectionHeader
+            eyebrow="Constructor"
+            title={team.name}
+            description={
+              drivers.length > 0
+                ? drivers.map((driver) => driver.name).join(' · ')
+                : 'No drivers recorded'
+            }
+          />
         </div>
       </header>
 
@@ -91,7 +92,7 @@ async function TeamDetail({ params }: { params: Promise<{ name: string }> }) {
       </div>
 
       <section className="mt-10">
-        <h2 className="font-heading text-2xl font-bold tracking-tight">By season</h2>
+        <h2 className="type-section-title">By season</h2>
         <p className="mt-2 text-sm text-muted">
           Covering the seasons imported here. Entries count both cars, so a full season is
           twice the number of races.

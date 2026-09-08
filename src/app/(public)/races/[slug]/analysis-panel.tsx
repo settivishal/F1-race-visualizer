@@ -145,7 +145,7 @@ function AnalysisHeading({
   return (
     <div className="max-w-2xl">
       <p className="text-eyebrow font-bold uppercase text-accent">{eyebrow}</p>
-      <h3 className="font-heading mt-2 text-2xl font-bold tracking-tight">{title}</h3>
+      <h3 className="type-section-title mt-2">{title}</h3>
       <p className="mt-2 text-sm leading-6 text-muted">{description}</p>
     </div>
   );

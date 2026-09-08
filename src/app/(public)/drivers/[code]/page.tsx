@@ -2,6 +2,7 @@ import { Suspense } from 'react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { PageContainer } from '@/components/ui/page-container';
+import { SectionHeader } from '@/components/ui/section-header';
 import { Skeleton } from '@/components/ui/skeleton';
 import { RecordTable, StatRow } from '@/components/archive/record-table';
 import { getArchiveIndex, getDriverProfile } from '@/lib/queries';
@@ -57,19 +58,15 @@ async function DriverDetail({ params }: { params: Promise<{ code: string }> }) {
 
   return (
     <>
-      <header className="mt-5">
-        <p className="text-eyebrow font-semibold uppercase text-accent">
-          {driver.code}
-          {driver.number !== null ? ` · #${driver.number}` : ''}
-        </p>
-        <h1 className="font-heading mt-2.5 text-4xl font-bold tracking-tight sm:text-5xl">
-          {driver.name}
-        </h1>
-        <p className="mt-2.5 text-muted">
-          {driver.country ?? 'Nationality unknown'}
-          {latest?.team ? ` · ${latest.team.name} in ${latest.season}` : ''}
-        </p>
-      </header>
+      <div className="mt-5">
+        <SectionHeader
+          eyebrow={`${driver.code}${driver.number !== null ? ` · #${driver.number}` : ''}`}
+          title={driver.name}
+          description={`${driver.country ?? 'Nationality unknown'}${
+            latest?.team ? ` · ${latest.team.name} in ${latest.season}` : ''
+          }`}
+        />
+      </div>
 
       <div className="mt-8">
         <StatRow
@@ -85,7 +82,7 @@ async function DriverDetail({ params }: { params: Promise<{ code: string }> }) {
       </div>
 
       <section className="mt-10">
-        <h2 className="font-heading text-2xl font-bold tracking-tight">By season</h2>
+        <h2 className="type-section-title">By season</h2>
         {/* The honest caveat, on the page rather than in a comment: these are
             the seasons this database holds, not a career total. */}
         <p className="mt-2 text-sm text-muted">

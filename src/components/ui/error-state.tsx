@@ -16,7 +16,7 @@ export function ErrorState({
 }) {
   return (
     <div role="alert" className="tone tone-red rounded-xl border p-6 text-center">
-      <p className="font-heading text-lg font-semibold">{title}</p>
+      <p className="type-card-title">{title}</p>
       <p className="mx-auto mt-2 max-w-sm text-sm leading-6 opacity-90">{message}</p>
       {action ? <div className="mt-5 flex justify-center">{action}</div> : null}
     </div>

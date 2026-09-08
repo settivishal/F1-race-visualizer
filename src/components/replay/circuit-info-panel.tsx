@@ -61,7 +61,7 @@ export function CircuitInfoPanel({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-eyebrow font-bold uppercase text-accent">Circuit</p>
-          <h2 className="font-heading mt-2 text-2xl font-bold tracking-tight">{name}</h2>
+          <h2 className="type-section-title mt-2">{name}</h2>
           {place ? <p className="mt-1 text-sm text-muted">{place}</p> : null}
         </div>
         {circuit ? (
