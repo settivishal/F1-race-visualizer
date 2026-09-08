@@ -1,3 +1,4 @@
+import { Analytics } from '@vercel/analytics/next';
 import type { Metadata } from "next";
 import { Inter, JetBrains_Mono, Titillium_Web } from "next/font/google";
 import { siteUrl } from "@/lib/site-url";
@@ -70,7 +71,14 @@ export default function RootLayout({
       </head>
       {/* Deliberately bare. The nav, footer and `<main>` landmark belong to
           the (public) group; /admin renders its own shell. */}
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        {children}
+        {/* Free on Hobby, and the only traffic data this project will have —
+            /admin/runs says whether the ingest worked, not whether anyone
+            visited. It ships nothing in development, so a local page view is
+            never counted. */}
+        <Analytics />
+      </body>
     </html>
   );
 }
