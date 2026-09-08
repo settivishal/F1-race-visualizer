@@ -194,9 +194,14 @@ type PulseRoundShape = {
   round: number;
   name: string;
   slug: string | null;
+  status: 'SCHEDULED' | 'COMPLETED' | 'CANCELLED';
   winnerCode: string | null;
   teamColor: string | null;
 };
+
+const PulseStatus = builder.enumType('PulseRoundStatus', {
+  values: ['SCHEDULED', 'COMPLETED', 'CANCELLED'] as const,
+});
 
 const PulseRound = builder.objectRef<PulseRoundShape>('PulseRound').implement({
   fields: (t) => ({
@@ -204,6 +209,7 @@ const PulseRound = builder.objectRef<PulseRoundShape>('PulseRound').implement({
     name: t.exposeString('name'),
     // Null where the round has not been run: there is no replay to link to.
     slug: t.exposeString('slug', { nullable: true }),
+    status: t.field({ type: PulseStatus, resolve: (r) => r.status }),
     winnerCode: t.exposeString('winnerCode', { nullable: true }),
     teamColor: t.exposeString('teamColor', { nullable: true }),
   }),
@@ -219,7 +225,7 @@ builder.queryField('seasonPulse', (t) =>
           round: meetings.round,
           name: meetings.name,
           slug: races.slug,
-          laps: races.laps,
+          status: races.status,
           winnerCode: drivers.code,
           teamColor: sql<string | null>`coalesce(${teamSeasons.color}, ${teams.color})`,
         })
@@ -239,15 +245,20 @@ builder.queryField('seasonPulse', (t) =>
         .where(eq(meetings.seasonYear, args.season))
         .orderBy(asc(meetings.round));
 
-      return rows.map((row) => ({
-        round: row.round,
-        name: row.name,
-        // A scheduled race has a slug and a page, but no result — the page says
-        // so itself, so it is still worth linking to.
-        slug: row.slug,
-        winnerCode: row.laps && row.laps > 0 ? row.winnerCode : null,
-        teamColor: row.laps && row.laps > 0 ? row.teamColor : null,
-      }));
+      return rows.map((row) => {
+        const status = row.status ?? 'SCHEDULED';
+        const run = status === 'COMPLETED';
+        return {
+          round: row.round,
+          name: row.name,
+          // A round that has not been run still has a page worth linking to:
+          // it says when it is, or that it was cancelled.
+          slug: row.slug,
+          status,
+          winnerCode: run ? row.winnerCode : null,
+          teamColor: run ? row.teamColor : null,
+        };
+      });
     },
   }),
 );

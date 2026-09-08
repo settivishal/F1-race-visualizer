@@ -122,6 +122,9 @@ export async function updateMetadataAction(
       // Not coalesced to null: an empty string is a meaningful instruction to
       // clear the circuit name, which is the one nullable field of the three.
       circuitName: String(formData.get('circuitName') ?? ''),
+      status: String(formData.get('status') ?? '') || null,
+      // Checkboxes the admin ticked to hand a field back to the ingest.
+      release: formData.getAll('release').map(String),
     });
   } catch (error) {
     return { ok: false, message: messageOf(error) };
@@ -188,6 +191,8 @@ const UPDATE_METADATA = /* GraphQL */ `
     $name: String
     $country: String
     $circuitName: String
+    $status: String
+    $release: [String!]
   ) {
     updateRaceMetadata(
       slug: $slug
@@ -195,6 +200,8 @@ const UPDATE_METADATA = /* GraphQL */ `
       name: $name
       country: $country
       circuitName: $circuitName
+      status: $status
+      release: $release
     ) {
       slug
       laps

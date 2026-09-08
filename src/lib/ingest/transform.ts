@@ -1,3 +1,4 @@
+import { formatDriverName } from '@/lib/format-name';
 import type { Lap, Meeting, Pit, PositionSample, Session, Stint } from './openf1';
 import type {
   EventRow, LineupRow, PitStopRow, PositionRow, RaceBundle, ResultRow, StintRow,
@@ -277,7 +278,9 @@ export function buildLineup(bundle: RaceBundle): LineupRow[] {
     .map((d) => ({
       driverNumber: d.driver_number,
       code: d.name_acronym,
-      name: d.full_name,
+      // OpenF1 shouts the surname; Ergast does not. Both paths normalise, so the
+      // stored name no longer depends on which upstream imported last.
+      name: formatDriverName(d.full_name),
       country: d.country_code,
       // Upstream's image URL, recorded as-is. M4 copies the bytes to our own
       // storage and overwrites this; until then the column is honest about

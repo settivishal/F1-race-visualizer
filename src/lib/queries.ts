@@ -51,7 +51,7 @@ const RACE_LIBRARY = /* GraphQL */ `
       edges {
         cursor
         node {
-          id slug date laps type isFeatured
+          id slug date laps status type isFeatured
           meeting { name country circuitName round season }
         }
       }
@@ -64,7 +64,7 @@ const RACE_LIBRARY = /* GraphQL */ `
 const RACE_HEADER = /* GraphQL */ `
   query RaceHeader($slug: String!) {
     race(slug: $slug) {
-      id slug date laps type
+      id slug date laps status type
       meeting {
         name country circuitName round season
         circuit { ergastId name locality country lengthKm turns firstGrandPrix }
@@ -127,7 +127,7 @@ const LATEST_RESULT = /* GraphQL */ `
 const SEASON_PULSE = /* GraphQL */ `
   query SeasonPulse($season: Int!) {
     seasonPulse(season: $season) {
-      round name slug winnerCode teamColor
+      round name slug status winnerCode teamColor
     }
   }
 `;
@@ -371,7 +371,7 @@ const SEASON_SCHEDULE = /* GraphQL */ `
           slug
           date
           type
-          laps
+          status
           meeting { name round }
         }
       }

@@ -68,11 +68,42 @@ export function RaceStartTime({ date }: { date: string }) {
   );
 }
 
-/** The race page's replay area, when there is nothing yet to replay. */
-export function UpcomingRace({ date, name }: { date: string; name: string }) {
+/**
+ * The race page's replay area, when there is nothing to replay.
+ *
+ * Two reasons for that, and they must not read the same. A scheduled race
+ * counts down. A cancelled one says so and stops — the two 2026 rounds
+ * abandoned in April were, before this, counting down to a date months past.
+ */
+export function UpcomingRace({
+  date,
+  name,
+  cancelled = false,
+}: {
+  date: string;
+  name: string;
+  cancelled?: boolean;
+}) {
   const now = useNow();
   const start = new Date(date);
   const known = now !== 0;
+
+  if (cancelled) {
+    return (
+      <div className="rounded-xl border border-dashed border-line bg-panel px-6 py-12 text-center">
+        <p className="text-eyebrow font-bold uppercase text-flag-red">Cancelled</p>
+        <p className="type-section-title mt-3">This race was not held</p>
+        <p className="mt-3 text-sm text-muted">
+          {name} was scheduled for{' '}
+          <span className="tabular text-foreground">
+            {start.toISOString().slice(0, 10)}
+          </span>{' '}
+          and did not take place. It keeps its round so the season reads as it
+          was planned.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="rounded-xl border border-dashed border-line bg-panel px-6 py-12 text-center">

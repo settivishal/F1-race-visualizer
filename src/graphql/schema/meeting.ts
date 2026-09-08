@@ -51,6 +51,7 @@ Meeting.implement({
       },
     }),
     season: t.exposeInt('seasonYear'),
+    adminEdited: t.exposeStringList('adminEdited'),
     startDate: t.field({ type: 'DateTime', resolve: (m) => m.startDate }),
     // Upstream's shape, passed through unread. Nothing in this codebase
     // depends on its keys, so modelling it as types would be inventing a

@@ -117,6 +117,7 @@ export const meetings = pgTable('meetings', {
   seasonYear: integer('season_year').notNull().references(() => seasons.year),
   round: integer('round').notNull(),
   name: text('name').notNull(),                  // "São Paulo Grand Prix"
+  adminEdited: text('admin_edited').array().notNull().default([]),
   country: text('country').notNull(),
   circuitName: text('circuit_name'),
   // Nullable: every meeting OpenF1 imported has a circuit *name* and no circuit
@@ -130,11 +131,29 @@ export const meetings = pgTable('meetings', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [uniqueIndex('meetings_season_round_uq').on(t.seasonYear, t.round)]);
 
+/**
+ * What happened to a scheduled race.
+ *
+ * `laps = 0` used to carry all of this: not yet run, cancelled, and imported
+ * but empty were the same value, so the two 2026 races abandoned in April
+ * rendered as upcoming with a countdown to a date months gone.
+ *
+ * COMPLETED and SCHEDULED are set by the ingest from whether positions exist.
+ * CANCELLED is only ever an admin's word — no upstream publishes it — and is
+ * protected from being overwritten by `admin_edited`.
+ */
+export const raceStatus = pgEnum('race_status', ['SCHEDULED', 'COMPLETED', 'CANCELLED']);
+
 export const races = pgTable('races', {
   id: uuid('id').primaryKey().defaultRandom(),
   meetingId: uuid('meeting_id').notNull().references(() => meetings.id, { onDelete: 'cascade' }),
   type: raceType('type').notNull(),
   slug: text('slug').notNull().unique(),         // "2025-sao-paulo", "2025-sao-paulo-sprint"
+  status: raceStatus('status').notNull().default('SCHEDULED'),
+  // Columns an admin has set by hand, which the ingest must not overwrite.
+  // See sqlAdminWins in lib/ingest/run.ts. Clearing a field in the admin drops
+  // it from this list, and the next import restores what upstream says.
+  adminEdited: text('admin_edited').array().notNull().default([]),
   date: timestamp('date', { withTimezone: true }).notNull(),
   laps: integer('laps').notNull(),
   isFeatured: boolean('is_featured').notNull().default(false),

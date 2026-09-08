@@ -1,3 +1,4 @@
+import { formatDriverName } from '@/lib/format-name';
 import type { ErgastLap, ErgastPitStop, ErgastRace, ErgastResult } from './ergast';
 import { buildOvertakes } from './transform';
 import type {
@@ -142,7 +143,7 @@ export function buildArchiveLineup(
       // Ergast omits the code for some drivers; the first three letters of the
       // surname is the convention the sport itself used before codes existed.
       code: (driver.code ?? driver.familyName.slice(0, 3)).toUpperCase(),
-      name: `${driver.givenName} ${driver.familyName}`,
+      name: formatDriverName(`${driver.givenName} ${driver.familyName}`),
       country: driver.nationality ?? null,
       headshotUrl: null,
       teamName: result.Constructor.name,

@@ -10,6 +10,7 @@ query RaceLibrary($season: Int, $search: String, $first: Int, $after: String, $b
         slug
         date
         laps
+        status
         type
         isFeatured
         meeting {
@@ -42,6 +43,7 @@ query RaceHeader($slug: String!) {
     slug
     date
     laps
+    status
     type
     meeting {
       name

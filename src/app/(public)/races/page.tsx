@@ -171,9 +171,8 @@ async function RaceLibrary({ searchParams }: { searchParams: SearchParams }) {
                         : 'Season unknown'}
                     </span>
                     {node.type === 'SPRINT' ? <Badge>Sprint</Badge> : null}
-                    {/* No laps means no result: the calendar is stored whole, so
-                        a race the season has not reached yet is a real row. */}
-                    {node.laps === 0 ? <Badge tone="accent">Upcoming</Badge> : null}
+                    {node.status === 'SCHEDULED' ? <Badge tone="accent">Upcoming</Badge> : null}
+                    {node.status === 'CANCELLED' ? <Badge>Cancelled</Badge> : null}
                   </div>
                   {/* The same name on the race page's <h1>, so the title is
                       one object that moves rather than two that swap. */}
@@ -184,7 +183,9 @@ async function RaceLibrary({ searchParams }: { searchParams: SearchParams }) {
                   </ViewTransition>
                   <p className="mt-1.5 text-sm text-muted">
                     {node.meeting?.circuitName ?? node.meeting?.country ?? '—'} ·{' '}
-                    {node.laps === 0 ? (
+                    {node.status === 'CANCELLED' ? (
+                      <span className="line-through">Not held</span>
+                    ) : node.status === 'SCHEDULED' ? (
                       <RaceStartTime date={node.date} />
                     ) : (
                       <>

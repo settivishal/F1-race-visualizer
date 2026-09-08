@@ -68,6 +68,9 @@ beforeAll(async () => {
   const [race] = await db.insert(dbSchema.races).values({
     meetingId: meeting.id, type: 'GRAND_PRIX', slug: '2025-test',
     date: new Date('2025-03-02T14:00:00Z'), laps: 3, openf1SessionKey: 1,
+    // These rows are inserted directly rather than through writeRace, so the
+    // status the ingest would have derived has to be stated here.
+    status: 'COMPLETED',
   }).returning();
 
   // Lap 2 is deliberately absent and lap 3 has one car in P2 with no P1: both
@@ -90,6 +93,7 @@ beforeAll(async () => {
   const [sprint] = await db.insert(dbSchema.races).values({
     meetingId: meeting.id, type: 'SPRINT', slug: '2025-test-sprint',
     date: new Date('2025-03-01T14:00:00Z'), laps: 2, openf1SessionKey: 2,
+    status: 'COMPLETED',
   }).returning();
 
   await db.insert(dbSchema.raceResults).values([
@@ -129,6 +133,7 @@ describe('featuredRace', () => {
     await db.insert(dbSchema.races).values({
       meetingId: later.id, type: 'GRAND_PRIX', slug: '2025-scheduled',
       date: new Date('2030-01-01T00:00:00Z'), laps: 0, openf1SessionKey: 99,
+      status: 'SCHEDULED',
     });
 
     const data = await run<{ featuredRace: { slug: string } }>(
