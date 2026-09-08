@@ -1,12 +1,21 @@
 import 'dotenv/config';
 import { eq } from 'drizzle-orm';
 import { getDb, schema } from '@/db';
+import { fetchSeasonCircuits } from '@/lib/ingest/ergast';
 
 /**
- * Fills the three circuit facts Ergast does not publish: length, turn count and
- * the year of the first world-championship grand prix there.
+ * Creates the circuit rows for every season in the database, then fills the
+ * three facts Ergast does not publish: length, turn count and the year of the
+ * first world-championship grand prix there.
  *
  *   pnpm tsx scripts/seed-circuits.ts
+ *
+ * The creation half exists because circuits used to arrive only as a side
+ * effect of an Ergast race import — so a database holding only OpenF1 seasons
+ * had no circuits at all, and `/circuits/[id]` could not build, since
+ * generateStaticParams may not return an empty list under Cache Components.
+ * A circuit is a place, not a race, and should not depend on which races have
+ * been backfilled.
  *
  * These are static facts about physical places, which is the one kind of data
  * that genuinely does not need an API — a circuit's length changes when it is
@@ -64,6 +73,35 @@ const CIRCUIT_FACTS: Record<string, { lengthKm: number; turns: number; firstGran
 
 async function main() {
   const db = getDb();
+
+  // Only the seasons already imported: fetching every circuit Ergast knows
+  // would list places this database has no race for.
+  const seasons = await db.select({ year: schema.seasons.year }).from(schema.seasons);
+  console.log(`${seasons.length} season(s) in the database\n`);
+
+  let created = 0;
+  for (const { year } of seasons) {
+    const circuits = await fetchSeasonCircuits(year);
+    for (const circuit of circuits) {
+      const values = {
+        ergastCircuitId: circuit.circuitId,
+        name: circuit.circuitName,
+        locality: circuit.Location.locality ?? null,
+        country: circuit.Location.country ?? null,
+        latitude: circuit.Location.lat ? Number(circuit.Location.lat) : null,
+        longitude: circuit.Location.long ? Number(circuit.Location.long) : null,
+      };
+      // Upsert, so this is safe to re-run and so a season that shares a circuit
+      // with an earlier one refreshes it rather than colliding.
+      await db.insert(schema.circuits).values(values).onConflictDoUpdate({
+        target: schema.circuits.ergastCircuitId,
+        set: { ...values, updatedAt: new Date() },
+      });
+      created++;
+    }
+    console.log(`${year}: ${circuits.length} circuit(s)`);
+  }
+
   const rows = await db.select().from(schema.circuits);
 
   let filled = 0;
@@ -84,7 +122,7 @@ async function main() {
     filled++;
   }
 
-  console.log(`\n${filled} circuit(s) filled, ${unknown} left null, ${rows.length} total`);
+  console.log(`\n${created} circuit row(s) written, ${filled} filled, ${unknown} left null, ${rows.length} total`);
 }
 
 main().then(() => process.exit(0), (err) => { console.error(err); process.exit(1); });
