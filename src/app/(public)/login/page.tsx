@@ -1,7 +1,9 @@
 import { Suspense } from 'react';
 import { redirect } from 'next/navigation';
 import { AuthError } from 'next-auth';
+import { headers } from 'next/headers';
 import { auth, signIn } from '@/auth';
+import { clientKey, consume } from '@/lib/rate-limit';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -47,11 +49,21 @@ export default function LoginPage({ searchParams }: { searchParams: SearchParams
  * so the password never enters a client bundle's scope and there is no fetch to
  * write.
  */
+// Five attempts, then one more every thirty seconds. A person who mistypes a
+// password twice never meets it; a script working through a word list meets it
+// immediately, and the limit is on the address rather than the email so trying
+// many accounts is no cheaper than trying one.
+const LOGIN_BUCKET = { capacity: 5, refillPerSecond: 1 / 30 };
+
 async function authenticate(formData: FormData) {
   'use server';
 
   const target = String(formData.get('from') ?? '/admin');
   const safeTarget = isAdminPath(target) ? target : '/admin';
+
+  if (!(await consume(clientKey(await headers(), 'login'), LOGIN_BUCKET))) {
+    redirect(`/login?error=rate&from=${encodeURIComponent(safeTarget)}`);
+  }
 
   try {
     await signIn('credentials', {
@@ -75,7 +87,8 @@ async function LoginForm({ searchParams }: { searchParams: SearchParams }) {
   const params = await searchParams;
   const raw = Array.isArray(params.from) ? params.from[0] : params.from;
   const from = raw && isAdminPath(raw) ? raw : '/admin';
-  const failed = params.error !== undefined;
+  const error = Array.isArray(params.error) ? params.error[0] : params.error;
+  const failed = error !== undefined;
 
   return (
     <Card className="mt-8">
@@ -91,9 +104,11 @@ async function LoginForm({ searchParams }: { searchParams: SearchParams }) {
         />
 
         {failed ? (
-          // Deliberately does not say which of the two was wrong.
           <p role="alert" className="text-sm text-flag-red">
-            Those credentials did not match.
+            {error === 'rate'
+              ? 'Too many attempts. Try again in a minute.'
+              : // Deliberately does not say which of the two was wrong.
+                'Those credentials did not match.'}
           </p>
         ) : null}
 
