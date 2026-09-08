@@ -1,0 +1,40 @@
+name: Health
+
+# The alerting this project can afford.
+#
+# The observability design rested on someone noticing a stale row in
+# /admin/runs, and nobody did — the ingest spent six months pointed at the wrong
+# season, importing nothing and reporting success every morning. A failing
+# scheduled workflow is free, arrives by email, and is impossible to not notice.
+#
+# Runs after the ingest cron (06:00 UTC, vercel.json) has had time to finish.
+on:
+  schedule:
+    - cron: '0 9 * * *'
+  # So a change to the check can be proven without waiting a day.
+  workflow_dispatch:
+
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ask production whether the ingest is working
+        run: |
+          # /api/health answers 503 when a race has run and is still not
+          # imported, when the configured season has no races at all, or when
+          # the last ingest failed. The body says which.
+          body=$(mktemp)
+          code=$(curl -sS -o "$body" -w '%{http_code}' --max-time 30 \
+            "$SITE_URL/api/health")
+
+          echo "HTTP $code"
+          cat "$body"
+          echo
+
+          if [ "$code" != "200" ]; then
+            echo "::error::Ingest health check failed (HTTP $code). See the body above."
+            exit 1
+          fi
+        env:
+          # Set as a repository variable, not a secret: it is the public URL.
+          SITE_URL: ${{ vars.SITE_URL || 'https://f1-race-visualizer-alpha.vercel.app' }}
