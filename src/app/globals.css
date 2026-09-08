@@ -53,12 +53,26 @@
      `muted` without dropping under the contrast floor. */
   --foreground: #f3f5f8;
   --muted: #9aa4b4;
-  --subtle: #6b7482;
+  /* Was #6b7482, which is 4.1:1 on the panel — under AA for text, and axe
+     flags it wherever a small label uses it. Still clearly a step down from
+     --muted, just a legible one. */
+  --subtle: #7b8494;
 
   /* F1 red. Kept from v1 — it is the domain's colour and the flag system
      already leans on it. */
   --accent: #ff2016;
   --accent-strong: #ff4a41;
+  /* The same red cannot do both jobs on a dark ground. As *text* on the
+     background #ff2016 is 5.2:1; as a *fill* behind white it is 3.8:1, which
+     fails AA and which axe flags on every page with a primary button or an
+     active chip. Darkening the accent itself would fix the fill and break the
+     text (4.0:1), so the fill is its own token: 4.7:1 with white, and still
+     unmistakably the same red. */
+  --accent-fill: #e5121a;
+  /* The chart panel is a fixed dark surface in both themes, so a theme-following
+     accent lands on it at 3.7:1 in light mode. This one is chosen for that
+     ground and does not move. */
+  --on-track-accent: #ff5a4f;
   --accent-soft: rgba(255, 32, 22, 0.12);
   --on-accent: #ffffff;
 
@@ -95,10 +109,12 @@
 
   --foreground: #10151d;
   --muted: #56606f;
-  --subtle: #78828f;
+  --subtle: #697079;
 
   --accent: #e10600;
   --accent-strong: #b80500;
+  --accent-fill: #e10600;
+  --on-track-accent: #ff5a4f;
   --accent-soft: rgba(225, 6, 0, 0.07);
   --on-accent: #ffffff;
 
@@ -129,9 +145,11 @@
 
     --foreground: #10151d;
     --muted: #56606f;
-    --subtle: #78828f;
+    --subtle: #697079;
 
     --accent: #e10600;
+    --accent-fill: #e10600;
+    --on-track-accent: #ff5a4f;
     --accent-strong: #b80500;
     --accent-soft: rgba(225, 6, 0, 0.07);
     --on-accent: #ffffff;
@@ -165,6 +183,8 @@
   --color-subtle: var(--subtle);
   --color-accent: var(--accent);
   --color-accent-strong: var(--accent-strong);
+  --color-accent-fill: var(--accent-fill);
+  --color-on-track-accent: var(--on-track-accent);
   --color-accent-soft: var(--accent-soft);
   --color-on-accent: var(--on-accent);
   --color-track: var(--track);
@@ -250,13 +270,22 @@ body {
 
 /* Form controls do not inherit the page font on their own. This was in v1 and
    did not survive the port, which is why selects and inputs were rendering in
-   the UA default. */
-button,
-input,
-select,
-textarea {
-  font: inherit;
-  color: inherit;
+   the UA default.
+ *
+ * In `@layer base`, and that is the whole point. Unlayered CSS outranks every
+ * layered rule no matter its specificity, so as plain CSS this `color: inherit`
+ * silently beat `text-on-accent` on every button on the site — the primary
+ * button rendered the page foreground on red rather than white, which is a
+ * contrast failure axe found and a person had not. A reset belongs in the base
+ * layer so utilities can still win, which is what a utility is for. */
+@layer base {
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+    color: inherit;
+  }
 }
 
 /* A global focus ring, so keyboard access does not depend on each component
@@ -273,9 +302,14 @@ textarea {
   outline: none;
 }
 
-a {
-  color: inherit;
-  text-decoration: none;
+/* Layered, for the reason given above the form-control reset: unlayered
+   `color: inherit` beats every text utility, so a link styled `text-on-accent`
+   rendered the page foreground instead. */
+@layer base {
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
 }
 
 ::selection {

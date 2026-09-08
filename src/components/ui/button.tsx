@@ -20,7 +20,7 @@ type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
  */
 const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
   primary:
-    "bg-accent text-on-accent hover:bg-accent-strong active:brightness-90",
+    "bg-accent-fill text-on-accent hover:bg-accent-strong active:brightness-90",
   secondary:
     "border border-line bg-panel text-foreground hover:border-line-strong hover:bg-panel-strong active:brightness-95",
   ghost:
