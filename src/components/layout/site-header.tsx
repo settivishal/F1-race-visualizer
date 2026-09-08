@@ -4,6 +4,9 @@ import { ThemeToggle } from './theme-toggle';
 const NAV_LINKS = [
   { href: '/races', label: 'Races' },
   { href: '/standings', label: 'Standings' },
+  { href: '/drivers', label: 'Drivers' },
+  { href: '/teams', label: 'Teams' },
+  { href: '/circuits', label: 'Circuits' },
 ];
 
 /**

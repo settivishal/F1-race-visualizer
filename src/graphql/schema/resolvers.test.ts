@@ -53,9 +53,15 @@ beforeAll(async () => {
   const [norSeat] = await db.insert(dbSchema.driverTeamAssignments)
     .values({ teamSeasonId: mclaren25.id, driverId: norris.id }).returning();
 
+  const [circuit] = await db.insert(dbSchema.circuits).values({
+    ergastCircuitId: 'test_circuit', name: 'Test Circuit',
+    locality: 'Testville', country: 'Testland', latitude: 1.5, longitude: -2.5,
+  }).returning();
+
   const [meeting] = await db.insert(dbSchema.meetings).values({
     seasonYear: 2025, round: 1, name: 'Test Grand Prix', country: 'Testland',
     startDate: new Date('2025-03-01T00:00:00Z'), openf1MeetingKey: 1,
+    circuitId: circuit.id,
   }).returning();
 
   const [race] = await db.insert(dbSchema.races).values({
@@ -88,6 +94,18 @@ beforeAll(async () => {
   await db.insert(dbSchema.raceResults).values([
     { raceId: sprint.id, assignmentId: norSeat.id, finalPosition: 1, status: 'FINISHED', points: 8, lapsCompleted: 2 },
     { raceId: sprint.id, assignmentId: lecSeat.id, finalPosition: 2, status: 'FINISHED', points: 7, lapsCompleted: 2 },
+  ]);
+
+  // Norris pits on lap 1. Lap 2 has no rows at all, so lap 3 is the next lap he
+  // recorded and therefore his out-lap — the case the missing-lap rule exists
+  // for.
+  await db.insert(dbSchema.pitStops).values([
+    { raceId: race.id, assignmentId: norSeat.id, lap: 1, durationMs: 23400 },
+  ]);
+
+  await db.insert(dbSchema.stints).values([
+    { raceId: race.id, assignmentId: norSeat.id, stintNumber: 1, lapStart: 1, lapEnd: 1, compound: 'MEDIUM', tyreAgeAtStart: 0 },
+    { raceId: race.id, assignmentId: norSeat.id, stintNumber: 2, lapStart: 2, lapEnd: 3, compound: 'HARD', tyreAgeAtStart: 2 },
   ]);
 
   await db.insert(dbSchema.raceEvents).values([
@@ -146,9 +164,109 @@ describe('race', () => {
     ]);
   });
 
+  it('defaults an existing race to the FULL tier, since OpenF1 wrote it', async () => {
+    const data = await run<{ race: { dataTier: string } }>(
+      'query { race(slug: "2025-test") { dataTier } }',
+    );
+    expect(data.race.dataTier).toBe('FULL');
+  });
+
+  it('resolves the circuit a meeting was held at', async () => {
+    const data = await run<{ race: { meeting: { circuitName: string; circuit: { name: string; locality: string; lengthKm: number | null } } } }>(`
+      query {
+        race(slug: "2025-test") {
+          meeting { circuitName circuit { name locality lengthKm } }
+        }
+      }
+    `);
+    expect(data.race.meeting.circuit).toEqual({
+      name: 'Test Circuit',
+      locality: 'Testville',
+      // The overlay fields are not in Ergast, so they stay null until a human
+      // fills them in.
+      lengthKm: null,
+    });
+  });
+
   it('returns null for a slug that does not exist', async () => {
     const data = await run<{ race: null }>('query { race(slug: "nope") { slug } }');
     expect(data.race).toBeNull();
+  });
+});
+
+describe('analysis', () => {
+  it('returns a lap-time series per driver, in lap order', async () => {
+    const data = await run<{ race: { analysis: { lapTimes: { driver: { code: string }; laps: { lap: number; time: number }[] }[] } } }>(`
+      query { race(slug: "2025-test") { analysis { lapTimes { driver { code } laps { lap time } } } } }
+    `);
+    const norris = data.race.analysis.lapTimes.find((d) => d.driver.code === 'NOR');
+    expect(norris!.laps.map((l) => l.lap)).toEqual([1, 3]);
+  });
+
+  it('flags a pit lap and its out-lap rather than deleting them', async () => {
+    const data = await run<{ race: { analysis: { lapTimes: { driver: { code: string }; laps: { lap: number; isOutlier: boolean }[]; pace: { lapsCounted: number; lapsExcluded: number; best: number } }[] } } }>(`
+      query {
+        race(slug: "2025-test") {
+          analysis { lapTimes { driver { code } laps { lap isOutlier } pace { lapsCounted lapsExcluded best } } }
+        }
+      }
+    `);
+    const norris = data.race.analysis.lapTimes.find((d) => d.driver.code === 'NOR')!;
+    // Both of his laps are still in the series — a chart with a hole in it looks
+    // like missing data, which is a different fact.
+    expect(norris.laps).toHaveLength(2);
+    expect(norris.laps.every((l) => l.isOutlier)).toBe(true);
+    expect(norris.pace.lapsCounted).toBe(0);
+    expect(norris.pace.lapsExcluded).toBe(2);
+    // The best lap survives the exclusion: a fast lap is a fact, not noise.
+    expect(norris.pace.best).toBe(91.5);
+  });
+
+  it('returns stints with their compound', async () => {
+    const data = await run<{ race: { analysis: { stints: { driver: { code: string }; compound: string; lapStart: number; lapEnd: number }[] } } }>(`
+      query { race(slug: "2025-test") { analysis { stints { driver { code } compound lapStart lapEnd } } } }
+    `);
+    expect(data.race.analysis.stints).toEqual([
+      { driver: { code: 'NOR' }, compound: 'MEDIUM', lapStart: 1, lapEnd: 1 },
+      { driver: { code: 'NOR' }, compound: 'HARD', lapStart: 2, lapEnd: 3 },
+    ]);
+  });
+
+  it('converts a stored millisecond duration to seconds on the wire', async () => {
+    const data = await run<{ race: { analysis: { pitStops: { lap: number; durationSeconds: number }[] } } }>(`
+      query { race(slug: "2025-test") { analysis { pitStops { lap durationSeconds } } } }
+    `);
+    expect(data.race.analysis.pitStops).toEqual([{ lap: 1, durationSeconds: 23.4 }]);
+  });
+
+  it('compares two drivers lap by lap', async () => {
+    const data = await run<{ race: { analysis: { headToHead: { lapsAheadA: number; lapsAheadB: number; laps: { lap: number; positionDelta: number | null }[]; a: { finalPosition: number | null } } } } }>(`
+      query {
+        race(slug: "2025-test") {
+          analysis {
+            headToHead(driverA: "LEC", driverB: "NOR") {
+              lapsAheadA lapsAheadB
+              a { finalPosition }
+              laps { lap positionDelta }
+            }
+          }
+        }
+      }
+    `);
+    const h = data.race.analysis.headToHead;
+    expect(h.lapsAheadA).toBe(1);            // lap 1, P1 against P2
+    expect(h.lapsAheadB).toBe(0);
+    expect(h.a.finalPosition).toBe(1);
+    // Lap 3 has no Leclerc row, so the comparison has no answer rather than a
+    // zero — a null gap is not a dead heat.
+    expect(h.laps.find((l) => l.lap === 3)!.positionDelta).toBeNull();
+  });
+
+  it('is null when a driver did not start the race', async () => {
+    const data = await run<{ race: { analysis: { headToHead: null } } }>(`
+      query { race(slug: "2025-test") { analysis { headToHead(driverA: "LEC", driverB: "VER") { lapsAheadA } } } }
+    `);
+    expect(data.race.analysis.headToHead).toBeNull();
   });
 });
 

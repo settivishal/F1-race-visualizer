@@ -1,7 +1,8 @@
 import { and, asc, eq, ilike, or, sql } from 'drizzle-orm';
 import { meetings, raceEvents, racePositions, raceResults, races } from '@/db/schema';
 import { builder } from '../builder';
-import type { Context } from '../context';
+import { RaceAnalysis, loadAnalysis } from './analysis';
+import { driverOfAssignment, teamOfAssignment } from './assignment';
 import { Driver, Team } from './entity';
 import { Meeting } from './meeting';
 
@@ -11,39 +12,11 @@ type EventRow = typeof raceEvents.$inferSelect;
 type ResultRow = typeof raceResults.$inferSelect;
 
 const RaceType = builder.enumType('RaceType', { values: ['GRAND_PRIX', 'SPRINT'] as const });
+/** What this race's era published. See the `data_tier` enum in db/schema.ts. */
+const DataTier = builder.enumType('DataTier', { values: ['FULL', 'LAPS'] as const });
 const DriverStatus = builder.enumType('DriverStatus', {
   values: ['FINISHED', 'DNF', 'DNS', 'DSQ'] as const,
 });
-
-/**
- * The assignment is how storage links a driver to a team for a season
- * (document 02, Part 3). It is a storage concern and never appears in the
- * schema: a client asks a position for its `driver`, and the resolver walks
- * the assignment to find one.
- *
- * These still run once per parent object — a thousand position rows still call
- * them a thousand times. What changed is that they no longer issue a query
- * each: every .load() made in the same tick is collected into one
- * `WHERE id IN (...)`, and a key already fetched is served from the loader's
- * cache. The walk is the same; the round trips are not.
- */
-async function driverOfAssignment(ctx: Context, assignmentId: string) {
-  const assignment = await ctx.loaders.assignmentById.load(assignmentId);
-  if (!assignment) return null;
-  return ctx.loaders.driverById.load(assignment.driverId);
-}
-
-async function teamOfAssignment(ctx: Context, assignmentId: string) {
-  const assignment = await ctx.loaders.assignmentById.load(assignmentId);
-  if (!assignment) return null;
-  const teamSeason = await ctx.loaders.teamSeasonById.load(assignment.teamSeasonId);
-  if (!teamSeason) return null;
-  const team = await ctx.loaders.teamById.load(teamSeason.teamId);
-  if (!team) return null;
-  // The per-season livery is the more specific fact, so it wins where it
-  // exists and teams.color is the fallback.
-  return { ...team, color: teamSeason.color ?? team.color };
-}
 
 export const RacePosition = builder.objectRef<PositionRow>('RacePosition').implement({
   fields: (t) => ({
@@ -204,6 +177,9 @@ Race.implement({
     type: t.field({ type: RaceType, resolve: (r) => r.type }),
     laps: t.exposeInt('laps'),
     isFeatured: t.exposeBoolean('isFeatured'),
+    // How much of this race exists, so a client can say "this era published no
+    // sector times" rather than rendering empty columns.
+    dataTier: t.field({ type: DataTier, resolve: (r) => r.dataTier }),
     // Upstream's public identifier for the session. Exposed because the admin
     // needs it to re-run an import, and it is nullable because a race can be
     // in the database without one — a manually created row, or an import that
@@ -260,6 +236,15 @@ Race.implement({
           .where(eq(racePositions.raceId, race.id))
           .orderBy(asc(racePositions.lap), asc(racePositions.position)),
       }),
+    }),
+
+    /**
+     * Lap times, stints, pit stops and pace — the Analysis tab's whole payload
+     * behind one field, so the rows it shares with the replay are read once.
+     */
+    analysis: t.field({
+      type: RaceAnalysis,
+      resolve: (race, _args, ctx) => loadAnalysis(ctx, race.id),
     }),
 
     events: t.field({

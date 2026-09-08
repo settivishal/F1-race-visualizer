@@ -47,6 +47,15 @@ query RaceHeader($slug: String!) {
       circuitName
       round
       season
+      circuit {
+        ergastId
+        name
+        locality
+        country
+        lengthKm
+        turns
+        firstGrandPrix
+      }
     }
     results {
       finalPosition

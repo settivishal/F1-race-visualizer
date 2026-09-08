@@ -8,6 +8,20 @@
       "when": 1788488306839,
       "tag": "0000_living_purple_man",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1788810981674,
+      "tag": "0001_vengeful_bloodaxe",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1788812610626,
+      "tag": "0002_curious_juggernaut",
+      "breakpoints": true
     }
   ]
 }

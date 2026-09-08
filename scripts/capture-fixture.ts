@@ -2,7 +2,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import {
   fetchDrivers, fetchLaps, fetchPits, fetchPositions,
-  fetchRaceControl, fetchSessionResults, fetchWeather,
+  fetchRaceControl, fetchSessionResults, fetchStints, fetchWeather,
 } from '@/lib/ingest/openf1';
 
 /**
@@ -30,6 +30,7 @@ async function main() {
     laps: await fetchLaps(key),
     positions: await fetchPositions(key),
     pits: await fetchPits(key),
+    stints: await fetchStints(key),
     raceControl: await fetchRaceControl(key),
     results: await fetchSessionResults(key),
     weather: await fetchWeather(key),

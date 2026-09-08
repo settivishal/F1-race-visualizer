@@ -55,6 +55,7 @@ query RaceReplay($slug: String!) {
     laps
     date
     type
+    dataTier
     meeting {
       name
       country

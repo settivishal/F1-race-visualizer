@@ -14,17 +14,39 @@ import { LiveTimingTower } from "./live-timing-tower";
 import type { ReplayView } from "./types";
 import { MotionConfig, animate, useMotionValue, useReducedMotion } from "framer-motion";
 
+/** The index of the lap closest to `lap`, or 0 when there is nothing to match. */
+function nearestLapIndex(laps: number[], lap: number | undefined): number {
+  if (lap == null || laps.length === 0) return 0;
+  let best = 0;
+  for (let i = 1; i < laps.length; i++) {
+    if (Math.abs(laps[i] - lap) < Math.abs(laps[best] - lap)) best = i;
+  }
+  return best;
+}
+
 const BASE_LAP_DURATION_MS = 1600;
 const DEFAULT_SPEED = 1;
 
 export function RaceVisualizationPlayer({
   visualization,
   storyPanel = true,
+  initialLap,
 }: {
   visualization: ReplayView;
   storyPanel?: boolean;
+  /**
+   * The lap to open on, from `?lap=` in the URL — so a moment in a race can be
+   * linked to. A lap that does not exist lands on the nearest one that does
+   * rather than failing: upstream leaves lap ranges missing, so a perfectly
+   * reasonable lap number can have no data behind it.
+   */
+  initialLap?: number;
 }) {
-  const [currentLapIndex, setCurrentLapIndex] = useState(0);
+  const startIndex = useMemo(
+    () => nearestLapIndex(visualization.laps, initialLap),
+    [visualization.laps, initialLap],
+  );
+  const [currentLapIndex, setCurrentLapIndex] = useState(startIndex);
   const lapProgress = useMotionValue(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [speed, setSpeed] = useState(DEFAULT_SPEED);
@@ -62,14 +84,14 @@ export function RaceVisualizationPlayer({
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setCurrentLapIndex(0);
+    setCurrentLapIndex(startIndex);
     lapProgress.set(0);
     setIsPlaying(false);
     setSpeed(DEFAULT_SPEED);
     // lapProgress is a MotionValue and keeps the same identity for the life of
     // the component, so listing it changes nothing at runtime and satisfies the
     // rule honestly rather than by suppressing it.
-  }, [visualization, lapProgress]);
+  }, [visualization, lapProgress, startIndex]);
 
   useEffect(() => {
     if (!isPlaying || !canAdvance) {
@@ -177,7 +199,7 @@ export function RaceVisualizationPlayer({
           for the current lap as text.
         </p>
         <div className="overflow-x-auto pb-10">
-          <div className="grid w-full items-stretch gap-5 lg:grid-cols-[20rem_minmax(0,1fr)]">
+          <div className="grid w-full items-stretch gap-5 lg:grid-cols-[22rem_minmax(0,1fr)]">
             <div className="h-full max-h-[800px]">
               <LiveTimingTower
                 visualization={visualization}

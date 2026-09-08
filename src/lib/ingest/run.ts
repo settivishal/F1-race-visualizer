@@ -1,12 +1,15 @@
-import { eq, sql } from 'drizzle-orm';
-import { getDb } from '@/db';
+import { eq, sql, type AnyColumn } from 'drizzle-orm';
+import type { PgDatabase, PgQueryResultHKT } from 'drizzle-orm/pg-core';
+import { getDb, schema } from '@/db';
 import {
-  driverTeamAssignments, drivers, ingestRuns, meetings, racePositions,
-  raceEvents, raceResults, races, seasons, teamSeasons, teams,
+  circuits, driverTeamAssignments, drivers, ingestRuns, meetings, pitStops,
+  racePositions, raceEvents, raceResults, races, seasons, stints, teamSeasons, teams,
 } from '@/db/schema';
+import { fetchRaceLaps, fetchRacePitStops, fetchSeasonResults } from './ergast';
+import { transformArchiveRace } from './ergast-transform';
 import {
   fetchDrivers, fetchLaps, fetchMeetings, fetchPits, fetchPositions,
-  fetchRaceControl, fetchSessionResults, fetchSessions, fetchWeather,
+  fetchRaceControl, fetchSessionResults, fetchSessions, fetchStints, fetchWeather,
 } from './openf1';
 import { deriveRounds, isScoredSession, transformRace } from './transform';
 import type { RaceBundle, TransformedRace } from './types';
@@ -16,6 +19,14 @@ import type { RaceBundle, TransformedRace } from './types';
  * branches — fetch, compute, write — with every decision living in the one
  * line that touches nothing.
  */
+/**
+ * Any Postgres drizzle instance over our schema — the Neon pool in production,
+ * PGlite in a test. Typed structurally rather than as `ReturnType<typeof
+ * getDb>` so the write path can be exercised against a real database in CI
+ * without a network.
+ */
+type Db = PgDatabase<PgQueryResultHKT, typeof schema>;
+
 export type IngestResult = {
   slug: string;
   rowsWritten: number;
@@ -58,7 +69,59 @@ export async function ingestRace(sessionKey: number): Promise<IngestResult> {
   }
 }
 
-/** Everything one session needs. Nine calls, all paced by the client's throttle. */
+/**
+ * One archive race, from Ergast.
+ *
+ * The season's results are fetched by the caller and passed in, because a
+ * season is one paginated request set for all of its races and re-fetching it
+ * per race would multiply a backfill's cost by twenty.
+ *
+ * Recorded under `source: 'ergast'` so `/admin/runs` shows which upstream wrote
+ * what, and so a failed archive race is distinguishable from a failed cron.
+ */
+export async function ingestArchiveRace(
+  season: number,
+  round: number,
+  seasonRaces?: Awaited<ReturnType<typeof fetchSeasonResults>>,
+): Promise<IngestResult> {
+  const db = getDb();
+
+  const [run] = await db.insert(ingestRuns)
+    .values({ source: 'ergast', target: `${season}-${round}`, status: 'RUNNING' })
+    .returning();
+
+  try {
+    const races = seasonRaces ?? (await fetchSeasonResults(season));
+    const race = races.find((r) => r.round === round);
+    if (!race) throw new Error(`${season} has no round ${round}`);
+
+    const [laps, stops] = await Promise.all([
+      fetchRaceLaps(season, round),
+      fetchRacePitStops(season, round),
+    ]);
+
+    const transformed = transformArchiveRace(race, laps, stops);
+    const rowsWritten = await writeRace(transformed);
+
+    await db.update(ingestRuns)
+      .set({
+        status: 'SUCCESS',
+        rowsWritten,
+        finishedAt: new Date(),
+        error: transformed.warnings.length > 0 ? transformed.warnings.join('\n') : null,
+      })
+      .where(eq(ingestRuns.id, run.id));
+
+    return { slug: transformed.race.slug, rowsWritten, warnings: transformed.warnings };
+  } catch (error) {
+    await db.update(ingestRuns)
+      .set({ status: 'FAILED', finishedAt: new Date(), error: String(error) })
+      .where(eq(ingestRuns.id, run.id));
+    throw error;
+  }
+}
+
+/** Everything one session needs. Ten calls, all paced by the client's throttle. */
 export async function fetchRaceBundle(sessionKey: number): Promise<RaceBundle> {
   const [firstSession] = await fetchSessionsByKey(sessionKey);
   if (!firstSession) throw new Error(`session ${sessionKey} not found`);
@@ -76,15 +139,15 @@ export async function fetchRaceBundle(sessionKey: number): Promise<RaceBundle> {
   const round = deriveRounds(allMeetings, allSessions).get(meeting.meeting_key);
   if (round === undefined) throw new Error(`meeting ${meeting.meeting_key} has no race, so no round`);
 
-  const [ldrivers, laps, positions, pits, raceControl, results, weather] = await Promise.all([
+  const [ldrivers, laps, positions, pits, stintList, raceControl, results, weather] = await Promise.all([
     fetchDrivers(sessionKey), fetchLaps(sessionKey), fetchPositions(sessionKey),
-    fetchPits(sessionKey), fetchRaceControl(sessionKey), fetchSessionResults(sessionKey),
-    fetchWeather(sessionKey),
+    fetchPits(sessionKey), fetchStints(sessionKey), fetchRaceControl(sessionKey),
+    fetchSessionResults(sessionKey), fetchWeather(sessionKey),
   ]);
 
   return {
     meeting, session: firstSession, round,
-    drivers: ldrivers, laps, positions, pits, raceControl, results, weather,
+    drivers: ldrivers, laps, positions, pits, stints: stintList, raceControl, results, weather,
   };
 }
 
@@ -112,29 +175,82 @@ async function fetchSessionsByKey(sessionKey: number) {
  * property of the schema, not a behaviour of the code, so there is no check to
  * get wrong.
  */
-async function writeRace(race: TransformedRace): Promise<number> {
-  const db = getDb();
-
+export async function writeRace(
+  race: TransformedRace,
+  // Injectable so the two-upstream merge can be tested against PGlite rather
+  // than against whatever DATABASE_URL happens to hold.
+  db: Db = getDb(),
+): Promise<number> {
   return db.transaction(async (tx) => {
     let rows = 0;
 
     await tx.insert(seasons).values({ year: race.meeting.seasonYear }).onConflictDoNothing();
 
+    // The circuit, where the source knows one. Ergast does; OpenF1 does not, so
+    // an OpenF1 import leaves whatever is already linked alone.
+    let circuitId: string | null = null;
+    if (race.meeting.circuit) {
+      const [circuitRow] = await tx.insert(circuits)
+        .values(race.meeting.circuit)
+        .onConflictDoUpdate({
+          target: circuits.ergastCircuitId,
+          set: { ...race.meeting.circuit, updatedAt: new Date() },
+        })
+        .returning();
+      circuitId = circuitRow.id;
+    }
+
+    const { circuit: _circuit, ...meetingValues } = race.meeting;
+
+    /**
+     * Both upserts conflict on the natural key rather than on an upstream one.
+     *
+     * A meeting is identified by its season and round, and a race by its slug,
+     * in every source. Conflicting on `openf1_meeting_key` instead — as this did
+     * — means an archive import, whose key is null, cannot match the row OpenF1
+     * already wrote for the same weekend, and inserts a duplicate that trips the
+     * (season, round) constraint. The natural key is the one both upstreams
+     * agree on, which is what makes them able to meet on the same row.
+     */
     const [meetingRow] = await tx.insert(meetings)
-      .values(race.meeting)
+      .values({ ...meetingValues, circuitId })
       .onConflictDoUpdate({
-        target: meetings.openf1MeetingKey,
-        set: { ...race.meeting, updatedAt: new Date() },
+        target: [meetings.seasonYear, meetings.round],
+        set: {
+          name: meetingValues.name,
+          country: meetingValues.country,
+          circuitName: meetingValues.circuitName,
+          startDate: meetingValues.startDate,
+          // Each of these is only known to one source. Coalescing keeps what
+          // the other source wrote instead of blanking it on every re-import.
+          weather: sqlCoalesce('weather', meetings.weather),
+          openf1MeetingKey: sqlCoalesce('openf1_meeting_key', meetings.openf1MeetingKey),
+          circuitId: sqlCoalesce('circuit_id', meetings.circuitId),
+          updatedAt: new Date(),
+        },
       })
       .returning();
 
     const [raceRow] = await tx.insert(races)
       .values({ ...race.race, meetingId: meetingRow.id })
       .onConflictDoUpdate({
-        target: races.openf1SessionKey,
-        set: { ...race.race, meetingId: meetingRow.id, updatedAt: new Date() },
+        target: races.slug,
+        set: {
+          meetingId: meetingRow.id,
+          type: race.race.type,
+          date: race.race.date,
+          laps: race.race.laps,
+          dataTier: race.race.dataTier ?? 'FULL',
+          openf1SessionKey: sqlCoalesce('openf1_session_key', races.openf1SessionKey),
+          ergastRound: sqlCoalesce('ergast_round', races.ergastRound),
+          updatedAt: new Date(),
+        },
       })
       .returning();
+
+    // OpenF1 reads the livery off the timing feed; the archive guesses it from
+    // a lookup table. Only one of those should be allowed to overwrite.
+    const liveryIsAuthoritative = (race.race.dataTier ?? 'FULL') === 'FULL';
 
     // driver_number is upstream's key; assignments are ours. Resolving the two
     // is the only reason the lineup is written before anything that references
@@ -142,11 +258,30 @@ async function writeRace(race: TransformedRace): Promise<number> {
     const assignmentByNumber = new Map<number, string>();
 
     for (const entry of race.lineup) {
+      /**
+       * Colours and identity keys are coalesced rather than assigned.
+       *
+       * Which way round the coalesce goes depends on who is writing. OpenF1
+       * publishes the actual livery for the seasons it covers, so it wins over
+       * whatever is stored. The archive's colours are a hand-maintained map —
+       * good enough to make a 2019 chart readable, not good enough to overwrite
+       * a colour taken from the timing feed — so there they only fill a gap.
+       */
       const [teamRow] = await tx.insert(teams)
-        .values({ name: entry.teamName, color: entry.teamColor })
+        .values({
+          name: entry.teamName,
+          color: entry.teamColor,
+          ergastConstructorId: entry.ergastConstructorId ?? null,
+        })
         .onConflictDoUpdate({
           target: teams.name,
-          set: { color: entry.teamColor, updatedAt: new Date() },
+          set: {
+            color: liveryIsAuthoritative
+              ? sqlCoalesce('color', teams.color)
+              : sqlPreferStored('color', teams.color),
+            ergastConstructorId: sqlCoalesce('ergast_constructor_id', teams.ergastConstructorId),
+            updatedAt: new Date(),
+          },
         })
         .returning();
 
@@ -154,7 +289,11 @@ async function writeRace(race: TransformedRace): Promise<number> {
         .values({ seasonYear: race.meeting.seasonYear, teamId: teamRow.id, color: entry.teamColor })
         .onConflictDoUpdate({
           target: [teamSeasons.seasonYear, teamSeasons.teamId],
-          set: { color: entry.teamColor },
+          set: {
+            color: liveryIsAuthoritative
+              ? sqlCoalesce('color', teamSeasons.color)
+              : sqlPreferStored('color', teamSeasons.color),
+          },
         })
         .returning();
 
@@ -162,12 +301,15 @@ async function writeRace(race: TransformedRace): Promise<number> {
         .values({
           code: entry.code, name: entry.name, number: entry.driverNumber,
           country: entry.country, headshotUrl: entry.headshotUrl,
+          ergastDriverId: entry.ergastDriverId ?? null,
         })
         .onConflictDoUpdate({
           target: drivers.code,
           set: {
             name: entry.name, number: entry.driverNumber, country: entry.country,
-            headshotUrl: entry.headshotUrl, updatedAt: new Date(),
+            headshotUrl: sqlCoalesce('headshot_url', drivers.headshotUrl),
+            ergastDriverId: sqlCoalesce('ergast_driver_id', drivers.ergastDriverId),
+            updatedAt: new Date(),
           },
         })
         .returning();
@@ -224,11 +366,42 @@ async function writeRace(race: TransformedRace): Promise<number> {
       rows += chunk.length;
     }
 
+    // Same replace-wholesale rule as positions and events, and for the same
+    // reason: a re-import that produces fewer stints must not leave the old
+    // ones behind, where they would draw a strategy the driver never ran.
+    await tx.delete(stints).where(eq(stints.raceId, raceRow.id));
+    const stintRows = race.stints
+      .filter((s) => assignmentByNumber.has(s.driverNumber))
+      .map((s) => ({
+        raceId: raceRow.id,
+        assignmentId: assignmentFor(s.driverNumber),
+        stintNumber: s.stintNumber, lapStart: s.lapStart, lapEnd: s.lapEnd,
+        compound: s.compound, tyreAgeAtStart: s.tyreAgeAtStart,
+      }));
+    for (const chunk of chunked(stintRows, 500)) {
+      await tx.insert(stints).values(chunk);
+      rows += chunk.length;
+    }
+
+    await tx.delete(pitStops).where(eq(pitStops.raceId, raceRow.id));
+    const pitRows = race.pitStops
+      .filter((p) => assignmentByNumber.has(p.driverNumber))
+      .map((p) => ({
+        raceId: raceRow.id,
+        assignmentId: assignmentFor(p.driverNumber),
+        lap: p.lap, durationMs: p.durationMs,
+      }));
+    for (const chunk of chunked(pitRows, 500)) {
+      await tx.insert(pitStops).values(chunk);
+      rows += chunk.length;
+    }
+
     const resultRows = race.results.map((r) => ({
       raceId: raceRow.id,
       assignmentId: assignmentFor(r.driverNumber),
       finalPosition: r.finalPosition, status: r.status,
       lapsCompleted: r.lapsCompleted, points: r.points, fastestLap: r.fastestLap,
+      gridPosition: r.gridPosition ?? null,
     }));
     if (resultRows.length > 0) {
       await tx.insert(raceResults)
@@ -239,6 +412,9 @@ async function writeRace(race: TransformedRace): Promise<number> {
             finalPosition: sqlExcluded('final_position'), status: sqlExcluded('status'),
             lapsCompleted: sqlExcluded('laps_completed'), points: sqlExcluded('points'),
             fastestLap: sqlExcluded('fastest_lap'),
+            // Only Ergast knows the grid, so an OpenF1 re-import of a race the
+            // archive has already filled must leave it alone.
+            gridPosition: sqlCoalesce('grid_position', raceResults.gridPosition),
           },
         });
       rows += resultRows.length;
@@ -255,6 +431,24 @@ async function writeRace(race: TransformedRace): Promise<number> {
  */
 function sqlExcluded(column: string) {
   return sql.raw(`excluded."${column}"`);
+}
+
+/**
+ * The incoming value, or the stored one when the incoming value is null.
+ *
+ * Two upstreams write the same rows and each knows things the other does not —
+ * OpenF1 has liveries and session keys, Ergast has grids and circuits. Assigning
+ * would mean each import blanking the other's columns, and the site would show
+ * whichever ran last. The column reference is needed rather than a bare name
+ * because inside ON CONFLICT the unqualified name is ambiguous.
+ */
+function sqlCoalesce(column: string, stored: AnyColumn) {
+  return sql`coalesce(excluded."${sql.raw(column)}", ${stored})`;
+}
+
+/** The stored value, or the incoming one where nothing is stored yet. */
+function sqlPreferStored(column: string, stored: AnyColumn) {
+  return sql`coalesce(${stored}, excluded."${sql.raw(column)}")`;
 }
 
 function* chunked<T>(items: T[], size: number): Generator<T[]> {

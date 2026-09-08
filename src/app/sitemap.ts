@@ -1,5 +1,5 @@
 import type { MetadataRoute } from 'next';
-import { getRaceSlugs } from '@/lib/queries';
+import { getArchiveIndex, getRaceSlugs } from '@/lib/queries';
 import { siteUrl } from '@/lib/site-url';
 
 /**
@@ -15,13 +15,32 @@ import { siteUrl } from '@/lib/site-url';
  * race.
  */
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const { races } = await getRaceSlugs(500);
+  // Both are cached reads the pages already make, so the sitemap adds no query.
+  const [{ races }, archive] = await Promise.all([getRaceSlugs(500), getArchiveIndex()]);
 
   return [
     { url: siteUrl, changeFrequency: 'weekly', priority: 1 },
     { url: `${siteUrl}/races`, changeFrequency: 'weekly', priority: 0.9 },
     { url: `${siteUrl}/standings`, changeFrequency: 'weekly', priority: 0.8 },
+    { url: `${siteUrl}/drivers`, changeFrequency: 'monthly', priority: 0.6 },
+    { url: `${siteUrl}/teams`, changeFrequency: 'monthly', priority: 0.6 },
+    { url: `${siteUrl}/circuits`, changeFrequency: 'monthly', priority: 0.5 },
     { url: `${siteUrl}/about`, changeFrequency: 'yearly', priority: 0.3 },
+    ...archive.drivers.map((driver) => ({
+      url: `${siteUrl}/drivers/${driver.code.toLowerCase()}`,
+      changeFrequency: 'monthly' as const,
+      priority: 0.5,
+    })),
+    ...archive.teams.map((team) => ({
+      url: `${siteUrl}/teams/${encodeURIComponent(team.name)}`,
+      changeFrequency: 'monthly' as const,
+      priority: 0.5,
+    })),
+    ...archive.circuits.map((circuit) => ({
+      url: `${siteUrl}/circuits/${circuit.ergastId}`,
+      changeFrequency: 'yearly' as const,
+      priority: 0.4,
+    })),
     ...races.edges.map(({ node }) => ({
       url: `${siteUrl}/races/${node.slug}`,
       lastModified: new Date(node.date),

@@ -1,0 +1,66 @@
+# The Analysis tab's payload. One request: lap times per driver, the strategy
+# behind them, and the pit stops that separate the stints.
+#
+# `isOutlier` comes back per lap rather than being decided in the component. The
+# rule for what counts as a representative lap is a fact about the race, so it
+# belongs on the server where it is tested, not in a chart that happens to draw
+# the laps.
+query RaceAnalysis($slug: String!) {
+  race(slug: $slug) {
+    id
+    slug
+    laps
+    dataTier
+    meeting {
+      name
+      season
+    }
+    analysis {
+      lapTimes {
+        driver {
+          id
+          code
+          name
+        }
+        team {
+          id
+          name
+          color
+        }
+        laps {
+          lap
+          time
+          isOutlier
+        }
+        pace {
+          best
+          median
+          consistency
+          lapsCounted
+          lapsExcluded
+        }
+      }
+      stints {
+        stintNumber
+        lapStart
+        lapEnd
+        compound
+        driver {
+          id
+          code
+        }
+        team {
+          color
+        }
+      }
+      pitStops {
+        lap
+        durationSeconds
+        driver {
+          id
+          code
+        }
+      }
+    }
+  }
+}

@@ -1,8 +1,36 @@
+type CareerTotals {
+  bestFinish: Int
+  podiums: Int!
+  points: Float!
+  seasonCount: Int!
+  seasons: [SeasonRecord!]!
+  starts: Int!
+  wins: Int!
+}
+
+type Circuit {
+  country: String
+  ergastId: String!
+  firstGrandPrix: Int
+  id: ID!
+  latitude: Float
+  lengthKm: Float
+  locality: String
+  longitude: Float
+  name: String!
+  turns: Int
+}
+
 type ConstructorStanding {
   points: Float!
   position: Int!
   team: Team!
   wins: Int!
+}
+
+enum DataTier {
+  FULL
+  LAPS
 }
 
 scalar DateTime
@@ -14,6 +42,18 @@ type Driver {
   id: ID!
   name: String!
   number: Int
+}
+
+type DriverLapTimes {
+  driver: Driver
+  laps: [Lap!]!
+  pace: Pace!
+  team: Team
+}
+
+type DriverProfile {
+  career: CareerTotals!
+  driver: Driver!
 }
 
 type DriverStanding {
@@ -30,6 +70,27 @@ enum DriverStatus {
   DNS
   DSQ
   FINISHED
+}
+
+type HeadToHead {
+  a: HeadToHeadSide!
+  b: HeadToHeadSide!
+  laps: [HeadToHeadLap!]!
+  lapsAheadA: Int!
+  lapsAheadB: Int!
+}
+
+type HeadToHeadLap {
+  lap: Int!
+  positionDelta: Int
+  timeDelta: Float
+}
+
+type HeadToHeadSide {
+  driver: Driver
+  finalPosition: Int
+  pace: Pace!
+  team: Team
 }
 
 type IngestRun {
@@ -49,7 +110,14 @@ enum IngestRunStatus {
   SUCCESS
 }
 
+type Lap {
+  isOutlier: Boolean!
+  lap: Int!
+  time: Float!
+}
+
 type Meeting {
+  circuit: Circuit
   circuitName: String
   country: String!
   id: ID!
@@ -67,21 +135,45 @@ type Mutation {
   updateRaceMetadata(circuitName: String, country: String, laps: Int, name: String, slug: String!): Race!
 }
 
+type Pace {
+  best: Float
+  consistency: Float
+  lapsCounted: Int!
+  lapsExcluded: Int!
+  mean: Float
+  median: Float
+}
+
 type PageInfo {
   endCursor: String
   hasNextPage: Boolean!
 }
 
+type PitStop {
+  driver: Driver
+  durationSeconds: Float
+  lap: Int!
+  team: Team
+}
+
 type Query {
+  circuit(ergastId: String!): Circuit
+  circuits: [Circuit!]!
   constructorStandings(season: Int!): [ConstructorStanding!]!
+  driver(code: String!): DriverProfile
   driverStandings(season: Int!): [DriverStanding!]!
+  drivers(season: Int): [Driver!]!
   ingestRuns(first: Int = 50): [IngestRun!]!
   race(slug: String!): Race
   races(after: String, first: Int, search: String, season: Int): RaceConnection!
   seasons: [Season!]!
+  team(name: String!): TeamProfile
+  teams: [Team!]!
 }
 
 type Race {
+  analysis: RaceAnalysis!
+  dataTier: DataTier!
   date: DateTime!
   events(lap: Int): [RaceEvent!]!
   id: ID!
@@ -94,6 +186,13 @@ type Race {
   results: [RaceResult!]!
   slug: String!
   type: RaceType!
+}
+
+type RaceAnalysis {
+  headToHead(driverA: String!, driverB: String!): HeadToHead
+  lapTimes: [DriverLapTimes!]!
+  pitStops: [PitStop!]!
+  stints: [Stint!]!
 }
 
 type RaceConnection {
@@ -165,11 +264,37 @@ type Season {
   year: Int!
 }
 
+type SeasonRecord {
+  bestFinish: Int
+  podiums: Int!
+  points: Float!
+  season: Int!
+  starts: Int!
+  team: Team
+  wins: Int!
+}
+
+type Stint {
+  compound: String
+  driver: Driver
+  lapEnd: Int!
+  lapStart: Int!
+  stintNumber: Int!
+  team: Team
+  tyreAgeAtStart: Int
+}
+
 type Team {
   color: String
   id: ID!
   logoUrl: String
   name: String!
+}
+
+type TeamProfile {
+  career: CareerTotals!
+  drivers(season: Int): [Driver!]!
+  team: Team!
 }
 
 type TriggerIngestResult {

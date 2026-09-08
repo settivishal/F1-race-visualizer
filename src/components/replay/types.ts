@@ -43,6 +43,12 @@ export type ReplayRace = {
   country: string;
   circuitName: string | null;
   laps: number;
+  /**
+   * What this race's era published. The tower reads it to say "no sector times
+   * before 2023" instead of drawing three columns of dashes, which is the
+   * difference between an absence and a fault.
+   */
+  dataTier: 'FULL' | 'LAPS';
 };
 
 export type ReplayView = {
@@ -81,6 +87,7 @@ export function toReplayView(race: RaceNode): ReplayView {
       country: race.meeting?.country ?? '',
       circuitName: race.meeting?.circuitName ?? null,
       laps: race.laps,
+      dataTier: race.dataTier === 'LAPS' ? 'LAPS' : 'FULL',
     },
     laps: race.replay.laps,
     summary: race.replay.summary,
