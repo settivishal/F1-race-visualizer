@@ -4,7 +4,9 @@ import type {
   ArchiveIndexQuery,
   CircuitProfileQuery,
   DriverProfileQuery,
-  HomeFeatureQuery,
+  HeroReplayQuery,
+  LatestResultQuery,
+  SeasonPulseQuery,
   RaceAnalysisQuery,
   TeamProfileQuery,
   HomeLineupQuery,
@@ -88,15 +90,44 @@ const RACE_HEADER = /* GraphQL */ `
  * Asking for 100 rows of four fields to choose one is cheap next to adding a
  * resolver argument, and the whole thing is one cached entry for a day.
  */
-const HOME_FEATURE = /* GraphQL */ `
-  query HomeFeature {
-    races(first: 100) {
-      edges {
-        node {
-          id slug laps type isFeatured
-          meeting { name country circuitName round season }
+const HERO_REPLAY = /* GraphQL */ `
+  query HeroReplay {
+    featuredRace {
+      slug
+      laps
+      meeting { name round season circuitName }
+      replay {
+        summary { maxLap maxPosition }
+        drivers {
+          driver { code }
+          team { color }
+          positions { lap position }
         }
       }
+    }
+  }
+`;
+
+const LATEST_RESULT = /* GraphQL */ `
+  query LatestResult {
+    latestRace {
+      slug
+      date
+      type
+      meeting { name round season circuitName country }
+      results {
+        finalPosition fastestLap points status
+        driver { code name }
+        team { name color }
+      }
+    }
+  }
+`;
+
+const SEASON_PULSE = /* GraphQL */ `
+  query SeasonPulse($season: Int!) {
+    seasonPulse(season: $season) {
+      round name slug winnerCode teamColor
     }
   }
 `;
@@ -340,6 +371,7 @@ const SEASON_SCHEDULE = /* GraphQL */ `
           slug
           date
           type
+          laps
           meeting { name round }
         }
       }
@@ -396,18 +428,48 @@ export async function getCircuitProfile(ergastId: string) {
   return executeQuery<CircuitProfileQuery, { ergastId: string }>(CIRCUIT_PROFILE, { ergastId });
 }
 
+/**
+ * The race the hero draws, with the slimmest projection that can draw it.
+ *
+ * This used to fetch a hundred races and take the last by date, which the
+ * stored calendar turned into a race in December that nobody has driven — and
+ * which was already arbitrary once the archive passed a hundred rows. The pick
+ * is `Query.featuredRace` now: the admin's flag, else the newest race run.
+ */
 export async function getFeaturedRace() {
   'use cache';
   cacheTag('race');
   cacheLife('days');
 
-  const { races } = await executeQuery<HomeFeatureQuery, Record<string, unknown>>(
-    HOME_FEATURE,
+  const { featuredRace } = await executeQuery<HeroReplayQuery, Record<string, unknown>>(
+    HERO_REPLAY,
     {},
   );
+  return featuredRace;
+}
 
-  const nodes = races.edges.map((edge) => edge.node);
-  return nodes.find((node) => node.isFeatured) ?? nodes.at(-1) ?? null;
+export async function getLatestResult() {
+  'use cache';
+  cacheTag('race');
+  cacheLife('days');
+
+  const { latestRace } = await executeQuery<LatestResultQuery, Record<string, unknown>>(
+    LATEST_RESULT,
+    {},
+  );
+  return latestRace;
+}
+
+export async function getSeasonPulse(season: number) {
+  'use cache';
+  cacheTag('race', 'standings');
+  cacheLife('days');
+
+  const { seasonPulse } = await executeQuery<SeasonPulseQuery, { season: number }>(
+    SEASON_PULSE,
+    { season },
+  );
+  return seasonPulse;
 }
 
 export async function getRaceSlugs(first = 100) {
