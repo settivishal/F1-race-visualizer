@@ -1,4 +1,4 @@
-import { eq, sql } from 'drizzle-orm';
+import { and, asc, eq, sql } from 'drizzle-orm';
 import {
   driverTeamAssignments, drivers, meetings, raceResults, races, teamSeasons, teams,
 } from '@/db/schema';
@@ -175,6 +175,79 @@ builder.queryField('constructorStandings', (t) =>
         }))
         .sort((a, b) => b.points - a.points || countback(a.finishes, b.finishes))
         .map((s, i) => ({ ...s, position: i + 1 }));
+    },
+  }),
+);
+
+/**
+ * The season at a glance: one entry per round, with whoever won it.
+ *
+ * Standings cannot give this. They are a sum over results, and a sum has no
+ * memory of which race produced it — so "who won round 7" needs its own query
+ * rather than a derivation from a table the home page already loads.
+ *
+ * Grands prix only. A sprint is a session inside a round, not a round, and a
+ * strip with 31 dots for a 24-race season would be reading the calendar wrong.
+ * A round with no winner yet is a round not yet run, which the UI draws hollow.
+ */
+type PulseRoundShape = {
+  round: number;
+  name: string;
+  slug: string | null;
+  winnerCode: string | null;
+  teamColor: string | null;
+};
+
+const PulseRound = builder.objectRef<PulseRoundShape>('PulseRound').implement({
+  fields: (t) => ({
+    round: t.exposeInt('round'),
+    name: t.exposeString('name'),
+    // Null where the round has not been run: there is no replay to link to.
+    slug: t.exposeString('slug', { nullable: true }),
+    winnerCode: t.exposeString('winnerCode', { nullable: true }),
+    teamColor: t.exposeString('teamColor', { nullable: true }),
+  }),
+});
+
+builder.queryField('seasonPulse', (t) =>
+  t.field({
+    type: [PulseRound],
+    args: { season: t.arg.int({ required: true }) },
+    resolve: async (_root, args, ctx) => {
+      const rows = await ctx.db
+        .select({
+          round: meetings.round,
+          name: meetings.name,
+          slug: races.slug,
+          laps: races.laps,
+          winnerCode: drivers.code,
+          teamColor: sql<string | null>`coalesce(${teamSeasons.color}, ${teams.color})`,
+        })
+        .from(meetings)
+        .leftJoin(
+          races,
+          and(eq(races.meetingId, meetings.id), eq(races.type, 'GRAND_PRIX')),
+        )
+        .leftJoin(
+          raceResults,
+          and(eq(raceResults.raceId, races.id), eq(raceResults.finalPosition, 1)),
+        )
+        .leftJoin(driverTeamAssignments, eq(driverTeamAssignments.id, raceResults.assignmentId))
+        .leftJoin(drivers, eq(drivers.id, driverTeamAssignments.driverId))
+        .leftJoin(teamSeasons, eq(teamSeasons.id, driverTeamAssignments.teamSeasonId))
+        .leftJoin(teams, eq(teams.id, teamSeasons.teamId))
+        .where(eq(meetings.seasonYear, args.season))
+        .orderBy(asc(meetings.round));
+
+      return rows.map((row) => ({
+        round: row.round,
+        name: row.name,
+        // A scheduled race has a slug and a page, but no result — the page says
+        // so itself, so it is still worth linking to.
+        slug: row.slug,
+        winnerCode: row.laps && row.laps > 0 ? row.winnerCode : null,
+        teamColor: row.laps && row.laps > 0 ? row.teamColor : null,
+      }));
     },
   }),
 );

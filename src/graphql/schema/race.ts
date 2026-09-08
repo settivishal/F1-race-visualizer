@@ -1,6 +1,7 @@
-import { and, asc, desc, eq, ilike, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, ilike, or, sql } from 'drizzle-orm';
 import { meetings, raceEvents, racePositions, raceResults, races } from '@/db/schema';
 import { builder } from '../builder';
+import type { Db } from '../context';
 import { RaceAnalysis, loadAnalysis } from './analysis';
 import { driverOfAssignment, teamOfAssignment } from './assignment';
 import { Driver, Team } from './entity';
@@ -279,6 +280,52 @@ builder.queryField('race', (t) =>
     resolve: async (_root, args, ctx) => {
       const race = await ctx.db.query.races.findFirst({ where: eq(races.slug, args.slug) });
       return race ?? null;
+    },
+  }),
+);
+
+/**
+ * The newest race that has actually been run.
+ *
+ * `laps > 0` is the test, not a comparison against the clock. The calendar is
+ * stored whole, so the newest race by date is usually one nobody has driven —
+ * and these resolvers are read inside `use cache` scopes, where "now" is
+ * whenever the entry was built.
+ */
+const newestRunRace = (ctx: { db: Db }) =>
+  ctx.db.query.races.findFirst({
+    where: gt(races.laps, 0),
+    orderBy: [desc(races.date)],
+  });
+
+builder.queryField('latestRace', (t) =>
+  t.field({
+    type: Race,
+    nullable: true,
+    resolve: async (_root, _args, ctx) => (await newestRunRace(ctx)) ?? null,
+  }),
+);
+
+/**
+ * The race the site leads with: whichever one an admin flagged, else the
+ * newest one run.
+ *
+ * `races.is_featured`, its mutation and its admin control have all existed
+ * since M3 and nothing has ever read the flag. The home page instead fetched a
+ * hundred races and took the last by date — which the stored calendar turned
+ * into "a race in December that nobody has driven", and which was already
+ * arbitrary once the archive passed a hundred rows.
+ */
+builder.queryField('featuredRace', (t) =>
+  t.field({
+    type: Race,
+    nullable: true,
+    resolve: async (_root, _args, ctx) => {
+      const flagged = await ctx.db.query.races.findFirst({
+        where: and(eq(races.isFeatured, true), gt(races.laps, 0)),
+        orderBy: [desc(races.date)],
+      });
+      return flagged ?? (await newestRunRace(ctx)) ?? null;
     },
   }),
 );

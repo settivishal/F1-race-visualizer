@@ -1,12 +1,18 @@
 import { Suspense } from 'react';
 import Link from 'next/link';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { PageContainer } from '@/components/ui/page-container';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ChampionshipFight } from '@/components/home/championship-fight';
+import { HeroReplay } from '@/components/home/hero-replay';
+import { LatestResult } from '@/components/home/latest-result';
+import { SeasonPulse } from '@/components/home/season-pulse';
 import { SeasonStatus, type ScheduledRace } from '@/components/home/season-status';
-import { getActiveSeason, getDriverStandings, getFeaturedRace, getSeasonSchedule } from '@/lib/queries';
+import {
+  getActiveSeason, getDriverStandings, getFeaturedRace, getLatestResult,
+  getSeasonPulse, getSeasonSchedule,
+} from '@/lib/queries';
 
 // Reads through the schema, not around it. A server component could query
 // Drizzle directly and be quicker to write, but then GraphQL would be a facade
@@ -16,7 +22,8 @@ import { getActiveSeason, getDriverStandings, getFeaturedRace, getSeasonSchedule
 export default function Home() {
   return (
     <PageContainer className="py-14">
-      <section className="max-w-3xl">
+      <section className="grid gap-10 lg:grid-cols-[minmax(0,26rem)_minmax(0,1fr)] lg:items-center">
+        <div>
         {/* Not the season: the shell prerenders, so it cannot await one, and
             the season status below already names the year. Two places saying it
             is how they come to disagree. */}
@@ -38,6 +45,13 @@ export default function Home() {
             <Button size="lg">Browse races</Button>
           </Link>
         </div>
+        </div>
+
+        {/* The claim above, demonstrated. Streams on its own so the copy is
+            never waiting on a race to load. */}
+        <Suspense fallback={<Skeleton className="h-72 w-full rounded-xl" />}>
+          <HeroChart />
+        </Suspense>
       </section>
 
       {/* Each section streams on its own, so a slow standings query cannot hold
@@ -47,7 +61,15 @@ export default function Home() {
       </Suspense>
 
       <Suspense fallback={<FeaturedSkeleton />}>
-        <FeaturedRace />
+        <LatestRace />
+      </Suspense>
+
+      <Suspense fallback={<Skeleton className="mt-14 h-24 w-full" />}>
+        <Pulse />
+      </Suspense>
+
+      <Suspense fallback={<Skeleton className="mt-14 h-44 w-full" />}>
+        <TitleRace />
       </Suspense>
 
       <Suspense fallback={<StandingsSkeleton />}>
@@ -77,35 +99,99 @@ async function SeasonProgress() {
   return <SeasonStatus season={season} races={scheduled} />;
 }
 
-async function FeaturedRace() {
+/**
+ * The featured race, drawn small and scrubbable.
+ *
+ * Ten drivers rather than twenty: the hero is 220px tall and twenty lines in it
+ * is a smear. The ten who finished best are the ones whose lines cross.
+ */
+async function HeroChart() {
   const race = await getFeaturedRace();
-  if (!race) return null;
+  if (!race || race.replay.drivers.length === 0) return null;
+
+  const drivers = [...race.replay.drivers]
+    .sort((a, b) => lastPosition(a.positions) - lastPosition(b.positions))
+    .slice(0, 10)
+    .filter((entry) => entry.driver !== null)
+    .map((entry) => ({
+      code: entry.driver!.code,
+      color: entry.team?.color ?? null,
+      positions: entry.positions,
+    }));
 
   return (
-    <section className="mt-14">
-      <h2 className="text-eyebrow font-bold uppercase text-muted">Start here</h2>
-      <Link
-        href={`/races/${race.slug}`}
-        className="mt-3 block rounded-xl"
-        prefetch
-      >
-        <Card interactive className="p-7">
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge tone="accent">
-              {race.meeting ? `Round ${race.meeting.round}` : 'Race'}
-            </Badge>
-            {race.type === 'SPRINT' ? <Badge>Sprint</Badge> : null}
-          </div>
-          <p className="type-page-title mt-4">
-            {race.meeting?.name ?? race.slug}
-          </p>
-          <p className="mt-2 text-muted">
-            {race.meeting?.circuitName ?? race.meeting?.country ?? '—'} ·{' '}
-            <span className="tabular">{race.laps}</span> laps
-          </p>
-        </Card>
-      </Link>
-    </section>
+    <HeroReplay
+      slug={race.slug}
+      title={`${race.meeting?.season ?? ''} ${race.meeting?.name ?? race.slug}`.trim()}
+      drivers={drivers}
+      maxLap={race.replay.summary.maxLap}
+      maxPosition={race.replay.summary.maxPosition}
+    />
+  );
+}
+
+const lastPosition = (positions: { position: number }[]) =>
+  positions.length === 0 ? Number.MAX_SAFE_INTEGER : positions[positions.length - 1].position;
+
+async function LatestRace() {
+  const race = await getLatestResult();
+  if (!race) return null;
+
+  const where = race.meeting?.circuitName ?? race.meeting?.country ?? null;
+
+  return (
+    <LatestResult
+      slug={race.slug}
+      title={race.meeting?.name ?? race.slug}
+      subtitle={
+        race.meeting
+          ? `${race.meeting.season} · Round ${race.meeting.round}${where ? ` · ${where}` : ''}`
+          : (where ?? '')
+      }
+      isSprint={race.type === 'SPRINT'}
+      results={race.results}
+    />
+  );
+}
+
+async function Pulse() {
+  const season = await getActiveSeason();
+  return <SeasonPulse season={season} rounds={await getSeasonPulse(season)} />;
+}
+
+/**
+ * The title race. `remaining` counts what is scheduled and not yet run, which
+ * the stored calendar makes a fact rather than an estimate.
+ */
+async function TitleRace() {
+  const season = await getActiveSeason();
+  const [{ driverStandings }, { races }] = await Promise.all([
+    getDriverStandings(season),
+    getSeasonSchedule(season),
+  ]);
+
+  if (driverStandings.length === 0) return null;
+
+  const notRun = races.edges.filter((edge) => edge.node.laps === 0);
+  const remaining = {
+    grandsPrix: notRun.filter((edge) => edge.node.type === 'GRAND_PRIX').length,
+    sprints: notRun.filter((edge) => edge.node.type === 'SPRINT').length,
+  };
+
+  const contender = (standing: (typeof driverStandings)[number]) => ({
+    code: standing.driver.code,
+    name: standing.driver.name,
+    points: standing.points,
+    teamColor: standing.team?.color ?? null,
+  });
+
+  return (
+    <ChampionshipFight
+      season={season}
+      leader={contender(driverStandings[0])}
+      second={driverStandings[1] ? contender(driverStandings[1]) : null}
+      remaining={remaining}
+    />
   );
 }
 

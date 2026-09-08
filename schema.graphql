@@ -158,6 +158,14 @@ type PitStop {
   team: Team
 }
 
+type PulseRound {
+  name: String!
+  round: Int!
+  slug: String
+  teamColor: String
+  winnerCode: String
+}
+
 type Query {
   activeSeason: Int!
   circuit(ergastId: String!): Circuit
@@ -166,10 +174,13 @@ type Query {
   driver(code: String!): DriverProfile
   driverStandings(season: Int!): [DriverStanding!]!
   drivers(season: Int): [Driver!]!
+  featuredRace: Race
   ingestRuns(first: Int = 50): [IngestRun!]!
+  latestRace: Race
   race(slug: String!): Race
   races(after: String, before: String, first: Int, search: String, season: Int): RaceConnection!
   search(query: String!): [SearchHit!]!
+  seasonPulse(season: Int!): [PulseRound!]!
   seasons: [Season!]!
   team(name: String!): TeamProfile
   teams: [Team!]!

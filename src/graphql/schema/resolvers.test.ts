@@ -1,3 +1,4 @@
+import { eq } from 'drizzle-orm';
 import { PGlite } from '@electric-sql/pglite';
 import { execute, parse } from 'graphql';
 import { drizzle } from 'drizzle-orm/pglite';
@@ -112,6 +113,60 @@ beforeAll(async () => {
     { raceId: race.id, lap: 2, assignmentId: null, type: 'SAFETY_CAR', details: 'Safety car deployed' },
     { raceId: race.id, lap: 3, assignmentId: norSeat.id, type: 'RETIREMENT', details: 'Engine' },
   ]);
+});
+
+describe('featuredRace', () => {
+  it('is the newest race that has been run, not the newest race', async () => {
+    // The calendar is stored whole, so the newest row by date is normally one
+    // nobody has driven. `laps > 0` is the test rather than the clock, because
+    // these resolvers are read from cache entries built at some other time.
+    // Its own meeting: (meeting_id, type) is unique, so a season cannot hold
+    // two grands prix in one round.
+    const [later] = await db.insert(dbSchema.meetings).values({
+      seasonYear: 2025, round: 2, name: 'Scheduled Grand Prix', country: 'Testland',
+      startDate: new Date('2030-01-01T00:00:00Z'), openf1MeetingKey: 2,
+    }).returning();
+    await db.insert(dbSchema.races).values({
+      meetingId: later.id, type: 'GRAND_PRIX', slug: '2025-scheduled',
+      date: new Date('2030-01-01T00:00:00Z'), laps: 0, openf1SessionKey: 99,
+    });
+
+    const data = await run<{ featuredRace: { slug: string } }>(
+      `query { featuredRace { slug } }`,
+    );
+    expect(data.featuredRace.slug).toBe('2025-test');
+
+    await db.delete(dbSchema.races).where(eq(dbSchema.races.slug, '2025-scheduled'));
+    await db.delete(dbSchema.meetings).where(eq(dbSchema.meetings.id, later.id));
+  });
+
+  it('prefers the flagged race, which is the only thing that reads is_featured', async () => {
+    await db.update(dbSchema.races)
+      .set({ isFeatured: true })
+      .where(eq(dbSchema.races.slug, '2025-test-sprint'));
+
+    const data = await run<{ featuredRace: { slug: string } }>(
+      `query { featuredRace { slug } }`,
+    );
+    expect(data.featuredRace.slug).toBe('2025-test-sprint');
+
+    await db.update(dbSchema.races).set({ isFeatured: false });
+  });
+});
+
+describe('seasonPulse', () => {
+  it('gives one entry per round with its winner, grands prix only', async () => {
+    const data = await run<{
+      seasonPulse: { round: number; winnerCode: string | null; teamColor: string | null }[];
+    }>(`query { seasonPulse(season: 2025) { round winnerCode teamColor } }`);
+
+    // One round in the fixture, won by Leclerc. The sprint in the same meeting
+    // is a session inside it, not a round of its own.
+    expect(data.seasonPulse).toHaveLength(1);
+    expect(data.seasonPulse[0]).toMatchObject({ round: 1, winnerCode: 'LEC' });
+    // The per-season livery, not the team's fallback colour.
+    expect(data.seasonPulse[0].teamColor).toBe('#E8002D');
+  });
 });
 
 describe('races paging', () => {
