@@ -25,16 +25,19 @@ export function SiteFooter() {
           </a>
           . Unofficial, and not associated with Formula 1.
         </p>
-        <div className="flex items-center gap-5">
+        {/* Standalone links rather than links in a sentence, so the WCAG
+            exception for inline text does not apply and they need a real box.
+            They were 20px tall — the height of their own text. */}
+        <div className="flex items-center gap-3">
           <Link
             href="/about"
-            className="rounded-sm font-medium text-muted transition-colors hover:text-foreground"
+            className="tap inline-flex items-center rounded-md px-2 py-1.5 font-medium text-muted transition-colors hover:text-foreground"
           >
             About
           </Link>
           <Link
             href="/races"
-            className="rounded-sm font-medium text-muted transition-colors hover:text-foreground"
+            className="tap inline-flex items-center rounded-md px-2 py-1.5 font-medium text-muted transition-colors hover:text-foreground"
           >
             Browse races
           </Link>

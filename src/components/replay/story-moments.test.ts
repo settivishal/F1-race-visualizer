@@ -208,26 +208,41 @@ describe('activeMomentAt', () => {
 describe('clusterMoments', () => {
   const at = (lap: number, id: string) => ({ id, lap }) as StoryMoment;
 
-  it('merges markers on the same lap into one target', () => {
-    // A safety car and the two stops it triggers, all on lap 30 of 60. Lap 31
-    // is 1.7% further along — wider than a marker, so it stays its own target.
-    const clusters = clusterMoments([at(30, 'a'), at(30, 'b'), at(31, 'c')], 1, 60);
-    expect(clusters.map((cluster) => cluster.moments.length)).toEqual([2, 1]);
+  // Every case states the rail width it is about. That is the whole point of
+  // the change: how close two markers may be is a question about pixels, and
+  // the same percentage means different things on a phone and a monitor.
+  //
+  // 740 is roughly what the rail gets on a full-width desktop page — the
+  // container is max-w-6xl less the timing tower and the padding — not the
+  // whole viewport.
+  const DESKTOP = 740;
+  const PHONE = 360;
+
+  it('merges everything on one lap, and the lap beside it when they touch', () => {
+    // A safety car and the two stops it triggers, all on lap 30 of 60. On a
+    // 740px rail consecutive laps are 12px apart — closer than the marker drawn
+    // on them — so lap 31 joins them.
+    const clusters = clusterMoments([at(30, 'a'), at(30, 'b'), at(31, 'c')], 1, 60, DESKTOP);
+    expect(clusters).toHaveLength(1);
+    expect(clusters[0].moments).toHaveLength(3);
   });
 
-  it('merges neighbouring laps on a long race, where they would overlap', () => {
-    // 78 laps: consecutive laps are 1.3% apart, inside a marker's width.
-    const clusters = clusterMoments([at(30, 'a'), at(31, 'b')], 1, 78);
-    expect(clusters).toHaveLength(1);
+  it('merges more on a phone than on a desktop, for the same race', () => {
+    // Three laps apart on a 60-lap race: 38px on the desktop rail, two
+    // comfortable targets — and 18px on a phone, which is one. Identical data,
+    // and the right answer differs, which a percentage could never express.
+    const pair = [at(30, 'a'), at(33, 'b')];
+    expect(clusterMoments(pair, 1, 60, DESKTOP)).toHaveLength(2);
+    expect(clusterMoments(pair, 1, 60, PHONE)).toHaveLength(1);
   });
 
   it('keeps markers far enough apart as separate targets', () => {
-    const clusters = clusterMoments([at(5, 'a'), at(40, 'b')], 1, 60);
+    const clusters = clusterMoments([at(5, 'a'), at(40, 'b')], 1, 60, DESKTOP);
     expect(clusters.map((cluster) => cluster.lap)).toEqual([5, 40]);
     expect(clusters[0].offset).toBeCloseTo((4 / 59) * 100);
   });
 
   it('does not divide by zero on a race with one lap', () => {
-    expect(clusterMoments([at(1, 'a')], 1, 1)[0].offset).toBe(0);
+    expect(clusterMoments([at(1, 'a')], 1, 1, DESKTOP)[0].offset).toBe(0);
   });
 });

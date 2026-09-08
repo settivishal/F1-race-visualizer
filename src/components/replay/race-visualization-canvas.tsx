@@ -237,7 +237,7 @@ export function RaceVisualizationCanvas({
     // light ground washes the team colours out — so this panel stays a dark
     // instrument on a light page, the way a video player does. It is the one
     // surface here that does not follow the theme.
-    <div className={cn("flex flex-col overflow-hidden rounded-xl border border-line-strong bg-track p-5 text-white shadow-lg", className)}>
+    <div className={cn("flex min-w-0 flex-col overflow-hidden rounded-xl border border-line-strong bg-track p-5 text-white shadow-lg", className)}>
       <div className="border-b border-white/10 px-4 pb-5">
         <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
           {/* min-w-0 so a long race name wraps instead of pushing the controls
