@@ -22,7 +22,12 @@ const NAV_LINKS = [
  */
 export function SiteHeader() {
   return (
-    <header className="sticky top-0 z-40 border-b border-line bg-background/85 backdrop-blur-md">
+    <header
+      className="sticky top-0 z-40 border-b border-line bg-background/85 backdrop-blur-md"
+      // Named so the view transition can pin it: a header that slides with the
+      // content removes the one fixed point the eye can hold on to.
+      style={{ viewTransitionName: 'site-header' }}
+    >
       <div className="mx-auto flex h-14 w-full max-w-6xl items-center gap-6 px-6">
         <Link
           href="/"
