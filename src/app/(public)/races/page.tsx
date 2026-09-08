@@ -1,6 +1,7 @@
 import { Suspense, ViewTransition } from 'react';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
+import { RaceStartTime } from '@/components/schedule/upcoming-race';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -130,6 +131,9 @@ async function RaceLibrary({ searchParams }: { searchParams: SearchParams }) {
                         : 'Season unknown'}
                     </span>
                     {node.type === 'SPRINT' ? <Badge>Sprint</Badge> : null}
+                    {/* No laps means no result: the calendar is stored whole, so
+                        a race the season has not reached yet is a real row. */}
+                    {node.laps === 0 ? <Badge tone="accent">Upcoming</Badge> : null}
                   </div>
                   {/* The same name on the race page's <h1>, so the title is
                       one object that moves rather than two that swap. */}
@@ -140,7 +144,13 @@ async function RaceLibrary({ searchParams }: { searchParams: SearchParams }) {
                   </ViewTransition>
                   <p className="mt-1.5 text-sm text-muted">
                     {node.meeting?.circuitName ?? node.meeting?.country ?? '—'} ·{' '}
-                    <span className="tabular">{node.laps}</span> laps
+                    {node.laps === 0 ? (
+                      <RaceStartTime date={node.date} />
+                    ) : (
+                      <>
+                        <span className="tabular">{node.laps}</span> laps
+                      </>
+                    )}
                   </p>
                 </Card>
               </Link>
