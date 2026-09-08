@@ -1,269 +1,149 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Badge } from "@/components/ui/badge";
-import { Card } from "@/components/ui/card";
+import { getReplayEventTone, type DriverReplayState, type ReplayRaceControl } from "./replay-state";
+import { RaceStoryTimeline } from "./race-story-timeline";
+import { activeMomentAt, buildStoryMoments, type StoryKind } from "./story-moments";
 import type { ReplayView } from "./types";
-import { getRaceControlTone, ReplayRaceControl } from "./replay-state";
 
-type StoryMoment = {
-  id: string;
-  lap: number;
-  title: string;
-  description: string;
-  tone: "event" | "overtake" | "strategy";
-};
+/**
+ * The race story: a lap axis and one line saying where the replay is.
+ *
+ * This was a full-width card below the whole player — a header, a static
+ * paragraph of product copy, a nested panel of counters, and a scrolling box of
+ * moment cards. It said what happened but not where, nothing in it was
+ * clickable, and it sat far enough below the canvas that you could not read it
+ * and watch at the same time.
+ *
+ * What replaced it is the timeline plus this strip, both sitting directly under
+ * the canvas. Everything the old panel showed is still here; it is one row
+ * instead of a page.
+ */
 
-const STORY_FILTERS = [
-  { id: "all", label: "All moments" },
-  { id: "event", label: "Race control" },
-  { id: "strategy", label: "Strategy" },
+const FILTERS: { id: StoryKind | "all"; label: string }[] = [
+  { id: "all", label: "All" },
+  { id: "control", label: "Race control" },
+  { id: "strategy", label: "Pit stops" },
   { id: "overtake", label: "Position swings" },
-] as const;
-
-type StoryFilterId = (typeof STORY_FILTERS)[number]["id"];
-
-function buildStoryMoments(visualization: ReplayView) {
-  const eventMoments: StoryMoment[] = visualization.events.map((event, index) => ({
-    // v1 keyed on an event id the schema does not expose. Lap, type and
-    // ordinal identify a row just as well and need no new field.
-    id: `event-${event.lap}-${event.type}-${index}`,
-    lap: event.lap,
-    title: `${event.type} on lap ${event.lap}`,
-    description: event.driver
-      ? `${event.driver.code} #${event.driver.number}: ${event.details}`
-      : event.details,
-    tone: event.type.toLowerCase().includes("pit") ? "strategy" : "event",
-  }));
-
-  const overtakeMoments: StoryMoment[] = [];
-
-  for (const entry of visualization.drivers) {
-    for (let index = 1; index < entry.positions.length; index += 1) {
-      const previous = entry.positions[index - 1];
-      const current = entry.positions[index];
-      if (!previous || !current) {
-        continue;
-      }
-
-      const gainedPlaces = previous.position - current.position;
-      if (gainedPlaces >= 2) {
-        overtakeMoments.push({
-          id: `gain-${entry.driver.id}-${current.lap}`,
-          lap: current.lap,
-          title: `${entry.driver.code} charges forward`,
-          description: `${entry.driver.name} gains ${gainedPlaces} places by lap ${current.lap}, moving from P${previous.position} to P${current.position}.`,
-          tone: "overtake",
-        });
-      }
-    }
-  }
-
-  return [...eventMoments, ...overtakeMoments]
-    .sort((left, right) => left.lap - right.lap || left.title.localeCompare(right.title))
-    .filter((moment, index, moments) => {
-      if (index === 0) {
-        return true;
-      }
-
-      const previous = moments[index - 1];
-      return !previous || previous.title !== moment.title || previous.lap !== moment.lap;
-    });
-}
-
-function getStoryToneClasses(tone: StoryMoment["tone"], isActive: boolean) {
-  if (tone === "strategy") {
-    return isActive
-      ? "tone tone-pit"
-      : "border-line bg-panel text-foreground";
-  }
-
-  if (tone === "overtake") {
-    return isActive
-      ? "tone tone-green"
-      : "border-line bg-panel text-foreground";
-  }
-
-  return isActive
-    ? "border-accent/40 bg-accent-soft text-foreground"
-    : "border-line bg-panel text-foreground";
-}
+];
 
 export function RaceStoryPanel({
   visualization,
   currentLap,
   raceControl,
-  trafficSummary,
+  driverStates,
+  onJumpToLap,
 }: {
   visualization: ReplayView;
   currentLap: number;
   raceControl: ReplayRaceControl;
-  trafficSummary: {
-    lappedCount: number;
-    backmarkerCount: number;
-    retiredCount: number;
-  };
+  /** Named drivers, not counts: the panel used to render bare integers. */
+  driverStates: Map<string, DriverReplayState>;
+  onJumpToLap: (lap: number) => void;
 }) {
-  const storyMoments = useMemo(() => buildStoryMoments(visualization), [visualization]);
-  const [selectedFilter, setSelectedFilter] = useState<StoryFilterId>("all");
-  const activeMoment =
-    [...storyMoments].reverse().find((moment) => moment.lap <= currentLap) ?? storyMoments[0] ?? null;
-  const filteredMoments = useMemo(() => {
-    if (selectedFilter === "all") {
-      return storyMoments;
-    }
+  const [filter, setFilter] = useState<StoryKind | "all">("all");
 
-    return storyMoments.filter((moment) => moment.tone === selectedFilter);
-  }, [selectedFilter, storyMoments]);
-  const visibleActiveMoment =
-    filteredMoments.find((moment) => moment.id === activeMoment?.id) ?? filteredMoments[0] ?? null;
+  const moments = useMemo(() => buildStoryMoments(visualization), [visualization]);
+  const shown = useMemo(
+    () => (filter === "all" ? moments : moments.filter((moment) => moment.kind === filter)),
+    [filter, moments],
+  );
+  const active = useMemo(() => activeMomentAt(shown, currentLap), [shown, currentLap]);
+
+  const traffic = useMemo(
+    () => summarizeTraffic(visualization, driverStates),
+    [visualization, driverStates],
+  );
 
   return (
-    <Card>
-      <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-        <div className="max-w-3xl">
-          <p className="text-eyebrow font-bold uppercase text-accent">
-            Race Story
-          </p>
-          <h3 className="mt-2.5 font-heading text-2xl font-bold tracking-tight text-foreground">
-            Replay context that moves with the race.
-          </h3>
-          <p className="mt-3 text-sm leading-7 text-muted">
-            Commentary highlights turn raw lap progression into a narrative, helping users spot
-            strategy shifts, race-control moments, and the biggest momentum swings.
-          </p>
-        </div>
-        <Badge>
-          {visibleActiveMoment ? `Active story • Lap ${visibleActiveMoment.lap}` : `Lap ${currentLap}`}
-        </Badge>
-      </div>
+    <div className="space-y-3">
+      <RaceStoryTimeline
+        moments={shown}
+        laps={visualization.laps}
+        currentLap={currentLap}
+        activeMomentId={active?.id ?? null}
+        onJumpToLap={onJumpToLap}
+      />
 
-      <div className="mt-6 grid gap-4 lg:grid-cols-[0.85fr_1.15fr]">
-        <div className="flex flex-col gap-4 rounded-xl border border-line bg-panel p-5">
-          <div>
-            <p className="text-eyebrow font-bold uppercase text-muted">
-              Race control
-            </p>
-            <div className="mt-3 flex items-center gap-2">
-              <div
-                className={`rounded-full border px-3 py-1 text-eyebrow font-semibold uppercase ${getRaceControlTone(raceControl.status)}`}
-              >
-                {raceControl.label}
-              </div>
-            </div>
-            <p className="mt-3 text-sm leading-6 text-muted">
-              {raceControl.details ?? "No caution or control change is recorded for this lap range."}
-            </p>
-          </div>
+      <div className="flex flex-wrap items-start gap-x-5 gap-y-3 rounded-xl border border-line bg-panel px-5 py-4">
+        <span
+          className={`shrink-0 rounded-full px-3 py-1 text-eyebrow font-bold uppercase ${getReplayEventTone(
+            raceControl.status === "green" ? "green" : raceControl.status,
+          )}`}
+        >
+          {raceControl.label}
+        </span>
 
-          <hr className="border-line" />
+        {/* The one thing on the page that changes as the replay runs and is not
+            visible as motion, so it is announced. */}
+        <p className="min-w-48 flex-1 text-sm leading-6" aria-live="polite">
+          {active ? (
+            <>
+              <span className="tabular font-semibold text-muted">Lap {active.lap}</span>{" "}
+              <span className="font-semibold">{active.title}</span>
+              {active.description ? (
+                <span className="text-muted"> — {active.description}</span>
+              ) : null}
+            </>
+          ) : (
+            <span className="text-muted">
+              {moments.length === 0
+                ? "No race-control messages were published for this race."
+                : "Nothing has happened yet at this lap."}
+            </span>
+          )}
+        </p>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <p className="text-eyebrow font-bold uppercase text-muted">Lapped</p>
-              <p className="tabular mt-1 font-heading text-xl font-bold text-foreground">{trafficSummary.lappedCount}</p>
-            </div>
-            <div>
-              <p className="text-eyebrow font-bold uppercase text-muted">Tail Traffic</p>
-              <p className="tabular mt-1 font-heading text-xl font-bold text-foreground">{trafficSummary.backmarkerCount}</p>
-            </div>
-          </div>
+        {traffic ? <p className="text-sm text-muted">{traffic}</p> : null}
 
-          {trafficSummary.retiredCount > 0 ? (
-            <div className="tone tone-double-yellow rounded-md border px-3 py-2 text-xs">
-              {trafficSummary.retiredCount} driver{trafficSummary.retiredCount === 1 ? "" : "s"} retired
-            </div>
-          ) : null}
-
-          <hr className="border-line" />
-
-          <div>
-            <p className="text-eyebrow font-bold uppercase text-muted">
-              Current focus
-            </p>
-            {visibleActiveMoment ? (
-              <>
-                <p className="mt-2 text-lg font-bold leading-6 text-foreground">
-                  {visibleActiveMoment.title}
-                </p>
-                <p className="mt-1 text-sm leading-6 text-muted">
-                  {visibleActiveMoment.description}
-                </p>
-              </>
-            ) : (
-              <p className="mt-2 text-sm leading-6 text-muted">
-                No major story beats have been derived from this replay yet.
-              </p>
-            )}
-          </div>
-        </div>
-
-        <div className="space-y-3">
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-eyebrow font-bold uppercase text-muted">
-              Story chapters
-            </p>
-            <p className="text-eyebrow font-bold uppercase text-muted">
-              {filteredMoments.length} highlight{filteredMoments.length === 1 ? "" : "s"}
-            </p>
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            {STORY_FILTERS.map((filter) => {
-              const isActive = filter.id === selectedFilter;
-              return (
-                <button
-                  key={filter.id}
-                  type="button"
-                  onClick={() => setSelectedFilter(filter.id)}
-                  className={`rounded-full border px-4 py-2 text-eyebrow font-semibold uppercase transition ${
-                    isActive
-                      ? "border-transparent bg-accent text-on-accent"
-                      : "border-line bg-panel text-foreground hover:bg-panel-strong"
-                  }`}
-                >
-                  {filter.label}
-                </button>
-              );
-            })}
-          </div>
-
-          <div className="grid max-h-[30rem] gap-3 overflow-y-auto pr-1 md:grid-cols-2 xl:grid-cols-1">
-            {filteredMoments.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-line bg-panel/50 px-4 py-5 text-sm text-muted md:col-span-2 xl:col-span-1">
-                Story moments will appear here once replay events or notable position swings are available.
-              </div>
-            ) : (
-              filteredMoments.map((moment) => {
-                const isActive = moment.id === visibleActiveMoment?.id;
-                return (
-                  <div
-                    key={moment.id}
-                    className={`rounded-2xl border px-4 py-4 transition ${getStoryToneClasses(moment.tone, isActive)}`}
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <p className="text-eyebrow font-bold uppercase text-foreground">
-                        Lap {moment.lap}
-                      </p>
-                      {isActive ? (
-                        <span className="tabular text-eyebrow font-bold uppercase text-accent">
-                          Live
-                        </span>
-                      ) : null}
-                    </div>
-                    <p className="mt-3 text-sm font-bold leading-6 text-foreground">
-                      {moment.title}
-                    </p>
-                    <p className="mt-2 text-sm leading-6 text-muted">
-                      {moment.description}
-                    </p>
-                  </div>
-                );
-              })
-            )}
-          </div>
+        <div className="flex flex-wrap gap-1.5">
+          {FILTERS.map((option) => (
+            <button
+              key={option.id}
+              type="button"
+              onClick={() => setFilter(option.id)}
+              aria-pressed={filter === option.id}
+              className={`rounded-full px-3 py-1 text-eyebrow font-bold uppercase transition-colors ${
+                filter === option.id
+                  ? "bg-accent text-on-accent"
+                  : "border border-line text-muted hover:border-line-strong hover:text-foreground"
+              }`}
+            >
+              {option.label}
+            </button>
+          ))}
         </div>
       </div>
-    </Card>
+    </div>
   );
+}
+
+/**
+ * "Lapped: STR, COL · Retired: HUL".
+ *
+ * The panel used to be handed three integers and print them as "Lapped 2". The
+ * player already has the per-driver state; naming them costs one lookup and
+ * turns a statistic into something you can go and look at on the canvas.
+ */
+function summarizeTraffic(
+  visualization: ReplayView,
+  driverStates: Map<string, DriverReplayState>,
+): string | null {
+  const codeOf = new Map(visualization.drivers.map((entry) => [entry.driver.id, entry.driver.code]));
+  const lapped: string[] = [];
+  const retired: string[] = [];
+
+  for (const state of driverStates.values()) {
+    const code = codeOf.get(state.driverId);
+    if (!code) continue;
+    // Retired first: a retired car is also reported as lapped, and naming it
+    // twice would overstate how much traffic is still running.
+    if (state.isRetired) retired.push(code);
+    else if (state.isLapped) lapped.push(code);
+  }
+
+  const parts: string[] = [];
+  if (lapped.length > 0) parts.push(`Lapped: ${lapped.join(", ")}`);
+  if (retired.length > 0) parts.push(`Out: ${retired.join(", ")}`);
+  return parts.length > 0 ? parts.join(" · ") : null;
 }

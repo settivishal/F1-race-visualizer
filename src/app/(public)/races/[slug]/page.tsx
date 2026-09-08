@@ -269,9 +269,14 @@ function AnalysisSkeleton() {
  */
 function ReplaySkeleton() {
   return (
-    <div className="space-y-4">
-      <Skeleton className="h-[26rem] w-full rounded-xl" />
-      <Skeleton className="h-24 w-full rounded-xl" />
+    // The tower's rail and the canvas column, matching the player's own grid,
+    // so the page does not jump sideways when the replay arrives.
+    <div className="grid gap-5 lg:grid-cols-[22rem_minmax(0,1fr)]">
+      <Skeleton className="h-[26rem] w-full rounded-xl lg:h-[38rem]" />
+      <div className="space-y-3">
+        <Skeleton className="h-[26rem] w-full rounded-xl lg:h-[30rem]" />
+        <Skeleton className="h-24 w-full rounded-xl" />
+      </div>
       <p className="sr-only" role="status">
         Loading replay
       </p>

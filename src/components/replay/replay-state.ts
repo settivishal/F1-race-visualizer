@@ -14,6 +14,8 @@ export type ReplayEventKind =
   | "penalty"
   | "green"
   | "chequered"
+  | "overtake"
+  | "fastest-lap"
   | "other";
 
 export type RaceControlStatus =
@@ -102,6 +104,18 @@ export function classifyReplayEvent(
     return "penalty";
   }
 
+  // Both are archive event types — Ergast files an OVERTAKE per position change
+  // and a FASTEST_LAP per race. Neither carries a keyword in its details
+  // ("P17 to P16"), so without matching the type they fell through to "other"
+  // and drew as grey markers on the canvas.
+  if (haystack.includes("fastest")) {
+    return "fastest-lap";
+  }
+
+  if (haystack.includes("overtake")) {
+    return "overtake";
+  }
+
   return "other";
 }
 
@@ -176,6 +190,10 @@ export function getReplayEventMarkerColor(kind: ReplayEventKind) {
       return "var(--flag-green)";
     case "chequered":
       return "var(--flag-chequered)";
+    case "fastest-lap":
+      return "var(--timing-best)";
+    case "overtake":
+      return "var(--accent)";
     default:
       return "var(--muted)";
   }
@@ -226,23 +244,6 @@ export function buildRaceControlByLap(
   }
 
   return result;
-}
-
-export function getRaceControlTone(status: RaceControlStatus) {
-  switch (status) {
-    case "yellow":
-    case "double-yellow":
-      return "border-yellow-200 bg-yellow-50 text-yellow-900";
-    case "red-flag":
-      return "border-red-200 bg-red-50 text-red-900";
-    case "safety-car":
-    case "virtual-safety-car":
-      return "border-orange-200 bg-orange-50 text-orange-900";
-    case "chequered":
-      return "border-zinc-300 bg-zinc-100 text-zinc-900";
-    default:
-      return "border-emerald-200 bg-emerald-50 text-emerald-900";
-  }
 }
 
 export function buildDriverReplayState(

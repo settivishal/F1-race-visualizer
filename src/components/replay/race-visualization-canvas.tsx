@@ -374,8 +374,10 @@ export function RaceVisualizationCanvas({
           The replay controller drives car positions, lap progress, and event markers from the same
           synchronized race state.
         </p>
+        {/* The race-control label lives in the story strip directly below;
+            printing it here as well said the same thing twice on one screen. */}
         <p className="text-accent">
-          {raceControl.label} • lap {currentLap}
+          Lap {currentLap}
           {nextLap !== currentLap ? ` → ${nextLap}` : ""}
         </p>
       </div>
