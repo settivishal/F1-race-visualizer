@@ -394,3 +394,24 @@ export function describeMissingLaps(laps: number[], totalLaps: number): string |
 
   return sentences.length > 0 ? sentences.join(" ") : null;
 }
+
+/**
+ * The same entries with the focused one last.
+ *
+ * SVG has no z-index — paint order is the only thing that puts one line over
+ * another — so a focused driver drawn in the middle of the list sits under
+ * every faint line after it. Returns the list unchanged when nothing is
+ * focused, or when the focused driver has no entry in it, which happens on a
+ * lap that has no row for them.
+ */
+export function withFocusLast<T extends { entry: { driver: { id: string } } }>(
+  frames: T[],
+  focusedDriverId: string | null,
+): T[] {
+  if (focusedDriverId == null) return frames;
+
+  const focused = frames.filter((frame) => frame.entry.driver.id === focusedDriverId);
+  if (focused.length === 0) return frames;
+
+  return [...frames.filter((frame) => frame.entry.driver.id !== focusedDriverId), ...focused];
+}

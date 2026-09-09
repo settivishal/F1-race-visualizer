@@ -40,3 +40,62 @@ test('a race replays: the lap advances and the order changes', async ({ page }) 
 
   await expect.poll(order, { timeout: 45_000 }).not.toEqual(startingOrder);
 });
+
+test('focusing a driver names them on the chart, and pressing again clears it', async ({
+  page,
+}) => {
+  await page.goto(`/races/${RACE}`);
+
+  const chart = page.getByRole('img', { name: /race position chart/i });
+  await expect(chart).toBeVisible({ timeout: 30_000 });
+
+  const code = (await page.getByTestId('tower-driver').first().innerText()).trim();
+  const named = new RegExp(`\\b${code}\\b`);
+  // The two controls the plan gave this feature, asserted as one piece of
+  // state: the tower row is pressed from the tower, and the chip above the
+  // chart must agree without being touched.
+  const row = page.locator('#replay-timing-tower').getByRole('button', { name: named }).first();
+  const chip = page.getByTestId('driver-chips').getByRole('button', { name: named }).first();
+
+  await row.click();
+  await expect(row).toHaveAttribute('aria-pressed', 'true');
+  await expect(chart).toHaveAttribute('aria-label', /focused on /i);
+
+  await row.click();
+  await expect(row).toHaveAttribute('aria-pressed', 'false');
+  await expect(chart).not.toHaveAttribute('aria-label', /focused on /i);
+
+  // And the same state reached from the other control.
+  await chip.click();
+  await expect(row).toHaveAttribute('aria-pressed', 'true');
+});
+
+test('hovering a driver previews the emphasis without committing to it', async ({ page }) => {
+  await page.goto(`/races/${RACE}`);
+  await expect(page.getByRole('img', { name: /race position chart/i })).toBeVisible({
+    timeout: 30_000,
+  });
+
+  // The cars are `<g opacity>` groups: exactly one at full strength is what
+  // "one driver stands out" means, and it is the assertion the pixels cannot
+  // give us.
+  const fullStrengthCars = () =>
+    page.evaluate(
+      () =>
+        [...document.querySelectorAll('svg g > g[opacity]')].filter(
+          (group) => group.getAttribute('opacity') === '1',
+        ).length,
+    );
+
+  const row = page.locator('#replay-timing-tower').getByRole('button').first();
+
+  await row.hover();
+  await expect.poll(fullStrengthCars).toBe(1);
+  // A hover is a preview, not a choice.
+  await expect(row).toHaveAttribute('aria-pressed', 'false');
+
+  // And leaving puts the whole field back at full strength, rather than
+  // leaving the last hovered driver lit.
+  await page.mouse.move(0, 0);
+  await expect.poll(fullStrengthCars).toBeGreaterThan(1);
+});
