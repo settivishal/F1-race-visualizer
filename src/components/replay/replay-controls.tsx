@@ -131,7 +131,12 @@ export function ReplayControls({
             type="button"
             onClick={onPlayPause}
             aria-label={isPlaying ? "Pause replay" : "Play replay"}
-            className="tap-square h-9 w-9 flex items-center justify-center rounded-full bg-accent-fill text-on-accent transition hover:bg-accent-strong active:brightness-90"
+            // The same button as its three neighbours. It used to be a red
+            // disc, which made one control in a row of four read as a
+            // different kind of thing; the accent is carried by the speed
+            // selection and the progress bar, which is enough red for one
+            // panel.
+            className="tap-square h-9 w-9 flex items-center justify-center rounded-full border border-white/15 bg-white/10 text-white transition hover:bg-white/20 active:brightness-90"
           >
             {isPlaying ? <PauseIcon /> : <PlayIcon />}
           </button>

@@ -694,6 +694,11 @@ function AnimatedCar({
       ) : null}
 
       {isCarActive ? (
+        // The badge is the loudest thing on the chart, so dimming it by the
+        // same factor as the lines is what actually makes a focused driver
+        // stand out. `muted` stays what it always was — a backmarker — and the
+        // two compound for a backmarker who is not the focused driver.
+        <g opacity={dim}>
         <RaceCar
           color={team.color}
           driverCode={driver.code}
@@ -707,9 +712,10 @@ function AnimatedCar({
                 ? "down"
                 : false
           }
-          muted={Boolean(state?.isBackmarker) || isDimmed}
+          muted={Boolean(state?.isBackmarker)}
           caution={raceControl.status !== "green" || Boolean(state?.isLapped)}
         />
+        </g>
       ) : null}
     </g>
   );
