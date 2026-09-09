@@ -10,7 +10,9 @@ import { PageContainer } from '@/components/ui/page-container';
  * Every read on these pages goes through a cached GraphQL query against Neon,
  * whose compute autosuspends — so the realistic failure is a cold start timing
  * out or the database being briefly unreachable, and the realistic fix is to
- * try again. Hence `reset()` as the primary action rather than a link home.
+ * try again. Hence `retry()` as the primary action rather than a link home —
+ * and `retry()` rather than `reset()`, which re-renders the children without
+ * re-fetching them and so cannot fix the failure this boundary catches.
  *
  * `digest` is the only part of the error React exposes to the client; the
  * message and stack stay on the server. Showing it gives a person something to
@@ -18,10 +20,10 @@ import { PageContainer } from '@/components/ui/page-container';
  */
 export default function PublicError({
   error,
-  reset,
+  retry,
 }: {
   error: Error & { digest?: string };
-  reset: () => void;
+  retry: () => void;
 }) {
   return (
     <PageContainer className="py-20">
@@ -33,7 +35,7 @@ export default function PublicError({
             : 'Something failed while fetching the race data.'
         }
         action={
-          <Button variant="secondary" onClick={reset}>
+          <Button variant="secondary" onClick={retry}>
             Try again
           </Button>
         }

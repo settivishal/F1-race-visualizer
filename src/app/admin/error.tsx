@@ -11,10 +11,10 @@ import { ErrorState } from '@/components/ui/error-state';
  */
 export default function AdminError({
   error,
-  reset,
+  retry,
 }: {
   error: Error & { digest?: string };
-  reset: () => void;
+  retry: () => void;
 }) {
   return (
     <div className="mx-auto w-full max-w-6xl px-6 py-16">
@@ -26,7 +26,7 @@ export default function AdminError({
             : 'The request did not complete.'
         }
         action={
-          <Button variant="secondary" onClick={reset}>
+          <Button variant="secondary" onClick={retry}>
             Try again
           </Button>
         }

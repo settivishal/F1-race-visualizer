@@ -25,6 +25,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${siteUrl}/drivers`, changeFrequency: 'monthly', priority: 0.6 },
     { url: `${siteUrl}/teams`, changeFrequency: 'monthly', priority: 0.6 },
     { url: `${siteUrl}/circuits`, changeFrequency: 'monthly', priority: 0.5 },
+    { url: `${siteUrl}/compare`, changeFrequency: 'monthly', priority: 0.5 },
     { url: `${siteUrl}/about`, changeFrequency: 'yearly', priority: 0.3 },
     ...archive.drivers.map((driver) => ({
       url: `${siteUrl}/drivers/${driver.code.toLowerCase()}`,

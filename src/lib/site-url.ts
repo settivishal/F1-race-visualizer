@@ -10,6 +10,13 @@
  * want, since a preview should not invite indexing of itself. `SITE_URL`
  * overrides it for the custom domain when that lands.
  */
+import { requireEnv } from '@/env';
+
+// Asserted here rather than in the root layout because this module is what the
+// sitemap and robots.txt import, and those routes render without the layout —
+// a missing SITE_URL has to fail for them too, not just for a page.
+requireEnv();
+
 export const siteUrl =
   process.env.SITE_URL ??
   (process.env.VERCEL_PROJECT_PRODUCTION_URL

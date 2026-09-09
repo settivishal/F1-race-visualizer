@@ -25,14 +25,34 @@ export async function generateMetadata({ params }: { params: Promise<{ name: str
   const { name } = await params;
   const { team } = await getTeamProfile(decodeURIComponent(name));
 
-  if (!team) return { title: 'Team not found — F1 Race Visualizer' };
+  if (!team) return { title: 'Team not found' };
   return {
-    title: `${team.team.name} — F1 Race Visualizer`,
+    title: `${team.team.name}`,
     description: `Season-by-season record for ${team.team.name}.`,
   };
 }
 
-export default function TeamPage({ params }: { params: Promise<{ name: string }> }) {
+/**
+ * The existence check runs here, above the Suspense boundary, and not in the
+ * detail component below it.
+ *
+ * It used to run below, and that broke every one of these pages in production:
+ * with Cache Components the shell is prerendered on its own, `notFound()` fired
+ * while the shell was being generated, and so the prerendered shell *was* the
+ * 404 page. Production then served that shell for a row that exists perfectly
+ * well. Locally in `next dev` there is no separate shell, which is why it
+ * looked fine every time.
+ *
+ * Awaiting the profile here costs a cache read — `generateMetadata` above
+ * already awaits the same one — and makes the 404 a real 404 instead of a 200
+ * that renders like one.
+ */
+export default async function TeamPage({ params }: { params: Promise<{ name: string }> }) {
+  const { name } = await params;
+  const { team: exists } = await getTeamProfile(decodeURIComponent(name));
+
+  if (!exists) notFound();
+
   return (
     <PageContainer>
       <Link

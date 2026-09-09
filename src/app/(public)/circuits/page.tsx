@@ -8,7 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { getActiveSeason, getArchiveIndex } from '@/lib/queries';
 
 export const metadata = {
-  title: 'Circuits — F1 Race Visualizer',
+  title: 'Circuits',
   description: 'Every circuit that has held a race in the archive.',
 };
 
