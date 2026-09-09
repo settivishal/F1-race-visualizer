@@ -54,7 +54,7 @@ function SpeedButton({
     <button
       type="button"
       onClick={() => onSelect(option)}
-      className={`tap inline-flex items-center justify-center rounded-full px-2.5 text-eyebrow font-bold uppercase transition ${className} ${
+      className={`tap inline-flex h-9 items-center justify-center rounded-md px-2.5 text-eyebrow font-bold uppercase transition ${className} ${
         isActive
           ? "bg-accent-fill text-on-accent hover:bg-accent-strong"
           : "border border-white/15 bg-white/10 text-white/70 hover:bg-white/20 hover:text-white"
@@ -123,7 +123,7 @@ export function ReplayControls({
             onClick={onPrevious}
             disabled={!canStepBackward}
             aria-label="Previous lap"
-            className="tap-square h-9 w-9 flex items-center justify-center rounded-full border border-white/15 bg-white/10 text-white transition hover:bg-white/20 disabled:opacity-30"
+            className="tap-square h-9 w-9 flex items-center justify-center rounded-md border border-white/15 bg-white/10 text-white transition hover:bg-white/20 disabled:opacity-30"
           >
             <PrevIcon />
           </button>
@@ -136,7 +136,7 @@ export function ReplayControls({
             // different kind of thing; the accent is carried by the speed
             // selection and the progress bar, which is enough red for one
             // panel.
-            className="tap-square h-9 w-9 flex items-center justify-center rounded-full border border-white/15 bg-white/10 text-white transition hover:bg-white/20 active:brightness-90"
+            className="tap-square h-9 w-9 flex items-center justify-center rounded-md border border-white/15 bg-white/10 text-white transition hover:bg-white/20 active:brightness-90"
           >
             {isPlaying ? <PauseIcon /> : <PlayIcon />}
           </button>
@@ -145,7 +145,7 @@ export function ReplayControls({
             onClick={onNext}
             disabled={!canStepForward}
             aria-label="Next lap"
-            className="tap-square h-9 w-9 flex items-center justify-center rounded-full border border-white/15 bg-white/10 text-white transition hover:bg-white/20 disabled:opacity-30"
+            className="tap-square h-9 w-9 flex items-center justify-center rounded-md border border-white/15 bg-white/10 text-white transition hover:bg-white/20 disabled:opacity-30"
           >
             <NextIcon />
           </button>
@@ -153,7 +153,7 @@ export function ReplayControls({
             type="button"
             onClick={onRestart}
             aria-label="Restart replay"
-            className="tap-square h-9 w-9 flex items-center justify-center rounded-full border border-white/15 bg-white/10 text-white transition hover:bg-white/20"
+            className="tap-square h-9 w-9 flex items-center justify-center rounded-md border border-white/15 bg-white/10 text-white transition hover:bg-white/20"
           >
             <RestartIcon />
           </button>
