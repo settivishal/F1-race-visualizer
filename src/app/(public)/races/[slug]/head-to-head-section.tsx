@@ -1,4 +1,4 @@
-import { AutoSubmit } from '@/components/ui/auto-submit';
+import Form from 'next/form';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { HeadToHead } from '@/components/analysis/head-to-head';
@@ -51,17 +51,21 @@ export async function HeadToHeadSection({
 
   return (
     <div className="space-y-5">
-      <form method="get" className="flex flex-wrap items-end gap-3">
+      {/* next/form rather than a bare <form>: a plain GET submit is a document
+          navigation, which lands the reader at the top of a long race page
+          having lost sight of the thing they just changed. This navigates on
+          the client and `scroll={false}` leaves the page where it was. Still a
+          GET to the same URL, so it degrades to the native form without JS. */}
+      <Form action={`/races/${slug}`} scroll={false} className="flex flex-wrap items-end gap-3">
         {/* The tab lives in the query string too, so choosing a driver must not
             navigate away from the Analysis view. */}
         <input type="hidden" name="view" value="analysis" />
-        <AutoSubmit />
         <Picker label="Driver" name="a" value={codeA} drivers={classified} />
         <Picker label="Against" name="b" value={codeB} drivers={classified} />
         <Button type="submit" variant="secondary">
           Compare
         </Button>
-      </form>
+      </Form>
 
       {comparison ? (
         <HeadToHead data={comparison} />
