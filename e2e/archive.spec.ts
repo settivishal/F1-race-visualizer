@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type APIRequestContext, type APIResponse } from '@playwright/test';
 
 /**
  * The archive pages, and the one thing that separates an archive race from a
@@ -39,8 +39,59 @@ test('a circuit page shows only the facts it has', async ({ page }) => {
   await expect(page.getByText('5.278 km')).toBeVisible();
 });
 
-test('an archive race says what its era did not publish', async ({ page }) => {
-  await page.goto('/races/2019-melbourne');
+/**
+ * The slug of the oldest race the database holds at `LAPS` tier, or null when
+ * there is none.
+ *
+ * The test below is about an era, not a race, and which eras are imported is a
+ * product decision that moves: 2018-2022 are on hold, so today production holds
+ * only `FULL` races and the assertion has nothing to stand on. Hardcoding
+ * `2019-melbourne` made this red for a missing import rather than a broken
+ * behaviour. Asking the API instead means the test skips while the archive is
+ * empty and arms itself the moment a backfill lands.
+ */
+type RacesPage = {
+  data?: {
+    races?: {
+      edges: { node: { slug: string; dataTier: string } }[];
+      pageInfo: { hasNextPage: boolean; endCursor: string | null };
+    };
+  };
+};
+
+async function findArchiveRace(request: APIRequestContext): Promise<string | null> {
+  let after: string | null = null;
+
+  for (;;) {
+    const response: APIResponse = await request.post('/api/graphql', {
+      data: {
+        query: `query($after: String) {
+          races(first: 100, after: $after) {
+            edges { node { slug dataTier } }
+            pageInfo { hasNextPage endCursor }
+          }
+        }`,
+        variables: { after },
+      },
+    });
+
+    const { data }: RacesPage = await response.json();
+    const connection = data?.races;
+    if (!connection) return null;
+
+    const archive = connection.edges.find((edge) => edge.node.dataTier === 'LAPS');
+    if (archive) return archive.node.slug;
+
+    if (!connection.pageInfo.hasNextPage) return null;
+    after = connection.pageInfo.endCursor;
+  }
+}
+
+test('an archive race says what its era did not publish', async ({ page, request }) => {
+  const slug = await findArchiveRace(request);
+  test.skip(slug === null, 'No LAPS-tier race is imported — the pre-2023 archive is on hold.');
+
+  await page.goto(`/races/${slug}`);
 
   await expect(page.getByRole('img', { name: /race position chart/i })).toBeVisible({
     timeout: 30_000,
