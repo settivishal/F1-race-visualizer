@@ -11,6 +11,7 @@ import {
   DriverReplayState,
   getReplayEventMarkerColor,
   ReplayRaceControl,
+  withFocusLast,
 } from "./replay-state";
 import { motion, MotionValue, useTransform } from "framer-motion";
 
@@ -198,6 +199,10 @@ export function RaceVisualizationCanvas({
   driverStates,
   controls,
   className,
+  focusedDriverId,
+  highlightedDriverId,
+  onToggleDriver,
+  onHoverDriver,
 }: {
   visualization: ReplayView;
   currentLap: number;
@@ -207,6 +212,12 @@ export function RaceVisualizationCanvas({
   driverStates: Map<string, DriverReplayState>;
   controls?: ReactNode;
   className?: string;
+  /** The driver held by a click — what `aria-pressed` and the label report. */
+  focusedDriverId: string | null;
+  /** The driver drawn at full strength: the hovered one, else the clicked one. */
+  highlightedDriverId: string | null;
+  onToggleDriver: (driverId: string) => void;
+  onHoverDriver: (driverId: string | null) => void;
 }) {
   const { race, summary, laps, drivers } = visualization;
 
@@ -294,6 +305,7 @@ export function RaceVisualizationCanvas({
   );
   const retiredFrames = currentDriverFrames.filter((frame) => frame.isRetiredAtCurrentLap);
   const activeFrames = currentDriverFrames.filter((frame) => !frame.isRetiredAtCurrentLap);
+  const focusedDriver = drivers.find((entry) => entry.driver.id === focusedDriverId)?.driver ?? null;
 
   return (
     // `bg-track` and the white text on it are deliberate in both themes. The
@@ -333,6 +345,45 @@ export function RaceVisualizationCanvas({
             {chartEvents.length} Flags
           </span>
         </div>
+
+        {/* The second way in to the same state — the timing tower's rows are
+            the first. Same chip shape as the row above so the dark panel keeps
+            one vocabulary, rather than importing the analysis tab's chips,
+            which live on a light surface and hold a different kind of state. */}
+        <ul data-testid="driver-chips" className="mt-2.5 flex flex-wrap gap-1.5">
+          {drivers.map((entry) => {
+            const isFocused = entry.driver.id === focusedDriverId;
+            const isHighlighted = entry.driver.id === highlightedDriverId;
+
+            return (
+              <li key={entry.driver.id}>
+                <button
+                  type="button"
+                  aria-pressed={isFocused}
+                  onClick={() => onToggleDriver(entry.driver.id)}
+                  onMouseEnter={() => onHoverDriver(entry.driver.id)}
+                  onMouseLeave={() => onHoverDriver(null)}
+                  onFocus={() => onHoverDriver(entry.driver.id)}
+                  onBlur={() => onHoverDriver(null)}
+                  className={cn(
+                    "tabular inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-[11px] font-semibold transition-[color,background-color,border-color,opacity] duration-200",
+                    isHighlighted
+                      ? "border-white/45 bg-white/20 text-white"
+                      : "border-white/10 bg-white/5 text-white/70 hover:text-white",
+                    highlightedDriverId && !isHighlighted ? "opacity-60" : null,
+                  )}
+                >
+                  <span
+                    className="h-2 w-2 rounded-full"
+                    style={{ backgroundColor: entry.team.color }}
+                    aria-hidden
+                  />
+                  {entry.driver.code}
+                </button>
+              </li>
+            );
+          })}
+        </ul>
       </div>
 
       {/* min-h-0 so this can shrink inside the card's flex column: without it
@@ -351,9 +402,12 @@ export function RaceVisualizationCanvas({
           <svg
             viewBox={`0 0 ${VIEWBOX_WIDTH} ${VIEWBOX_HEIGHT}`}
             role="img"
+            // The focus is named here as well, because dimming nineteen lines
+            // is a change to the picture and `role="img"` is all a screen
+            // reader has of it.
             aria-label={`${race.name} race position chart, lap ${currentLap} of ${
               summary.maxLap || race.laps
-            }`}
+            }${focusedDriver ? `, focused on ${focusedDriver.name}` : ''}`}
             aria-describedby={TIMING_TOWER_ID}
             // `meet` letterboxes rather than crops, so a short container makes
             // a smaller chart instead of a clipped one.
@@ -485,13 +539,16 @@ export function RaceVisualizationCanvas({
             })}
 
             {/* Render trails and active telemetry badges */}
-            {[...retiredFrames, ...activeFrames].map((frame) => {
+            {withFocusLast([...retiredFrames, ...activeFrames], highlightedDriverId).map((frame) => {
               const state = driverStates.get(frame.entry.driver.id);
               return (
                 <AnimatedCar
                   key={frame.entry.driver.id}
                   frame={frame}
                   state={state}
+                  isDimmed={
+                    highlightedDriverId !== null && frame.entry.driver.id !== highlightedDriverId
+                  }
                   raceControl={raceControl}
                   lapProgress={lapProgress}
                   summary={summary}
@@ -540,6 +597,7 @@ type DriverFrame = {
 function AnimatedCar({
   frame,
   state,
+  isDimmed,
   raceControl,
   lapProgress,
   summary,
@@ -549,6 +607,8 @@ function AnimatedCar({
 }: {
   frame: DriverFrame;
   state?: DriverReplayState;
+  /** True when another driver is focused: this one drops back, it does not go. */
+  isDimmed: boolean;
   raceControl: ReplayRaceControl;
   lapProgress: MotionValue<number>;
   summary: ReplaySummary;
@@ -571,6 +631,12 @@ function AnimatedCar({
   const { driver, team, positions } = entry;
   const first = positions[0];
   const last = positions[positions.length - 1];
+
+  // A multiplier rather than a replacement, so the weights the chart already
+  // draws — a retired line fainter than a running one, a backmarker fainter
+  // than the lead pack — survive being dimmed instead of flattening to one
+  // value.
+  const dim = isDimmed ? 0.3 : 1;
 
   const x = useTransform(lapProgress, (p) => {
     return lapX(isCarActive ? currentLap + (nextLap - currentLap) * p : currentLap);
@@ -605,12 +671,12 @@ function AnimatedCar({
         d={fullPath}
         fill="none"
         stroke={team.color}
-        strokeOpacity={isRetiredAtCurrentLap ? 0.08 : state?.isBackmarker ? 0.08 : 0.12}
+        strokeOpacity={(isRetiredAtCurrentLap ? 0.08 : state?.isBackmarker ? 0.08 : 0.12) * dim}
         strokeWidth="1.5"
         strokeLinecap="round"
         strokeLinejoin="round"
         strokeDasharray="4 8"
-        className="transition-opacity duration-200 hover:opacity-90"
+        className="transition-[opacity,stroke-opacity] duration-200 hover:opacity-90"
       />
 
       {trail ? (
@@ -618,12 +684,12 @@ function AnimatedCar({
           d={trail}
           fill="none"
           stroke={team.color}
-          strokeOpacity={isRetiredAtCurrentLap ? 0.36 : state?.isBackmarker ? 0.5 : 0.8}
+          strokeOpacity={(isRetiredAtCurrentLap ? 0.36 : state?.isBackmarker ? 0.5 : 0.8) * dim}
           strokeWidth={state?.isLapped ? "2.5" : isRetiredAtCurrentLap ? "2.2" : "3.2"}
           strokeLinecap="round"
           strokeLinejoin="round"
           strokeDasharray={state?.isLapped ? "8 6" : undefined}
-          className="transition-opacity duration-200 hover:opacity-100"
+          className="transition-[opacity,stroke-opacity] duration-200 hover:opacity-100"
         />
       ) : null}
 
@@ -632,7 +698,8 @@ function AnimatedCar({
           transform={`translate(${
             lapX(markerPoint.lap) + markerOffset.x
           } ${getPositionY(markerPoint.position, summary.maxPosition) + markerOffset.y})`}
-          className="opacity-90 transition-opacity duration-200 hover:opacity-100"
+          className="transition-[opacity,stroke-opacity] duration-200 hover:opacity-100"
+          opacity={0.9 * dim}
         >
           <circle r="8" fill="rgba(15,23,42,0.92)" stroke={team.color} strokeWidth="2.2" />
           <path d="M -3.5 -3.5 L 3.5 3.5 M 3.5 -3.5 L -3.5 3.5" stroke="white" strokeWidth="1.4" strokeLinecap="round" />
@@ -640,6 +707,11 @@ function AnimatedCar({
       ) : null}
 
       {isCarActive ? (
+        // The badge is the loudest thing on the chart, so dimming it by the
+        // same factor as the lines is what actually makes a focused driver
+        // stand out. `muted` stays what it always was — a backmarker — and the
+        // two compound for a backmarker who is not the focused driver.
+        <g opacity={dim} className="transition-opacity duration-200">
         <RaceCar
           color={team.color}
           driverCode={driver.code}
@@ -656,6 +728,7 @@ function AnimatedCar({
           muted={Boolean(state?.isBackmarker)}
           caution={raceControl.status !== "green" || Boolean(state?.isLapped)}
         />
+        </g>
       ) : null}
     </g>
   );
