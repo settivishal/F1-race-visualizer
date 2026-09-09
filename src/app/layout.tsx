@@ -46,8 +46,27 @@ export const metadata: Metadata = {
   // Without a base, the generated OG image tags are relative and every crawler
   // that reads them resolves nothing.
   metadataBase: new URL(siteUrl),
-  title: "F1 Race Visualizer",
+  // The suffix used to be typed out at the end of every page's title, which is
+  // eleven copies of one string and eleven chances to get it wrong. A template
+  // applies it to whatever a child segment sets; `default` is what renders when
+  // a segment sets nothing, and Next requires it alongside a template.
+  title: {
+    default: "F1 Race Visualizer",
+    template: "%s — F1 Race Visualizer",
+  },
   description: "Watch a grand prix unfold as an animated position chart.",
+  // Inherited by every route. The race pages add their own image through
+  // `races/[slug]/opengraph-image.tsx`; everything else gets the site default.
+  openGraph: {
+    type: "website",
+    siteName: "F1 Race Visualizer",
+    title: "F1 Race Visualizer",
+    description: "Watch a grand prix unfold as an animated position chart.",
+    url: siteUrl,
+  },
+  twitter: {
+    card: "summary_large_image",
+  },
 };
 
 export default function RootLayout({

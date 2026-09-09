@@ -3,7 +3,7 @@ import { PageContainer } from '@/components/ui/page-container';
 import { SectionHeader } from '@/components/ui/section-header';
 
 export const metadata = {
-  title: 'About — F1 Race Visualizer',
+  title: 'About',
   description:
     'Where the data comes from, how a race replay is built, and what this site is not.',
 };

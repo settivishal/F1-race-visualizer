@@ -9,12 +9,13 @@ import { PageContainer } from '@/components/ui/page-container';
  * render inside, so a not-found page in the group would never be reached.
  *
  * `notFound()` in the race page lands here too, which is the common case: a
- * slug that was never ingested. That one answers 200 rather than 404: the check
- * runs inside the Suspense boundary, so the response has already started
- * streaming and the status can no longer change. Next injects
- * `<meta name="robots" content="noindex">` for exactly this case, which keeps
- * the soft 404 out of search. A real 404 would mean checking the slug in
- * `proxy.ts` — a database lookup on every request to save a status code.
+ * slug that was never ingested. The existence check is hoisted into the page
+ * component now, above the Suspense boundary, so a bad slug renders this
+ * instead of a half-built race page — but the status is still 200, not 404.
+ * With Cache Components every dynamic route streams a static shell first, so
+ * the response is committed before the page function runs; Next's own
+ * `notFound` reference says a real 404 status has to come from `proxy.ts`.
+ * The `noindex` tag Next injects is what keeps the soft 404 out of search.
  */
 export default function NotFound() {
   return (

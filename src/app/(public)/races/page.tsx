@@ -11,7 +11,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { getActiveSeason, getRaceLibrary } from '@/lib/queries';
 
 export const metadata = {
-  title: 'Races — F1 Race Visualizer',
+  title: 'Races',
   description: 'Every grand prix and sprint in the archive, by season.',
 };
 

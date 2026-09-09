@@ -1347,3 +1347,61 @@ scopes it to the only route that renders it. The remaining win is that `?view=an
 ships the replay's JS, and Next's own guide is explicit that `next/dynamic` from a Server
 Component does not code-split, so collecting it means a client boundary whose only job is to
 defer the secondary tab.
+
+---
+
+## 2026-09-09 — Security headers ship without a CSP
+
+**Decided:** `next.config.ts` sends `X-Content-Type-Options`, `Referrer-Policy`,
+`X-Frame-Options` and a `Permissions-Policy` on every path. No `Content-Security-Policy`.
+
+A correct CSP means a nonce, because the root layout ships the inline theme script that
+prevents the light/dark flash. A nonce is per-request, so the root layout goes dynamic and
+every `use cache` page loses its prerender — the whole site pays render cost on every hit to
+harden against injection on a site with no user-supplied content and no third-party scripts
+beyond Vercel Analytics.
+
+**What would change this:** any user-generated content, or an inline script that can be moved
+into a file without reintroducing the flash.
+
+HSTS is not in the list: Vercel already serves it, verified on the live response.
+
+---
+
+## 2026-09-09 — The missing-lap notice is derived on the client
+
+**Decided:** the replay derives the gaps in its own lap coverage from the payload it already
+has — the sparse `laps` array and `race.laps` — rather than from a new `ReplaySummary` field.
+`describeMissingLaps` in `replay-state.ts`.
+
+The hardening plan proposed a nullable GraphQL field. Both inputs are already in the fragment
+every replay fetches, so the field would have been a resolver, a schema change, a generated
+type and a codegen run to move a number the client is holding.
+
+The notice also covers the truncated case — a race whose highest lap present is below its
+distance ends before the flag rather than at it. There is no synthesized chequered flag to
+suppress: that status only appears when upstream published the event.
+
+**Also in this pass:** `src/env.ts` fails a production build that is missing a required
+variable rather than serving localhost canonicals.
+
+---
+
+## 2026-09-09 — A bad race slug stays a soft 404
+
+**Decided:** the race page's existence check is hoisted above `Suspense`, so nothing of the
+race renders for a slug that does not exist — but the response is still 200 with Next's
+injected `noindex`, not a 404.
+
+The hardening plan assumed the hoist would fix the status. It does not. Cache Components
+streams a static shell for every dynamic route, so the response is committed before the page
+function runs; the `notFound` reference
+(`node_modules/next/dist/docs/01-app/03-api-reference/04-functions/not-found.md`) is explicit
+that a real 404 status has to come from `proxy.ts` instead.
+
+Doing that means a database read in the proxy, on a file whose comment currently says "No
+database access here" — a query on every request to a race URL, to change a status code that
+only crawlers read, on a route where `noindex` already keeps the soft 404 out of search.
+Not taken.
+
+**What would change this:** a slug list cheap enough to check in the proxy without a query.

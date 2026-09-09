@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildDriverReplayState,
+  describeMissingLaps,
+  nearestLapIndex,
   buildRaceControlByLap,
   classifyReplayEvent,
   summarizeDriverReplayState,
@@ -137,5 +139,60 @@ describe('summarizeDriverReplayState', () => {
       backmarkerCount: 1,
       retiredCount: 1,
     });
+  });
+});
+
+describe('nearestLapIndex', () => {
+  it('lands on the nearest lap that exists when the asked-for one does not', () => {
+    // 2025 Miami is missing laps 2-24, so ?lap=10 has no row behind it.
+    expect(nearestLapIndex([1, 25, 26], 10)).toBe(0);
+    expect(nearestLapIndex([1, 25, 26], 20)).toBe(1);
+  });
+
+  it('opens on lap one when there is nothing to match', () => {
+    expect(nearestLapIndex([1, 2, 3], undefined)).toBe(0);
+    expect(nearestLapIndex([], 5)).toBe(0);
+  });
+
+  it('keeps the first of two equally near laps rather than drifting forward', () => {
+    expect(nearestLapIndex([4, 6], 5)).toBe(0);
+  });
+});
+
+describe('describeMissingLaps', () => {
+  it('says nothing when the record is complete', () => {
+    expect(describeMissingLaps([1, 2, 3], 3)).toBeNull();
+  });
+
+  it('names a gap in the middle as a range', () => {
+    const notice = describeMissingLaps([1, 25, 26], 26);
+    expect(notice).toContain('laps 2–24');
+    expect(notice).not.toContain('final laps');
+  });
+
+  it('names a single missing lap in the singular', () => {
+    expect(describeMissingLaps([1, 3], 3)).toContain('lap 2');
+  });
+
+  it('separates several gaps', () => {
+    const notice = describeMissingLaps([1, 5, 9], 9);
+    expect(notice).toContain('laps 2–4');
+    expect(notice).toContain('laps 6–8');
+  });
+
+  it('reports a truncated race rather than a gap', () => {
+    const notice = describeMissingLaps([1, 2, 3], 58);
+    expect(notice).toContain('lap 3 of 58');
+    expect(notice).not.toContain('jumps over');
+  });
+
+  it('reports both a gap and a missing finish', () => {
+    const notice = describeMissingLaps([1, 5], 58);
+    expect(notice).toContain('laps 2–4');
+    expect(notice).toContain('lap 5 of 58');
+  });
+
+  it('stays quiet with no laps at all rather than claiming the whole race is missing', () => {
+    expect(describeMissingLaps([], 58)).toBeNull();
   });
 });

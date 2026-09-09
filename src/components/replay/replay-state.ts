@@ -334,3 +334,63 @@ function getDriverPointForLap(
 
   return candidate ?? null;
 }
+
+/**
+ * The index of the lap closest to `lap`, or 0 when there is nothing to match.
+ * Lives here rather than in the player so it is reachable from a plain unit
+ * test — vitest runs `.test.ts` without a DOM.
+ */
+export function nearestLapIndex(laps: number[], lap: number | undefined): number {
+  if (lap == null || laps.length === 0) return 0;
+  let best = 0;
+  for (let i = 1; i < laps.length; i++) {
+    if (Math.abs(laps[i] - lap) < Math.abs(laps[best] - lap)) best = i;
+  }
+  return best;
+}
+
+/**
+ * A sentence naming the laps upstream never published for this race, or null
+ * when the record is complete.
+ *
+ * Both inputs are already in the replay payload — `laps` is the sparse set of
+ * laps that have rows, `totalLaps` is the race distance — so the notice costs
+ * no extra field on the schema. The gap is real and upstream: a race can be
+ * missing a range in the middle, or stop short of its final lap, and a replay
+ * that skips them silently reads as our bug rather than a hole in the source.
+ */
+export function describeMissingLaps(laps: number[], totalLaps: number): string | null {
+  if (laps.length === 0 || totalLaps <= 0) return null;
+
+  const present = new Set(laps);
+  const lastPresent = Math.max(...laps);
+  const ranges: string[] = [];
+  let gapStart: number | null = null;
+
+  for (let lap = 1; lap <= lastPresent; lap++) {
+    if (!present.has(lap)) {
+      gapStart ??= lap;
+      continue;
+    }
+    if (gapStart !== null) {
+      ranges.push(gapStart === lap - 1 ? `lap ${gapStart}` : `laps ${gapStart}–${lap - 1}`);
+      gapStart = null;
+    }
+  }
+
+  const sentences: string[] = [];
+
+  if (ranges.length > 0) {
+    sentences.push(
+      `Lap data for ${ranges.join(", ")} was never published, so the replay jumps over it.`,
+    );
+  }
+
+  if (lastPresent < totalLaps) {
+    sentences.push(
+      `The record stops at lap ${lastPresent} of ${totalLaps} — the final laps were not published, so the replay ends before the flag.`,
+    );
+  }
+
+  return sentences.length > 0 ? sentences.join(" ") : null;
+}
