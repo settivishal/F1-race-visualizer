@@ -1,4 +1,5 @@
 import { LapTimeChart, type LapTimeSeries } from "@/components/analysis/lap-time-chart";
+import { LapTimeChartRecharts } from "@/components/analysis/lap-time-chart-recharts";
 import { PaceTable, type PaceRow } from "@/components/analysis/pace-table";
 import { StrategyChart, type StrategyRow } from "@/components/analysis/strategy-chart";
 import { HeadToHeadSection } from "./head-to-head-section";
@@ -98,6 +99,9 @@ export async function AnalysisPanel({
         />
         <div className="mt-5">
           <LapTimeChart series={series} />
+          <div data-testid="recharts-spike" className="mt-10">
+            <LapTimeChartRecharts series={series} />
+          </div>
         </div>
       </section>
 
