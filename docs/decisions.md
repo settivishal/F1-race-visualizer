@@ -1405,3 +1405,40 @@ only crawlers read, on a route where `noindex` already keeps the soft 404 out of
 Not taken.
 
 **What would change this:** a slug list cheap enough to check in the proxy without a query.
+
+---
+
+## 2026-09-09 — Still no chart library, and now with numbers
+
+**Decided:** the charts stay hand-drawn on `lib/scale.ts` and `ChartFrame`. Recharts was
+built, measured and closed (PR #88).
+
+The original decision (M5) was made before there was much to convert, so this time the
+lap-time chart was actually ported and rendered beside the existing one on the same race.
+
+It works, and looks near-identical. What it cost:
+
+- **155 KB gzipped** on the client, from `recharts` and the `victory-vendor` d3 bundles it
+  pulls — roughly double the route's existing JS, for one chart.
+- **No fewer lines.** ~215 against 205. The custom parts — the pivot to row-oriented data,
+  the outlier dots, the dashed bridges, the domain — are the bulk of the component either
+  way.
+- **Worse axis ticks.** `niceTicks` gives 1:25.000 and 1:30.000; Recharts ticks the raw
+  domain and gives 1:22.591 and 1:26.591, so `lib/scale.ts` would have stayed anyway.
+- **Two workarounds.** Its axis sizes itself to every series drawn on it, so the faint
+  out-of-range outlier dots dragged the domain until the whole field flattened into one
+  line — fixed with `allowDataOverflow` and a two-pass domain. And `connectNulls` joins
+  every gap rather than only the ones that are bridges, so each dashed bridge had to be its
+  own `ReferenceLine segment`.
+
+The deciding fact is that three of the four charts do not convert: the replay's position
+chart (per-frame interpolation through framer-motion, car badges, event markers, focus
+dimming), the stint chart, and the head-to-head bars. `ChartFrame` and `scale.ts` stay for
+those regardless — so a library here *adds* a dependency rather than replacing one.
+
+Its one real advantage was a hover tooltip across all series, which `<title>` per point
+cannot do. That is now built natively (PR #89): a crosshair snapped to laps that exist, and
+an HTML readout through a new optional `overlay` slot on `ChartFrame`.
+
+**What would change this:** a chart type that is not a linear scale over numbers — a map, a
+tree, anything needing layout rather than plotting.
