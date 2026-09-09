@@ -1,7 +1,8 @@
-import { and, asc, desc, eq, ilike, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, ilike, or, sql } from 'drizzle-orm';
 import { meetings, raceEvents, racePositions, raceResults, races } from '@/db/schema';
 import { builder } from '../builder';
 import type { Db } from '../context';
+import type { PodiumSlot } from '../loaders';
 import { RaceAnalysis, loadAnalysis } from './analysis';
 import { driverOfAssignment, teamOfAssignment } from './assignment';
 import { Driver, Team } from './entity';
@@ -76,6 +77,14 @@ export const RaceResult = builder.objectRef<ResultRow>('RaceResult').implement({
       nullable: true,
       resolve: (row, _args, ctx) => teamOfAssignment(ctx, row.assignmentId),
     }),
+  }),
+});
+
+const PodiumSlotRef = builder.objectRef<PodiumSlot>('PodiumSlot').implement({
+  fields: (t) => ({
+    position: t.exposeInt('position'),
+    code: t.exposeString('code'),
+    teamColor: t.exposeString('teamColor', { nullable: true }),
   }),
 });
 
@@ -274,6 +283,18 @@ Race.implement({
           .orderBy(asc(raceEvents.lap)),
     }),
 
+    /**
+     * The top three, batched.
+     *
+     * `results` below is one query per race, which a page of forty tiles turns
+     * into forty. This goes through a loader instead, so the race library pays
+     * one statement for every podium on the page. Empty for a race not run.
+     */
+    podium: t.field({
+      type: [PodiumSlotRef],
+      resolve: (race, _args, ctx) => ctx.loaders.podiumByRaceId.load(race.id),
+    }),
+
     results: t.field({
       type: [RaceResult],
       resolve: (race, _args, ctx) =>
@@ -316,6 +337,37 @@ builder.queryField('latestRace', (t) =>
     type: Race,
     nullable: true,
     resolve: async (_root, _args, ctx) => (await newestRunRace(ctx)) ?? null,
+  }),
+);
+
+/**
+ * The next race not yet run — the only one the library calls "upcoming".
+ *
+ * `status`, not a comparison against the clock, for the reason above: these
+ * resolvers run inside `use cache` scopes where "now" is whenever the entry was
+ * built. The cron that flips a race to COMPLETED is what moves this along.
+ *
+ * "Earliest SCHEDULED" alone is wrong on real data: the archive holds rows an
+ * import never marked, so 2023 Imola — cancelled, never run — is the earliest
+ * scheduled race in the database and would be announced as next. The newest
+ * race actually run is the fence: whatever is scheduled after it is ahead of
+ * us, and anything scheduled before it is a gap in the archive.
+ */
+builder.queryField('nextRace', (t) =>
+  t.field({
+    type: Race,
+    nullable: true,
+    resolve: async (_root, _args, ctx) => {
+      const latest = await newestRunRace(ctx);
+      return (
+        (await ctx.db.query.races.findFirst({
+          where: latest
+            ? and(eq(races.status, 'SCHEDULED'), gt(races.date, latest.date))
+            : eq(races.status, 'SCHEDULED'),
+          orderBy: [asc(races.date)],
+        })) ?? null
+      );
+    },
   }),
 );
 

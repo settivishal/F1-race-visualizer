@@ -1,4 +1,5 @@
 import { Suspense } from 'react';
+import { AutoSubmit } from '@/components/ui/auto-submit';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -71,6 +72,7 @@ async function CompareBody({ searchParams }: { searchParams: Promise<Search> }) 
     <>
       <Card className="mt-8">
         <form className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5 lg:items-end">
+          <AutoSubmit />
           <Picker label="Compare" name="kind" value={kind}>
             <option value="driver">Drivers</option>
             <option value="team">Constructors</option>

@@ -1,3 +1,4 @@
+import { AutoSubmit } from '@/components/ui/auto-submit';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { HeadToHead } from '@/components/analysis/head-to-head';
@@ -54,6 +55,7 @@ export async function HeadToHeadSection({
         {/* The tab lives in the query string too, so choosing a driver must not
             navigate away from the Analysis view. */}
         <input type="hidden" name="view" value="analysis" />
+        <AutoSubmit />
         <Picker label="Driver" name="a" value={codeA} drivers={classified} />
         <Picker label="Against" name="b" value={codeB} drivers={classified} />
         <Button type="submit" variant="secondary">
