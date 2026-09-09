@@ -30,11 +30,11 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const { slug } = await params;
   const { race } = await getRaceHeader(slug);
 
-  if (!race) return { title: 'Race not found — F1 Race Visualizer' };
+  if (!race) return { title: 'Race not found' };
 
   const name = race.meeting?.name ?? race.slug;
   return {
-    title: `${name} — F1 Race Visualizer`,
+    title: `${name}`,
     description: `Lap-by-lap replay of the ${race.meeting?.season ?? ''} ${name}.`.trim(),
   };
 }
@@ -54,17 +54,33 @@ const isView = (value: unknown): value is View =>
 
 /**
  * `params` is URL data, and reading it above every Suspense boundary makes the
- * whole route block on the navigation instead of streaming into a shell. So the
- * page itself is not async: the container and the back link are the shell, and
- * everything keyed by the slug renders below the boundary.
+ * whole route block on the navigation instead of streaming into a shell — which
+ * is why everything keyed by the slug still renders below the boundary.
+ *
+ * The one exception is whether the race exists at all. That check used to live
+ * in `RaceDetail`, below the boundary, where `notFound()` fires after the
+ * response has already been committed as 200: the reader saw the 404 page and
+ * every crawler saw a soft 404 on every mistyped slug. So the existence check
+ * is hoisted here and the page is async again.
+ *
+ * It costs a cache read and not a round trip: `getRaceHeader` is a `use cache`
+ * scope, and `generateMetadata` above already awaits the same call for the same
+ * slug. Every slug that exists is prerendered anyway by
+ * `generateStaticParams`, so the only request that pays for this is the one
+ * that was going to 404.
  */
-export default function RacePage({
+export default async function RacePage({
   params,
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
   searchParams: Promise<{ view?: string; lap?: string; a?: string; b?: string }>;
 }) {
+  const { slug } = await params;
+  const { race: exists } = await getRaceHeader(slug);
+
+  if (!exists) notFound();
+
   return (
     <PageContainer>
       <Link
@@ -97,6 +113,10 @@ async function RaceDetail({
   const initialLap = Number(lap);
   const { race } = await getRaceHeader(slug);
 
+  // The page above has already established that this race exists and returned
+  // a 404 if it did not. This one is left in to narrow the type — and because a
+  // component that assumes a caller checked is a component that breaks the day
+  // it gets a second caller.
   if (!race) notFound();
 
   const meeting = race.meeting;

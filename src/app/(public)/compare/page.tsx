@@ -21,7 +21,7 @@ import { getArchiveIndex, getDriverProfile, getTeamProfile } from '@/lib/queries
  */
 
 export const metadata = {
-  title: 'Compare — F1 Race Visualizer',
+  title: 'Compare',
   description: 'Compare two drivers or two constructors over a season or the whole archive.',
 };
 

@@ -9,12 +9,10 @@ import { PageContainer } from '@/components/ui/page-container';
  * render inside, so a not-found page in the group would never be reached.
  *
  * `notFound()` in the race page lands here too, which is the common case: a
- * slug that was never ingested. That one answers 200 rather than 404: the check
- * runs inside the Suspense boundary, so the response has already started
- * streaming and the status can no longer change. Next injects
- * `<meta name="robots" content="noindex">` for exactly this case, which keeps
- * the soft 404 out of search. A real 404 would mean checking the slug in
- * `proxy.ts` — a database lookup on every request to save a status code.
+ * slug that was never ingested. That one answered 200 for a while, because the
+ * check ran inside the Suspense boundary and the response had already started
+ * streaming. It now answers 404 — the existence check is hoisted into the page
+ * component, above the boundary, and costs a cache read rather than a query.
  */
 export default function NotFound() {
   return (

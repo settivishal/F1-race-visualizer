@@ -9,7 +9,7 @@ import { SeasonFilter } from '@/components/ui/season-filter';
 import { getActiveSeason, getArchiveIndex } from '@/lib/queries';
 
 export const metadata = {
-  title: 'Teams — F1 Race Visualizer',
+  title: 'Teams',
   description: 'Every constructor in the archive, with their season-by-season record.',
 };
 

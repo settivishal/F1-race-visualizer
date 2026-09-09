@@ -19,6 +19,17 @@ import {
 // over one path rather than the data layer — and the resolvers, the loaders and
 // the query budget would go unexercised by the page people actually load.
 
+// The one public route that had no metadata of its own, so it inherited the
+// root title verbatim. Given the template, the title here is the bare name
+// rather than the name plus a suffix.
+export const metadata = {
+  title: {
+    absolute: 'F1 Race Visualizer — every position change, lap by lap',
+  },
+  description:
+    'Replay any grand prix as an animated position chart: pit windows, safety cars, and the lap someone finally got past.',
+};
+
 export default function Home() {
   return (
     <PageContainer className="py-14">

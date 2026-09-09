@@ -9,7 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { getActiveSeason, getSeasonStandings } from '@/lib/queries';
 
 export const metadata = {
-  title: 'Standings — F1 Race Visualizer',
+  title: 'Standings',
   description: 'Drivers and constructors championships, derived from race results.',
 };
 

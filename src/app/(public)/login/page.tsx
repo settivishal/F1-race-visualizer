@@ -12,7 +12,7 @@ import { isAdminPath } from '@/lib/admin-path';
 import { Skeleton } from '@/components/ui/skeleton';
 
 export const metadata = {
-  title: 'Sign in — F1 Race Visualizer',
+  title: 'Sign in',
   // The one page on the site that should never be indexed.
   robots: { index: false, follow: false },
 };
