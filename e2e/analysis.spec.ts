@@ -88,3 +88,27 @@ test('head to head compares two drivers and follows the picker', async ({ page }
   await expect(page.getByText('Two drivers, lap by lap')).toBeVisible();
   expect(page.url()).toContain('view=analysis');
 });
+
+test('the lap-time chart reads out every shown driver for the lap under the pointer', async ({
+  page,
+}) => {
+  await page.goto(`/races/${RACE}?view=analysis`);
+
+  const chart = page.getByRole('img', { name: /^lap times for .+/i });
+  await expect(chart).toBeVisible({ timeout: 30_000 });
+
+  // hover() rather than mouse.move(): it scrolls the chart into view first,
+  // and the analysis tab is long enough that the chart starts below the fold.
+  await chart.hover();
+
+  // A lap number and one row per driver drawn — the readout is about the lap,
+  // not about the nearest dot.
+  const readout = page.getByText(/^Lap \d+$/).last();
+  await expect(readout).toBeVisible();
+  const rows = readout.locator('xpath=../ul/li');
+  await expect(rows).toHaveCount(5);
+
+  // Off the plot, it goes away rather than sticking to the last lap hovered.
+  await page.mouse.move(0, 0);
+  await expect(readout).toBeHidden();
+});

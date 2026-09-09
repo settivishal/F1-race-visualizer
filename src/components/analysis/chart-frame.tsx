@@ -36,6 +36,7 @@ export function ChartFrame({
   formatX = String,
   formatY = String,
   children,
+  overlay,
   title,
 }: {
   xDomain: [number, number];
@@ -48,6 +49,14 @@ export function ChartFrame({
   formatY?: (value: number) => string;
   /** The series, drawn in pixel space through the scales handed back. */
   children: (frame: Frame) => ReactNode;
+  /**
+   * HTML drawn on top of the plot, in the same coordinate space — for the one
+   * thing SVG is bad at, which is a box of styled text that has to follow a
+   * pointer. Positioned by the caller as a percentage of `width`/`height`,
+   * because the SVG scales with its container and pixels here are viewBox
+   * units, not screen ones.
+   */
+  overlay?: (frame: Frame) => ReactNode;
   /** Read by screen readers in place of the drawing. */
   title: string;
 }) {
@@ -61,7 +70,20 @@ export function ChartFrame({
   const xTicks = niceTicks(xDomain, 8);
   const yTicks = niceTicks(yDomain, 5);
 
-  return (
+  const frame: Frame = {
+    x,
+    y,
+    width,
+    height,
+    plot: {
+      left: PADDING.left,
+      top: PADDING.top,
+      right: PADDING.left + plotWidth,
+      bottom: PADDING.top + plotHeight,
+    },
+  };
+
+  const svg = (
     <svg
       viewBox={`0 0 ${width} ${height}`}
       className="h-auto w-full"
@@ -133,18 +155,18 @@ export function ChartFrame({
         </text>
       ) : null}
 
-      {children({
-        x,
-        y,
-        width,
-        height,
-        plot: {
-          left: PADDING.left,
-          top: PADDING.top,
-          right: PADDING.left + plotWidth,
-          bottom: PADDING.top + plotHeight,
-        },
-      })}
+      {children(frame)}
     </svg>
+  );
+
+  if (!overlay) return svg;
+
+  return (
+    <div className="relative">
+      {svg}
+      {/* pointer-events-none so the overlay never steals the pointer from the
+          plot underneath, which is what is tracking it. */}
+      <div className="pointer-events-none absolute inset-0">{overlay(frame)}</div>
+    </div>
   );
 }
