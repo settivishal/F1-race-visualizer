@@ -2,12 +2,16 @@
 
 import { useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { cn } from "@/lib/cn";
 import { formatLapTime } from "@/lib/scale";
 import type { ReplayView } from "./types";
 
 interface TimingTowerProps {
   visualization: ReplayView;
   currentLap: number;
+  /** The driver the chart is drawing at full strength, or null for the field. */
+  focusedDriverId: string | null;
+  onToggleDriver: (driverId: string) => void;
 }
 
 type SectorColor = "purple" | "green" | "yellow" | "none";
@@ -38,7 +42,12 @@ function formatSector(val: number | null | undefined): string {
  */
 export const TIMING_TOWER_ID = 'replay-timing-tower';
 
-export function LiveTimingTower({ visualization, currentLap }: TimingTowerProps) {
+export function LiveTimingTower({
+  visualization,
+  currentLap,
+  focusedDriverId,
+  onToggleDriver,
+}: TimingTowerProps) {
   // A fact about the era, not about this import — see races.data_tier.
   //
   // There is no gap column. `gap` is null on every row of every race: neither
@@ -131,14 +140,28 @@ export function LiveTimingTower({ visualization, currentLap }: TimingTowerProps)
         <div className="relative">
           <AnimatePresence initial={false}>
             {standings.map((standing) => (
-              <motion.div
+              // A button, because the row is how you focus a driver on the
+              // chart beside it — and the tower is what the chart points at
+              // with aria-describedby, so the control and the text
+              // alternative stay in the same place.
+              <motion.button
                 key={standing.entry.driver.id}
+                type="button"
+                aria-pressed={focusedDriverId === standing.entry.driver.id}
+                onClick={() => onToggleDriver(standing.entry.driver.id)}
                 layout="position"
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.9 }}
                 transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                className="group flex items-center gap-1 rounded-md px-2 py-1.5 text-xs transition-colors hover:bg-panel-strong"
+                className={cn(
+                  "group flex w-full items-center gap-1 rounded-md px-2 py-1.5 text-left text-xs transition-colors hover:bg-panel-strong",
+                  focusedDriverId === standing.entry.driver.id
+                    ? "bg-panel-strong ring-1 ring-line-strong"
+                    : focusedDriverId
+                      ? "opacity-60"
+                      : null,
+                )}
               >
                 <div className="tabular w-8 font-mono font-medium text-muted">
                   {standing.position}
@@ -170,7 +193,7 @@ export function LiveTimingTower({ visualization, currentLap }: TimingTowerProps)
                     <SectorBlock value={standing.sector3} color={standing.s3Color} />
                   </>
                 ) : null}
-              </motion.div>
+              </motion.button>
             ))}
           </AnimatePresence>
         </div>

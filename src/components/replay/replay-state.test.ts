@@ -3,6 +3,7 @@ import {
   buildDriverReplayState,
   describeMissingLaps,
   nearestLapIndex,
+  withFocusLast,
   buildRaceControlByLap,
   classifyReplayEvent,
   summarizeDriverReplayState,
@@ -194,5 +195,27 @@ describe('describeMissingLaps', () => {
 
   it('stays quiet with no laps at all rather than claiming the whole race is missing', () => {
     expect(describeMissingLaps([], 58)).toBeNull();
+  });
+});
+
+describe('withFocusLast', () => {
+  const frames = [
+    { entry: entry('a', []) },
+    { entry: entry('b', []) },
+    { entry: entry('c', []) },
+  ];
+  const ids = (list: typeof frames) => list.map((f) => f.entry.driver.id);
+
+  it('puts the focused driver last, because SVG paint order is the only z-index', () => {
+    expect(ids(withFocusLast(frames, 'a'))).toEqual(['b', 'c', 'a']);
+    expect(ids(withFocusLast(frames, 'c'))).toEqual(['a', 'b', 'c']);
+  });
+
+  it('leaves the order alone when nothing is focused', () => {
+    expect(withFocusLast(frames, null)).toBe(frames);
+  });
+
+  it('drops nobody when the focused driver has no frame on this lap', () => {
+    expect(ids(withFocusLast(frames, 'zzz'))).toEqual(['a', 'b', 'c']);
   });
 });

@@ -40,3 +40,32 @@ test('a race replays: the lap advances and the order changes', async ({ page }) 
 
   await expect.poll(order, { timeout: 45_000 }).not.toEqual(startingOrder);
 });
+
+test('focusing a driver names them on the chart, and pressing again clears it', async ({
+  page,
+}) => {
+  await page.goto(`/races/${RACE}`);
+
+  const chart = page.getByRole('img', { name: /race position chart/i });
+  await expect(chart).toBeVisible({ timeout: 30_000 });
+
+  const code = (await page.getByTestId('tower-driver').first().innerText()).trim();
+  const named = new RegExp(`\\b${code}\\b`);
+  // The two controls the plan gave this feature, asserted as one piece of
+  // state: the tower row is pressed from the tower, and the chip above the
+  // chart must agree without being touched.
+  const row = page.locator('#replay-timing-tower').getByRole('button', { name: named }).first();
+  const chip = page.getByTestId('driver-chips').getByRole('button', { name: named }).first();
+
+  await row.click();
+  await expect(row).toHaveAttribute('aria-pressed', 'true');
+  await expect(chart).toHaveAttribute('aria-label', /focused on /i);
+
+  await row.click();
+  await expect(row).toHaveAttribute('aria-pressed', 'false');
+  await expect(chart).not.toHaveAttribute('aria-label', /focused on /i);
+
+  // And the same state reached from the other control.
+  await chip.click();
+  await expect(row).toHaveAttribute('aria-pressed', 'true');
+});

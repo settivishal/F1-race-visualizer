@@ -40,6 +40,10 @@ export function RaceVisualizationPlayer({
   const [currentLapIndex, setCurrentLapIndex] = useState(startIndex);
   const lapProgress = useMotionValue(0);
   const [isPlaying, setIsPlaying] = useState(false);
+  // Which driver the chart draws at full strength, or null for the whole
+  // field. A way of looking rather than a place in the race, so unlike `?lap=`
+  // it stays here and out of the URL.
+  const [focusedDriverId, setFocusedDriverId] = useState<string | null>(null);
   const [speed, setSpeed] = useState(DEFAULT_SPEED);
   const shouldReduceMotion = useReducedMotion();
 
@@ -74,6 +78,9 @@ export function RaceVisualizationPlayer({
   );
   // Hoisted out of the controls so the timeline's markers and the scrubber
   // are the same action rather than two copies of it.
+  const toggleFocusedDriver = useCallback((driverId: string) => {
+    setFocusedDriverId((current) => (current === driverId ? null : driverId));
+  }, []);
   const jumpToLap = useCallback(
     (lap: number) => {
       setIsPlaying(false);
@@ -89,6 +96,8 @@ export function RaceVisualizationPlayer({
     lapProgress.set(0);
     setIsPlaying(false);
     setSpeed(DEFAULT_SPEED);
+    // A new race must not open with the previous race's driver focused.
+    setFocusedDriverId(null);
     // lapProgress is a MotionValue and keeps the same identity for the life of
     // the component, so listing it changes nothing at runtime and satisfies the
     // rule honestly rather than by suppressing it.
@@ -150,7 +159,11 @@ export function RaceVisualizationPlayer({
       if (
         target instanceof HTMLInputElement ||
         target instanceof HTMLSelectElement ||
-        target instanceof HTMLTextAreaElement
+        target instanceof HTMLTextAreaElement ||
+        // Buttons included: Space is how a focused button is activated, and a
+        // shortcut that also fires on it makes every control do two things at
+        // once. The Play button still plays — through its own click.
+        target instanceof HTMLButtonElement
       ) {
         return;
       }
@@ -170,6 +183,8 @@ export function RaceVisualizationPlayer({
         setIsPlaying(false);
         lapProgress.set(0);
         setCurrentLapIndex((current) => Math.max(current - 1, 0));
+      } else if (event.code === "Escape") {
+        setFocusedDriverId(null);
       } else if (event.code === "Home") {
         event.preventDefault();
         setIsPlaying(false);
@@ -196,7 +211,7 @@ export function RaceVisualizationPlayer({
             keyboard focus; out of the way otherwise. */}
         <p className="sr-only focus-within:not-sr-only" tabIndex={0}>
           Keyboard: Space plays and pauses, Left and Right arrows step one lap,
-          Home returns to lap one. The live timing tower lists the running order
+          Home returns to lap one, Escape clears a focused driver. The live timing tower lists the running order
           for the current lap as text.
         </p>
         {/* No overflow-x here. It used to wrap the whole grid, so anything
@@ -225,6 +240,8 @@ export function RaceVisualizationPlayer({
               <LiveTimingTower
                 visualization={visualization}
                 currentLap={currentLap}
+                focusedDriverId={focusedDriverId}
+                onToggleDriver={toggleFocusedDriver}
               />
             </div>
 
@@ -239,6 +256,8 @@ export function RaceVisualizationPlayer({
                 visualization={visualization}
                 currentLap={currentLap}
                 nextLap={nextLap}
+                focusedDriverId={focusedDriverId}
+                onToggleDriver={toggleFocusedDriver}
                 lapProgress={lapProgress}
                 raceControl={activeRaceControl}
                 driverStates={driverReplayStates}
