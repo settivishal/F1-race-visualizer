@@ -263,7 +263,6 @@ export function RaceVisualizationPlayer({
                 driverStates={driverReplayStates}
                 controls={
                   <ReplayControls
-                    compact
                     currentLap={currentLap}
                     maxLap={visualization.summary.maxLap || visualization.race.laps}
                     isPlaying={isPlaying}
