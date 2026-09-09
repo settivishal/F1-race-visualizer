@@ -209,15 +209,12 @@ Race.implement({
     // predates the column.
     openf1SessionKey: t.exposeInt('openf1SessionKey', { nullable: true }),
     date: t.field({ type: 'DateTime', resolve: (r) => r.date }),
+    // Through the loader, not a findFirst: the race library asks this once per
+    // tile, which was 31 statements for a season that fits on one page.
     meeting: t.field({
       type: Meeting,
       nullable: true,
-      resolve: async (race, _args, ctx) => {
-        const meeting = await ctx.db.query.meetings.findFirst({
-          where: eq(meetings.id, race.meetingId),
-        });
-        return meeting ?? null;
-      },
+      resolve: (race, _args, ctx) => ctx.loaders.meetingById.load(race.meetingId),
     }),
 
     /**

@@ -1,12 +1,20 @@
 import DataLoader from 'dataloader';
 import { and, asc, eq, inArray, lte, sql } from 'drizzle-orm';
-import { driverTeamAssignments, drivers, raceResults, teamSeasons, teams } from '@/db/schema';
+import {
+  driverTeamAssignments,
+  drivers,
+  meetings,
+  raceResults,
+  teamSeasons,
+  teams,
+} from '@/db/schema';
 import type { Db } from './context';
 
 type AssignmentRow = typeof driverTeamAssignments.$inferSelect;
 type DriverRow = typeof drivers.$inferSelect;
 type TeamSeasonRow = typeof teamSeasons.$inferSelect;
 type TeamRow = typeof teams.$inferSelect;
+type MeetingRow = typeof meetings.$inferSelect;
 
 /**
  * Written by hand rather than through @pothos/plugin-dataloader, deliberately.
@@ -96,6 +104,11 @@ export function createLoaders(db: Db) {
     ),
     teamById: byId<TeamRow>(db, (ids) =>
       db.select().from(teams).where(inArray(teams.id, ids)),
+    ),
+    // A page of race tiles asks for one meeting per tile, and a weekend's two
+    // sessions share one — so this batches and dedupes both.
+    meetingById: byId<MeetingRow>(db, (ids) =>
+      db.select().from(meetings).where(inArray(meetings.id, ids)),
     ),
     podiumByRaceId: podiumLoader(db),
   };
