@@ -69,3 +69,33 @@ test('focusing a driver names them on the chart, and pressing again clears it', 
   await chip.click();
   await expect(row).toHaveAttribute('aria-pressed', 'true');
 });
+
+test('hovering a driver previews the emphasis without committing to it', async ({ page }) => {
+  await page.goto(`/races/${RACE}`);
+  await expect(page.getByRole('img', { name: /race position chart/i })).toBeVisible({
+    timeout: 30_000,
+  });
+
+  // The cars are `<g opacity>` groups: exactly one at full strength is what
+  // "one driver stands out" means, and it is the assertion the pixels cannot
+  // give us.
+  const fullStrengthCars = () =>
+    page.evaluate(
+      () =>
+        [...document.querySelectorAll('svg g > g[opacity]')].filter(
+          (group) => group.getAttribute('opacity') === '1',
+        ).length,
+    );
+
+  const row = page.locator('#replay-timing-tower').getByRole('button').first();
+
+  await row.hover();
+  await expect.poll(fullStrengthCars).toBe(1);
+  // A hover is a preview, not a choice.
+  await expect(row).toHaveAttribute('aria-pressed', 'false');
+
+  // And leaving puts the whole field back at full strength, rather than
+  // leaving the last hovered driver lit.
+  await page.mouse.move(0, 0);
+  await expect.poll(fullStrengthCars).toBeGreaterThan(1);
+});

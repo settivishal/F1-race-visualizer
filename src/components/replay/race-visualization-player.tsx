@@ -44,6 +44,10 @@ export function RaceVisualizationPlayer({
   // field. A way of looking rather than a place in the race, so unlike `?lap=`
   // it stays here and out of the URL.
   const [focusedDriverId, setFocusedDriverId] = useState<string | null>(null);
+  // Hovering a driver previews the same emphasis without committing to it, so
+  // reading the field is a sweep of the pointer rather than a click per driver.
+  // A hover wins while it lasts; letting go falls back to whatever was clicked.
+  const [hoveredDriverId, setHoveredDriverId] = useState<string | null>(null);
   const [speed, setSpeed] = useState(DEFAULT_SPEED);
   const shouldReduceMotion = useReducedMotion();
 
@@ -78,6 +82,7 @@ export function RaceVisualizationPlayer({
   );
   // Hoisted out of the controls so the timeline's markers and the scrubber
   // are the same action rather than two copies of it.
+  const highlightedDriverId = hoveredDriverId ?? focusedDriverId;
   const toggleFocusedDriver = useCallback((driverId: string) => {
     setFocusedDriverId((current) => (current === driverId ? null : driverId));
   }, []);
@@ -98,6 +103,7 @@ export function RaceVisualizationPlayer({
     setSpeed(DEFAULT_SPEED);
     // A new race must not open with the previous race's driver focused.
     setFocusedDriverId(null);
+    setHoveredDriverId(null);
     // lapProgress is a MotionValue and keeps the same identity for the life of
     // the component, so listing it changes nothing at runtime and satisfies the
     // rule honestly rather than by suppressing it.
@@ -241,7 +247,9 @@ export function RaceVisualizationPlayer({
                 visualization={visualization}
                 currentLap={currentLap}
                 focusedDriverId={focusedDriverId}
+                highlightedDriverId={highlightedDriverId}
                 onToggleDriver={toggleFocusedDriver}
+                onHoverDriver={setHoveredDriverId}
               />
             </div>
 
@@ -257,7 +265,9 @@ export function RaceVisualizationPlayer({
                 currentLap={currentLap}
                 nextLap={nextLap}
                 focusedDriverId={focusedDriverId}
+                highlightedDriverId={highlightedDriverId}
                 onToggleDriver={toggleFocusedDriver}
+                onHoverDriver={setHoveredDriverId}
                 lapProgress={lapProgress}
                 raceControl={activeRaceControl}
                 driverStates={driverReplayStates}

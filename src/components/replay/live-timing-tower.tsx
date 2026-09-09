@@ -9,9 +9,12 @@ import type { ReplayView } from "./types";
 interface TimingTowerProps {
   visualization: ReplayView;
   currentLap: number;
-  /** The driver the chart is drawing at full strength, or null for the field. */
+  /** The driver held by a click — what `aria-pressed` reports. */
   focusedDriverId: string | null;
+  /** The driver drawn at full strength: the hovered one, else the clicked one. */
+  highlightedDriverId: string | null;
   onToggleDriver: (driverId: string) => void;
+  onHoverDriver: (driverId: string | null) => void;
 }
 
 type SectorColor = "purple" | "green" | "yellow" | "none";
@@ -46,7 +49,9 @@ export function LiveTimingTower({
   visualization,
   currentLap,
   focusedDriverId,
+  highlightedDriverId,
   onToggleDriver,
+  onHoverDriver,
 }: TimingTowerProps) {
   // A fact about the era, not about this import — see races.data_tier.
   //
@@ -149,16 +154,22 @@ export function LiveTimingTower({
                 type="button"
                 aria-pressed={focusedDriverId === standing.entry.driver.id}
                 onClick={() => onToggleDriver(standing.entry.driver.id)}
+                // Focus as well as hover, so tabbing through the tower
+                // previews each driver the way a pointer does.
+                onMouseEnter={() => onHoverDriver(standing.entry.driver.id)}
+                onMouseLeave={() => onHoverDriver(null)}
+                onFocus={() => onHoverDriver(standing.entry.driver.id)}
+                onBlur={() => onHoverDriver(null)}
                 layout="position"
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.9 }}
                 transition={{ type: "spring", stiffness: 300, damping: 30 }}
                 className={cn(
-                  "group flex w-full items-center gap-1 rounded-md px-2 py-1.5 text-left text-xs transition-colors hover:bg-panel-strong",
-                  focusedDriverId === standing.entry.driver.id
+                  "group flex w-full items-center gap-1 rounded-md px-2 py-1.5 text-left text-xs transition-[background-color,opacity] duration-200 hover:bg-panel-strong",
+                  highlightedDriverId === standing.entry.driver.id
                     ? "bg-panel-strong ring-1 ring-line-strong"
-                    : focusedDriverId
+                    : highlightedDriverId
                       ? "opacity-60"
                       : null,
                 )}
