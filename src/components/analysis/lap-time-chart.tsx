@@ -115,20 +115,47 @@ export function LapTimeChart({ series }: { series: LapTimeSeries[] }) {
         >
           {({ x, y }) =>
             shown.map((driver) => {
-              const segments: { lap: number; time: number }[][] = [];
+              const runs: { lap: number; time: number }[][] = [];
               let run: { lap: number; time: number }[] = [];
               for (const lap of driver.laps) {
                 if (lap.isOutlier) {
-                  if (run.length > 1) segments.push(run);
+                  if (run.length > 0) runs.push(run);
                   run = [];
                   continue;
                 }
                 run.push(lap);
               }
-              if (run.length > 1) segments.push(run);
+              if (run.length > 0) runs.push(run);
+
+              // A single clean lap between two cautions has nothing to stroke —
+              // it is already drawn as a dot below — but it still ends and
+              // starts a bridge, so the runs are kept whole and only the
+              // strokeable ones are filtered here.
+              const segments = runs.filter((entry) => entry.length > 1);
+              // The gaps read as missing data otherwise. They are not: a pit
+              // stop or a safety car took those laps out of the line, and the
+              // driver kept driving. A faint dashed bridge carries the eye
+              // across without pretending the laps in between were racing laps.
+              const bridges = runs.slice(0, -1).map((entry, index) => ({
+                from: entry[entry.length - 1],
+                to: runs[index + 1][0],
+              }));
 
               return (
                 <g key={driver.id}>
+                  {bridges.map((bridge) => (
+                    <line
+                      key={`${bridge.from.lap}-${bridge.to.lap}`}
+                      x1={x(bridge.from.lap)}
+                      y1={y(bridge.from.time)}
+                      x2={x(bridge.to.lap)}
+                      y2={y(bridge.to.time)}
+                      stroke={driver.color}
+                      strokeWidth={1.5}
+                      strokeDasharray="3 4"
+                      strokeOpacity={0.35}
+                    />
+                  ))}
                   {segments.map((segment, index) => (
                     <motion.path
                       key={index}
