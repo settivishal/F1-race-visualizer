@@ -167,15 +167,23 @@ async function RaceLibrary({ searchParams }: { searchParams: SearchParams }) {
               {/* prefetch: the race pages are prerendered and cached, so warming
                   one on hover costs almost nothing and removes the wait on the
                   click that matters. */}
-              <Link href={`/races/${node.slug}`} className="block h-full rounded-xl" prefetch>
+              {/* The glow sits on the link, not the card: Card already carries
+                  `shadow-sm`, and cn() is a join rather than a tailwind-merge,
+                  so a second shadow utility there loses to whichever the
+                  stylesheet happens to order last. */}
+              <Link
+                href={`/races/${node.slug}`}
+                className={`block h-full rounded-xl ${
+                  // The one race just run. A glow rather than a badge: it says
+                  // "here" without taking a word away from the tile.
+                  node.slug === latestRace?.slug ? 'shadow-glow' : ''
+                }`}
+                prefetch
+              >
                 <Card
                   interactive
                   className={`flex h-full gap-4 ${
-                    // The one race just run. A ring rather than a badge: it says
-                    // "here" without taking a word away from the tile.
-                    node.slug === latestRace?.slug
-                      ? 'ring-1 ring-accent/50 shadow-[0_0_28px_-8px_var(--accent)]'
-                      : ''
+                    node.slug === latestRace?.slug ? 'border-accent/40' : ''
                   }`}
                 >
                   <div className="flex min-w-0 flex-1 flex-col">
