@@ -71,6 +71,10 @@ export default function GlobalError({
             >
               Try again
             </button>
+            {/* A plain anchor on purpose: the root layout is what failed, so a
+                client-side <Link /> navigation would re-mount the same broken
+                tree. This needs a full document load. */}
+            {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
             <a
               href="/"
               style={{

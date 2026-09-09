@@ -58,10 +58,15 @@ const isView = (value: unknown): value is View =>
  * is why everything keyed by the slug still renders below the boundary.
  *
  * The one exception is whether the race exists at all. That check used to live
- * in `RaceDetail`, below the boundary, where `notFound()` fires after the
- * response has already been committed as 200: the reader saw the 404 page and
- * every crawler saw a soft 404 on every mistyped slug. So the existence check
- * is hoisted here and the page is async again.
+ * in `RaceDetail`, below the boundary, where a bad slug rendered most of a race
+ * page and then swapped in the 404 mid-stream. It is hoisted here and the page
+ * is async again, so nothing of the race renders for a slug that does not
+ * exist.
+ *
+ * The status code is unchanged: still 200 with Next's `noindex` tag. Cache
+ * Components streams a static shell for every dynamic route, so the response is
+ * committed before this function runs — a real 404 status would have to come
+ * from `proxy.ts`, which today does no database access at all.
  *
  * It costs a cache read and not a round trip: `getRaceHeader` is a `use cache`
  * scope, and `generateMetadata` above already awaits the same call for the same

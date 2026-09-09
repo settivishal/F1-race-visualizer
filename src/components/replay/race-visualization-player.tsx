@@ -7,21 +7,13 @@ import { RaceVisualizationCanvas } from "./race-visualization-canvas";
 import {
   buildDriverReplayState,
   buildRaceControlByLap,
+  describeMissingLaps,
+  nearestLapIndex,
 } from "./replay-state";
 import { ReplayControls } from "./replay-controls";
 import { LiveTimingTower } from "./live-timing-tower";
 import type { ReplayView } from "./types";
 import { MotionConfig, animate, useMotionValue, useReducedMotion } from "framer-motion";
-
-/** The index of the lap closest to `lap`, or 0 when there is nothing to match. */
-function nearestLapIndex(laps: number[], lap: number | undefined): number {
-  if (lap == null || laps.length === 0) return 0;
-  let best = 0;
-  for (let i = 1; i < laps.length; i++) {
-    if (Math.abs(laps[i] - lap) < Math.abs(laps[best] - lap)) best = i;
-  }
-  return best;
-}
 
 const BASE_LAP_DURATION_MS = 1600;
 const DEFAULT_SPEED = 1;
@@ -68,6 +60,10 @@ export function RaceVisualizationPlayer({
     label: "Green Flag",
     details: null,
   };
+  const missingLapsNotice = useMemo(
+    () => describeMissingLaps(laps, visualization.race.laps),
+    [laps, visualization.race.laps],
+  );
   const driverReplayStates = useMemo(
     () =>
       buildDriverReplayState(
@@ -211,6 +207,13 @@ export function RaceVisualizationPlayer({
             items-start rather than stretch: the right column is now canvas plus
             timeline plus strip, and a stretched tower grew to match it, leaving
             a third of an empty card under the last driver. */}
+        {/* Same voice and same markup as the tower's "no sector times" line:
+            an absence in the source, stated, rather than a silent skip. */}
+        {missingLapsNotice ? (
+          <p className="rounded-xl bg-panel px-5 py-3 text-xs leading-relaxed text-muted ring-1 ring-line">
+            {missingLapsNotice}
+          </p>
+        ) : null}
         <div className="pb-10">
           <div className="grid w-full items-start gap-5 lg:grid-cols-[22rem_minmax(0,1fr)]">
             {/* min-w-0 on both columns, and it is not cosmetic. A grid child
