@@ -66,3 +66,25 @@ test('a lap can be linked to', async ({ page }) => {
   // The replay opens on the linked lap rather than on lap 1.
   await expect(chart).toHaveAttribute('aria-label', /lap 30 of/i);
 });
+
+test('head to head compares two drivers and follows the picker', async ({ page }) => {
+  // `Race.analysis.headToHead` was written in M5 and no page had ever queried
+  // it. This is the whole point of the section: that it renders, and that
+  // choosing a different driver changes the answer rather than the tab.
+  await page.goto('/races?season=all');
+  await page.locator('a[href^="/races/2"]').first().click();
+  await page.getByRole('link', { name: /analysis/i }).click();
+
+  await expect(page.getByText('Two drivers, lap by lap')).toBeVisible();
+  await expect(page.getByText(/laps ahead/).first()).toBeVisible();
+
+  // Switching the second driver keeps the Analysis view — the tab lives in the
+  // query string, so the form has to carry it.
+  const against = page.locator('select[name="b"]');
+  const options = await against.locator('option').all();
+  await against.selectOption(await options[options.length - 1].getAttribute('value') ?? '');
+  await page.getByRole('button', { name: 'Compare' }).click();
+
+  await expect(page.getByText('Two drivers, lap by lap')).toBeVisible();
+  expect(page.url()).toContain('view=analysis');
+});

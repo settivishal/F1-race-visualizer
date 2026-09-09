@@ -63,7 +63,7 @@ export default function RacePage({
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ view?: string; lap?: string }>;
+  searchParams: Promise<{ view?: string; lap?: string; a?: string; b?: string }>;
 }) {
   return (
     <PageContainer>
@@ -86,13 +86,13 @@ async function RaceDetail({
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ view?: string; lap?: string }>;
+  searchParams: Promise<{ view?: string; lap?: string; a?: string; b?: string }>;
 }) {
   const { slug } = await params;
   // The view lives in the URL, so it survives a reload and can be linked to.
   // Anything unrecognised falls back to the replay rather than 404ing: a bad
   // query string is not a missing page.
-  const { view, lap } = await searchParams;
+  const { view, lap, a, b } = await searchParams;
   const active: View = isView(view) ? view : 'replay';
   const initialLap = Number(lap);
   const { race } = await getRaceHeader(slug);
@@ -178,7 +178,7 @@ async function RaceDetail({
       ) : (
         <div className="mt-8">
           <Suspense fallback={<AnalysisSkeleton />}>
-            <AnalysisPanel slug={slug} />
+            <AnalysisPanel slug={slug} driverA={a ?? null} driverB={b ?? null} />
           </Suspense>
         </div>
       )}

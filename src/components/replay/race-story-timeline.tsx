@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { getReplayEventMarkerColor } from "./replay-state";
 import type { StoryMoment } from "./story-moments";
 
@@ -19,8 +19,15 @@ import type { StoryMoment } from "./story-moments";
  * there cannot drift apart.
  */
 
-/** Percent of the axis within which two markers are one target. */
-const COLLISION_WINDOW = 1.6;
+/**
+ * How close two markers may be, in pixels, before they become one target.
+ *
+ * A percentage cannot do this job. 1.6% of the rail is 19px on a desktop and
+ * 6px on a phone — narrower than the marker itself, so markers overlapped
+ * exactly where there was least room for them. A tap target is a physical size,
+ * so the window is one too, and the rail measures itself to convert.
+ */
+const COLLISION_PX = 22;
 
 type Cluster = {
   /** Percent along the axis. */
@@ -33,8 +40,11 @@ export function clusterMoments(
   moments: StoryMoment[],
   firstLap: number,
   lastLap: number,
+  /** The rail's rendered width. Until it is measured, assume a phone. */
+  railWidth = 360,
 ): Cluster[] {
   const span = Math.max(1, lastLap - firstLap);
+  const windowPercent = (COLLISION_PX / Math.max(1, railWidth)) * 100;
   const clusters: Cluster[] = [];
 
   for (const moment of moments) {
@@ -44,7 +54,7 @@ export function clusterMoments(
     // Moments arrive lap-ordered, so only the last cluster can be within reach.
     // A safety car and the three stops it triggers land on one lap and would
     // otherwise stack into an unclickable pile.
-    if (previous && offset - previous.offset <= COLLISION_WINDOW) {
+    if (previous && offset - previous.offset <= windowPercent) {
       previous.moments.push(moment);
       continue;
     }
@@ -70,9 +80,29 @@ export function RaceStoryTimeline({
 }) {
   const firstLap = laps[0] ?? 1;
   const lastLap = laps[laps.length - 1] ?? firstLap;
+
+  // The rail measures itself, because how close two markers may be is a
+  // question about pixels and the same percentage means different things on a
+  // phone and a monitor.
+  const rail = useRef<HTMLDivElement>(null);
+  const [railWidth, setRailWidth] = useState(0);
+
+  useEffect(() => {
+    const element = rail.current;
+    if (!element) return;
+
+    const observer = new ResizeObserver(([entry]) => {
+      setRailWidth(entry.contentRect.width);
+    });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+
   const clusters = useMemo(
-    () => clusterMoments(moments, firstLap, lastLap),
-    [moments, firstLap, lastLap],
+    // Zero until the first measurement lands; the default assumes a phone,
+    // which errs towards merging rather than towards markers on top of markers.
+    () => clusterMoments(moments, firstLap, lastLap, railWidth || undefined),
+    [moments, firstLap, lastLap, railWidth],
   );
 
   const playhead = ((currentLap - firstLap) / Math.max(1, lastLap - firstLap)) * 100;
@@ -88,7 +118,7 @@ export function RaceStoryTimeline({
 
       {/* Tall enough for a marker to sit above the rail and still be a
           comfortable target on a touchscreen. */}
-      <div className="relative mt-4 h-11">
+      <div ref={rail} className="relative mt-4 h-11">
         <div className="absolute inset-x-0 top-8 h-1 rounded-full bg-panel-strong" />
         {/* The race so far, so the rail reads as filling up. */}
         <div
@@ -113,7 +143,7 @@ export function RaceStoryTimeline({
               onClick={() => onJumpToLap(cluster.lap)}
               title={label}
               aria-label={label}
-              className="group absolute top-0 -translate-x-1/2 rounded-sm px-1 pb-1 pt-0.5"
+              className="tap group absolute top-0 -translate-x-1/2 rounded-sm px-2 pb-1 pt-0.5"
               style={{ left: `${cluster.offset}%` }}
             >
               {/* The stalk ties the dot to the rail; without it a row of dots

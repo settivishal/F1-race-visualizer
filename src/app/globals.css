@@ -378,6 +378,35 @@ html:has(:root.light) {
 }
 
 /* ---------------------------------------------------------------------------
+   Touch targets
+
+   A finger is about 9mm across and a mouse pointer is one pixel. Rather than
+   grow every control for everyone, this grows them only where the pointer is
+   coarse, so the desktop layout is untouched.
+
+   44px is Apple's guidance, not WCAG's — 2.5.8 asks 24x24 and most of these
+   already passed it. This is about whether a control is comfortable to hit, not
+   whether it is compliant.
+--------------------------------------------------------------------------- */
+@layer components {
+  @media (pointer: coarse) {
+    /* Height only. `.tap` also set a min-width, which turned every text pill
+       into a wide capsule — the replay's speed selector went from one row of
+       four to three rows of circles. A pill's width should come from its label;
+       what a finger needs is the vertical room. */
+    .tap {
+      min-height: 2.75rem;
+    }
+
+    /* For a square control — an icon button — where both axes are the target. */
+    .tap-square {
+      min-height: 2.75rem;
+      min-width: 2.75rem;
+    }
+  }
+}
+
+/* ---------------------------------------------------------------------------
    Race control tones
 
    One rule plus a modifier per signal, rather than nine hand-written pairs of

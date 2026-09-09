@@ -30,7 +30,7 @@ export function SeasonFilter({
       key={value}
       href={{ pathname, query: { season: value, ...extra } }}
       aria-current={isActive ? 'page' : undefined}
-      className={`tabular rounded-full px-3.5 py-1.5 text-sm font-semibold transition-colors ${
+      className={`tap tabular inline-flex items-center rounded-full px-3.5 py-1.5 text-sm font-semibold transition-colors ${
         isActive
           ? 'bg-accent-fill text-on-accent'
           : 'border border-line text-muted hover:border-line-strong hover:text-foreground'

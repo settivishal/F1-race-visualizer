@@ -64,3 +64,47 @@ query RaceAnalysis($slug: String!) {
     }
   }
 }
+
+# Two drivers inside one race. Its own operation rather than a field on
+# RaceAnalysis, because the pair keys the cache entry and the rest of the
+# analysis payload — every lap time of every driver — does not vary by it.
+query HeadToHead($slug: String!, $driverA: String!, $driverB: String!) {
+  race(slug: $slug) {
+    slug
+    laps
+    meeting {
+      name
+      season
+    }
+    results {
+      finalPosition
+      driver {
+        code
+        name
+      }
+    }
+    analysis {
+      headToHead(driverA: $driverA, driverB: $driverB) {
+        lapsAheadA
+        lapsAheadB
+        a {
+          driver { code name }
+          team { name color }
+          finalPosition
+          pace { best median consistency lapsCounted }
+        }
+        b {
+          driver { code name }
+          team { name color }
+          finalPosition
+          pace { best median consistency lapsCounted }
+        }
+        laps {
+          lap
+          positionDelta
+          timeDelta
+        }
+      }
+    }
+  }
+}

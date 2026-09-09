@@ -17,6 +17,7 @@
     "gql:generate": "pnpm gql:schema && graphql-codegen --config codegen.ts",
     "gql:check": "pnpm gql:schema && git diff --exit-code schema.graphql && graphql-codegen --config codegen.ts --check",
     "seed:admin": "tsx scripts/seed-admin.ts",
+    "seed:config": "tsx scripts/seed-config.ts",
     "e2e": "playwright test"
   },
   "dependencies": {
@@ -26,6 +27,7 @@
     "@neondatabase/serverless": "^1.1.0",
     "@pothos/core": "^4.13.1",
     "@pothos/plugin-relay": "^4.7.1",
+    "@vercel/analytics": "^2.0.1",
     "bcryptjs": "^3.0.3",
     "dataloader": "^2.2.3",
     "drizzle-orm": "^0.45.2",

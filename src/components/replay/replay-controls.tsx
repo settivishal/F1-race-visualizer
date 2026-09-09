@@ -34,6 +34,37 @@ const RestartIcon = () => (
   </svg>
 );
 
+/**
+ * One speed option. Hoisted out of the component: defined inside it, this would
+ * be a new component type on every render, and React would unmount and remount
+ * the buttons rather than update them.
+ */
+function SpeedButton({
+  option,
+  isActive,
+  onSelect,
+  className = "",
+}: {
+  option: number;
+  isActive: boolean;
+  onSelect: (speed: number) => void;
+  className?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => onSelect(option)}
+      className={`tap inline-flex items-center justify-center rounded-full px-2.5 text-eyebrow font-bold uppercase transition ${className} ${
+        isActive
+          ? "bg-accent-fill text-on-accent hover:bg-accent-strong"
+          : "border border-white/15 bg-white/10 text-white/70 hover:bg-white/20 hover:text-white"
+      }`}
+    >
+      {option}x
+    </button>
+  );
+}
+
 export function ReplayControls({
   currentLap,
   maxLap,
@@ -82,14 +113,17 @@ export function ReplayControls({
   // the accent is a token, because it is red either way.
   if (compact) {
     return (
-      <div className="min-w-[min(100%,34rem)] rounded-xl border border-white/10 bg-black/55 px-6 py-5 shadow-lg backdrop-blur-md">
-        <div className="flex flex-wrap items-center gap-2">
+      <div className="w-full rounded-xl border border-white/10 bg-black/55 px-4 py-4 shadow-lg backdrop-blur-md sm:px-6 sm:py-5">
+        {/* Two deliberate rows rather than one that wraps: at 390px the four
+            transport buttons and five speeds cannot share a line, and letting
+            them wrap put a lone 8x on a third row of its own. */}
+        <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={onPrevious}
             disabled={!canStepBackward}
             aria-label="Previous lap"
-            className="h-8 w-8 flex items-center justify-center rounded-full border border-white/15 bg-white/10 text-white transition hover:bg-white/20 disabled:opacity-30"
+            className="tap-square h-9 w-9 flex items-center justify-center rounded-full border border-white/15 bg-white/10 text-white transition hover:bg-white/20 disabled:opacity-30"
           >
             <PrevIcon />
           </button>
@@ -97,7 +131,7 @@ export function ReplayControls({
             type="button"
             onClick={onPlayPause}
             aria-label={isPlaying ? "Pause replay" : "Play replay"}
-            className="h-8 w-8 flex items-center justify-center rounded-full bg-accent-fill text-on-accent transition hover:bg-accent-strong active:brightness-90"
+            className="tap-square h-9 w-9 flex items-center justify-center rounded-full bg-accent-fill text-on-accent transition hover:bg-accent-strong active:brightness-90"
           >
             {isPlaying ? <PauseIcon /> : <PlayIcon />}
           </button>
@@ -106,7 +140,7 @@ export function ReplayControls({
             onClick={onNext}
             disabled={!canStepForward}
             aria-label="Next lap"
-            className="h-8 w-8 flex items-center justify-center rounded-full border border-white/15 bg-white/10 text-white transition hover:bg-white/20 disabled:opacity-30"
+            className="tap-square h-9 w-9 flex items-center justify-center rounded-full border border-white/15 bg-white/10 text-white transition hover:bg-white/20 disabled:opacity-30"
           >
             <NextIcon />
           </button>
@@ -114,30 +148,35 @@ export function ReplayControls({
             type="button"
             onClick={onRestart}
             aria-label="Restart replay"
-            className="h-8 w-8 flex items-center justify-center rounded-full border border-white/15 bg-white/10 text-white transition hover:bg-white/20"
+            className="tap-square h-9 w-9 flex items-center justify-center rounded-full border border-white/15 bg-white/10 text-white transition hover:bg-white/20"
           >
             <RestartIcon />
           </button>
 
-          <div className="ml-auto flex flex-wrap gap-1">
-            {SPEED_OPTIONS.map((option) => {
-              const isActive = option === speed;
-              return (
-                <button
-                  key={option}
-                  type="button"
-                  onClick={() => onChangeSpeed(option)}
-                  className={`rounded-full px-2.5 py-1 text-eyebrow font-bold uppercase transition ${
-                    isActive
-                      ? "bg-accent-fill text-on-accent hover:bg-accent-strong"
-                      : "border border-white/15 bg-white/10 text-white/70 hover:bg-white/20 hover:text-white"
-                  }`}
-                >
-                  {option}x
-                </button>
-              );
-            })}
+          {/* A segmented control on its own line: five options that share the
+              width rather than five pills that wrap. */}
+          <div className="ml-auto hidden gap-1 sm:flex">
+            {SPEED_OPTIONS.map((option) => (
+              <SpeedButton
+                key={option}
+                option={option}
+                isActive={option === speed}
+                onSelect={onChangeSpeed}
+              />
+            ))}
           </div>
+        </div>
+
+        <div className="mt-2 flex gap-1 sm:hidden">
+          {SPEED_OPTIONS.map((option) => (
+            <SpeedButton
+              key={option}
+              option={option}
+              isActive={option === speed}
+              onSelect={onChangeSpeed}
+              className="flex-1"
+            />
+          ))}
         </div>
 
         <div className="mt-3.5 grid gap-2">
