@@ -32,42 +32,22 @@ export const metadata = {
 
 export default function Home() {
   return (
-    <PageContainer className="py-14">
-      <section className="grid gap-10 lg:grid-cols-[minmax(0,26rem)_minmax(0,1fr)] lg:items-center">
-        <div>
-        {/* Not the season: the shell prerenders, so it cannot await one, and
-            the season status below already names the year. Two places saying it
-            is how they come to disagree. */}
-        <p className="text-eyebrow font-bold uppercase text-accent">
-          Formula 1, replayed
-        </p>
-        <h1 className="font-heading mt-3 text-4xl font-bold leading-[1.05] tracking-tight sm:text-6xl">
-          Every position change,
-          <br />
-          <span className="text-muted">lap by lap.</span>
-        </h1>
-        <p className="mt-5 max-w-xl text-lg leading-8 text-muted">
-          A grand prix is a thousand small moves that only make sense together. Pick a race
-          and watch the order rearrange itself — pit windows, safety cars, the lap someone
-          finally got past.
-        </p>
-        <div className="mt-8 flex flex-wrap gap-3">
-          <Link href="/races">
-            <Button size="lg">Browse races</Button>
-          </Link>
-        </div>
-        </div>
+    <>
+      {/* The hero is a full-bleed band, so it sits outside the container and
+          carries its own. The copy is passed into the chart rather than beside
+          it: one band, the claim over the thing that demonstrates it.
 
-        {/* The claim above, demonstrated. Streams on its own so the copy is
-            never waiting on a race to load. */}
-        <Suspense fallback={<Skeleton className="h-72 w-full rounded-xl" />}>
-          <HeroChart />
-        </Suspense>
-      </section>
+          The fallback holds the band's height, because the copy is inside it —
+          a shorter fallback would drop the headline to the top of the viewport
+          and then push it down when the race arrives. */}
+      <Suspense fallback={<Skeleton className="h-[32rem] w-full rounded-none" />}>
+        <HeroChart />
+      </Suspense>
 
+      <PageContainer className="py-14">
       {/* Each section streams on its own, so a slow standings query cannot hold
           up the featured race or the hero above it. */}
-      <Suspense fallback={<Skeleton className="mt-14 h-44 w-full" />}>
+      <Suspense fallback={<Skeleton className="h-44 w-full" />}>
         <SeasonProgress />
       </Suspense>
 
@@ -86,7 +66,8 @@ export default function Home() {
       <Suspense fallback={<StandingsSkeleton />}>
         <Standings />
       </Suspense>
-    </PageContainer>
+      </PageContainer>
+    </>
   );
 }
 
@@ -137,7 +118,30 @@ async function HeroChart() {
       drivers={drivers}
       maxLap={race.replay.summary.maxLap}
       maxPosition={race.replay.summary.maxPosition}
-    />
+    >
+      {/* Not the season: the season status below already names the year, and
+          two places saying it is how they come to disagree. */}
+      <p className="text-eyebrow font-bold uppercase text-on-track-accent">
+        Formula 1, replayed
+      </p>
+      <h1 className="font-heading mt-3 max-w-2xl text-4xl font-bold leading-[1.05] tracking-tight text-white sm:text-6xl">
+        Every position change,
+        <br />
+        <span className="text-white/60">lap by lap.</span>
+      </h1>
+      <p className="mt-5 max-w-xl text-lg leading-8 text-white/70">
+        A grand prix is a thousand small moves that only make sense together. Pick a race
+        and watch the order rearrange itself — pit windows, safety cars, the lap someone
+        finally got past.
+      </p>
+      <div className="mt-8 flex flex-wrap gap-3">
+        <Link href="/races">
+          <Button size="lg" className="transition-transform hover:scale-[1.03]">
+            Browse races
+          </Button>
+        </Link>
+      </div>
+    </HeroReplay>
   );
 }
 
@@ -217,7 +221,7 @@ async function Standings() {
   }
 
   return (
-    <section className="mt-14">
+    <section className="reveal mt-14">
       <div className="flex items-end justify-between gap-4">
         <h2 className="type-section-title">
           Drivers&rsquo; championship

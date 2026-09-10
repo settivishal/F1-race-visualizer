@@ -584,3 +584,42 @@ html:has(:root.light) {
     animation-delay: 0s !important;
   }
 }
+
+/* ── Landing page, option 2c ──────────────────────────────────────────
+ *
+ * Three one-shot load animations, all CSS: the reduced-motion block above
+ * already stops every one of them without any of them having to ask.
+ */
+
+/* The hero's lines draw themselves. Each path carries `pathLength="1"` in the
+ * markup, so one dash value works for a 3-lap sprint and a 78-lap Monaco
+ * without measuring anything. */
+.hero-line {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: hero-draw 1.2s var(--ease-out-fast) forwards;
+}
+
+@keyframes hero-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* The race just run, on the podium's first place. Slow enough to read as a
+ * pulse rather than a blink, and it stops for anyone who asked it to. */
+.podium-lead {
+  animation: podium-glow 2.2s ease-in-out 1s infinite;
+}
+
+@keyframes podium-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--accent) 55%, transparent),
+      0 0 22px -6px color-mix(in srgb, var(--accent) 70%, transparent);
+  }
+}

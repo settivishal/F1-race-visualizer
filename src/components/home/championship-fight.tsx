@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { CountUp } from '@/components/home/count-up';
 import { Card } from '@/components/ui/card';
 import { isTitleSettled, pointsStillAvailable, type RemainingRounds } from '@/lib/championship';
 
@@ -52,7 +53,12 @@ export function ChampionshipFight({
           {second ? (
             <>
               <p className="tabular text-center">
-                <span className="block type-page-title text-accent">+{formatPoints(gap)}</span>
+                {/* The one number on the page worth watching arrive. It renders
+                    as its final value, so the server output and a reader with
+                    no JavaScript both get the answer. */}
+                <span className="block type-page-title text-accent">
+                  +<CountUp value={gap} />
+                </span>
                 <span className="text-eyebrow font-semibold uppercase text-muted">points</span>
               </p>
               <Contender contender={second} label="Second" />
