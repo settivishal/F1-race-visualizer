@@ -67,6 +67,14 @@ export function StrategyChart({
             {COMPOUND[compound]?.label ?? compound}
           </li>
         ))}
+        {/* Only where the race was actually stopped, so the legend never
+            explains a mark that is not on the chart. */}
+        {rows.some((row) => row.stoppageLaps.length > 0) ? (
+          <li className="flex items-center gap-1.5 text-xs text-muted">
+            <span className="h-3.5 w-0.5 bg-flag-red" aria-hidden />
+            Red flag
+          </li>
+        ) : null}
       </ul>
 
       <ol className="mt-4 space-y-1.5">
@@ -108,15 +116,13 @@ export function StrategyChart({
                 );
               })}
             </span>
-            <span className="tabular w-36 shrink-0 whitespace-nowrap text-right text-xs text-muted">
+            {/* The count only. A red flag stops everyone, so saying so on every
+                row is one fact printed twenty times — the legend says it once
+                and the divider says where. */}
+            <span className="tabular w-24 shrink-0 text-right text-xs text-muted">
               {row.stops.length === 0
                 ? "no stops"
                 : `${row.stops.length} ${row.stops.length === 1 ? "stop" : "stops"}`}
-              {/* Said out loud rather than folded into the count: this driver's
-                  tyres changed, and it cost them nothing. */}
-              {row.stoppageLaps.length > 0 ? (
-                <span className="text-flag-red"> · red flag</span>
-              ) : null}
             </span>
           </li>
         ))}
