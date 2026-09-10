@@ -41,7 +41,7 @@ export function SeasonPulse({ season, rounds }: { season: number; rounds: PulseR
       </div>
 
       <ol className="mt-4 flex flex-wrap gap-1.5">
-        {rounds.map((round) => {
+        {rounds.map((round, index) => {
           const label =
             round.status === 'CANCELLED'
               ? `Round ${round.round}, ${round.name}: cancelled`
@@ -86,7 +86,15 @@ export function SeasonPulse({ season, rounds }: { season: number; rounds: PulseR
           );
 
           return (
-            <li key={round.round}>
+            // Each round arrives just after the one before it, so the strip
+            // reads left to right the way the season ran. Scroll-driven like
+            // every other entrance here, so it happens when the strip is
+            // looked at rather than while it is off screen.
+            <li
+              key={round.round}
+              className="pulse-pill"
+              style={{ '--i': index } as React.CSSProperties}
+            >
               {round.slug ? (
                 <Link href={`/races/${round.slug}`} className="group block rounded-lg" title={label}>
                   <span className="sr-only">{label}</span>
