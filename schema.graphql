@@ -172,6 +172,7 @@ type PulseRound {
   slug: String
   status: PulseRoundStatus!
   teamColor: String
+  teamName: String
   winnerCode: String
 }
 
