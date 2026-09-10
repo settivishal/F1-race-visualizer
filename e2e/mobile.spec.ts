@@ -77,10 +77,12 @@ test('the chart fits the screen and windows the race instead of panning', async 
   const chart = await page.evaluate(() => {
     const svg = document.querySelector('svg[role="img"]');
     const box = svg?.parentElement?.parentElement as HTMLElement;
+    // A phone labels the axis with a bare number; the desktop prefixes "Lap".
+    // Either way a tick is the only text in the chart that is just a number.
     const ticks = [...document.querySelectorAll('svg text')]
-      .map((node) => node.textContent ?? '')
-      .filter((text) => text.startsWith('Lap '))
-      .map((text) => Number(text.replace('Lap ', '')));
+      .map((node) => (node.textContent ?? '').replace('Lap ', ''))
+      .filter((text) => /^\d+$/.test(text))
+      .map(Number);
 
     return {
       content: box.scrollWidth,
@@ -130,4 +132,64 @@ test('what a finger lands on is big enough to hit', async ({ page }) => {
   });
 
   expect(tooSmall).toEqual([]);
+});
+
+test('the chart is drawn at the size it is displayed', async ({ page }) => {
+  // It used to have a fixed 1120x640 viewBox scaled into whatever box it had.
+  // At 390px that is a factor of 0.35, so an 11px label rendered at 3.8px and
+  // the box letterboxed 129px. "Looks small" is not a test; these numbers are.
+  await page.goto('/races/2026-monza?lap=40');
+  await page.waitForLoadState('networkidle');
+
+  const chart = await page.evaluate(() => {
+    const svg = document.querySelector('svg[role="img"]') as SVGSVGElement;
+    const box = svg.parentElement as HTMLElement;
+    const rows = [...svg.querySelectorAll('text')]
+      .filter((node) => /^P\d+$/.test(node.textContent ?? ''))
+      .map((node) => node.getBoundingClientRect());
+    const labels = [...svg.querySelectorAll('text')].map(
+      (node) => node.getBoundingClientRect().height,
+    );
+
+    const ticks = [...svg.querySelectorAll('text')]
+      .filter((node) => /^\d+$/.test(node.textContent ?? ''))
+      .map((node) => node.getBoundingClientRect())
+      .sort((a, b) => a.left - b.left);
+
+    return {
+      svgHeight: svg.getBoundingClientRect().height,
+      boxHeight: box.getBoundingClientRect().height,
+      smallestLabel: Math.min(...labels),
+      rowGap: rows.length > 1 ? rows[1].top - rows[0].top : 0,
+      rowCount: rows.length,
+      labelOverlap: ticks.filter((tick, i) => i > 0 && tick.left < ticks[i - 1].right).length,
+    };
+  });
+
+  // The assertion that would have caught this: type is type, at any width.
+  expect(chart.smallestLabel).toBeGreaterThanOrEqual(10);
+
+  // The drawing is the shape of its container, so nothing letterboxes.
+  expect(Math.abs(chart.svgHeight - chart.boxHeight)).toBeLessThanOrEqual(1);
+
+  // Rows stay far enough apart to read and to hit.
+  expect(chart.rowCount).toBeGreaterThan(10);
+  expect(chart.rowGap).toBeGreaterThanOrEqual(16);
+
+  // And the axis holds as many labels as fit, rather than a fixed eight
+  // overlapping into one smear.
+  expect(chart.labelOverlap).toBe(0);
+});
+
+test('the driver badges come off on a phone and stay on a desktop', async ({ page }) => {
+  // Twenty-two badges down a narrow screen are a column of labels over the
+  // plot. The timing tower above lists every driver as real text instead.
+  await page.goto('/races/2026-monza?lap=40');
+  await page.waitForLoadState('networkidle');
+  await expect(page.getByTestId('race-car')).toHaveCount(0);
+
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto('/races/2026-monza?lap=40');
+  await page.waitForLoadState('networkidle');
+  expect(await page.getByTestId('race-car').count()).toBeGreaterThan(0);
 });

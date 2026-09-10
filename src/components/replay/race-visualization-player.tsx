@@ -262,7 +262,7 @@ export function RaceVisualizationPlayer({
               <RaceVisualizationCanvas
                 // Shorter on a phone: at 600px the chart is the whole viewport
                 // and you pan a window you cannot see around.
-                className="min-h-[22rem] sm:min-h-[600px] max-h-[800px] flex-1"
+                className="sm:min-h-[600px] sm:max-h-[800px] flex-1"
                 visualization={visualization}
                 currentLap={currentLap}
                 nextLap={nextLap}
