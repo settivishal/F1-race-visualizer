@@ -262,6 +262,15 @@
   --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.36);
   --shadow-lg: 0 16px 44px rgba(0, 0, 0, 0.44);
 
+  /* The race just run. A bloom, not an outline: a 1px accent edge, a soft halo
+     just outside it, and a wide diffuse glow that fades into the ground. Kept
+     as a token because a three-layer shadow written inline at the call site is
+     unreadable, and because the tile is the only thing that should wear it. */
+  --shadow-glow:
+    0 0 0 1px color-mix(in srgb, var(--accent) 34%, transparent),
+    0 0 10px 1px color-mix(in srgb, var(--accent) 22%, transparent),
+    0 0 38px 2px color-mix(in srgb, var(--accent) 30%, transparent);
+
   /* Motion. Tailwind has no theme namespace for durations — `duration-fast`
      compiles to nothing — so "snappy" is set as the *default* every `transition-*`
      utility inherits, rather than a token each component has to remember to

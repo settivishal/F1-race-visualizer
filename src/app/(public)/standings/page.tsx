@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { PageContainer } from '@/components/ui/page-container';
+import { SeasonFilter } from '@/components/ui/season-filter';
 import { SectionHeader } from '@/components/ui/section-header';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getActiveSeason, getSeasonStandings } from '@/lib/queries';
@@ -56,35 +57,24 @@ async function Standings({ searchParams }: { searchParams: SearchParams }) {
 
   return (
     <>
-      <form method="get" className="mt-8 flex flex-wrap items-end gap-3">
-        <label className="flex flex-col gap-1.5">
-          <span className="text-eyebrow font-semibold uppercase text-muted">Season</span>
-          <select
-            name="season"
-            defaultValue={season}
-            className="h-10 w-full rounded-md border border-line bg-panel px-3 text-sm text-foreground transition-[border-color] hover:border-line-strong"
-          >
-            {/* The requested season is always an option, even one nobody has
-                raced yet — otherwise the selector would silently disagree with
-                the URL and the empty state below it. */}
-            {(seasons.some((entry) => entry.year === season)
-              ? seasons
-              : [...seasons, { year: season }]
-            )
-              .slice()
-              .sort((a, b) => b.year - a.year)
-              .map((entry) => (
-                <option key={entry.year} value={entry.year}>
-                  {entry.year}
-                </option>
-              ))}
-          </select>
-        </label>
-
-        <Button type="submit" variant="secondary">
-          Show season
-        </Button>
-      </form>
+      {/* Years as links, the shape the race library already uses: picking one
+          is the whole intent, so there is nothing left for a submit button to
+          confirm. The requested season is always a chip, even one nobody has
+          raced yet — otherwise the row would silently disagree with the URL and
+          the empty state below it. No "all seasons": a championship table is
+          one season by definition. */}
+      <div className="mt-8">
+        <SeasonFilter
+          pathname="/standings"
+          seasons={
+            seasons.some((entry) => entry.year === season)
+              ? seasons.map((entry) => entry.year)
+              : [...seasons.map((entry) => entry.year), season]
+          }
+          active={season}
+          allowAll={false}
+        />
+      </div>
 
       {driverStandings.length === 0 ? (
         <div className="mt-8">

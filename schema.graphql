@@ -160,6 +160,12 @@ type PitStop {
   underStoppage: Boolean!
 }
 
+type PodiumSlot {
+  code: String!
+  position: Int!
+  teamColor: String
+}
+
 type PulseRound {
   name: String!
   round: Int!
@@ -186,6 +192,7 @@ type Query {
   featuredRace: Race
   ingestRuns(first: Int = 50): [IngestRun!]!
   latestRace: Race
+  nextRace: Race
   race(slug: String!): Race
   races(after: String, before: String, first: Int, search: String, season: Int): RaceConnection!
   search(query: String!): [SearchHit!]!
@@ -206,6 +213,7 @@ type Race {
   laps: Int!
   meeting: Meeting
   openf1SessionKey: Int
+  podium: [PodiumSlot!]!
   positions(lap: Int): [RacePosition!]!
   replay: RaceReplay!
   results: [RaceResult!]!

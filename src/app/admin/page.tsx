@@ -1,5 +1,6 @@
 import { Suspense } from 'react';
 import Link from 'next/link';
+import { AutoSubmit } from '@/components/ui/auto-submit';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -95,6 +96,8 @@ async function RaceList({ searchParams }: { searchParams: SearchParams }) {
       </Card>
 
       <form method="get" className="mt-8 flex flex-wrap items-end gap-3">
+        {/* The season applies on pick; the search box still needs the button. */}
+        <AutoSubmit />
         <label className="flex flex-col gap-1.5">
           <span className="text-eyebrow font-semibold uppercase text-muted">Season</span>
           <select name="season" defaultValue={season ?? ''} className={fieldClasses}>
