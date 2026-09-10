@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { markAttributions } from '@/lib/team-marks';
 import { PageContainer } from '@/components/ui/page-container';
 import { SectionHeader } from '@/components/ui/section-header';
 
@@ -32,6 +33,8 @@ const linkClasses =
   'rounded-sm font-medium text-foreground underline decoration-line underline-offset-4 transition-colors hover:decoration-accent';
 
 export default function AboutPage() {
+  const marks = markAttributions();
+
   return (
     <PageContainer>
       <SectionHeader
@@ -70,6 +73,30 @@ export default function AboutPage() {
           Team colours are the season liveries, and the flag colours are the sport&rsquo;s
           own signals — yellow means yellow in either theme.
         </p>
+        {/* Written from the manifest rather than by hand, so a mark cannot be
+            added to the site without its credit appearing here. Nothing renders
+            while no team has one. */}
+        {marks.length > 0 ? (
+          <p>
+            Team marks shown beside the season are used under their own licences:{' '}
+            {marks.map((mark, index) => (
+              <span key={mark.src}>
+                {index > 0 ? '; ' : ''}
+                <a
+                  href={mark.source}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className={linkClasses}
+                >
+                  {mark.src.split('/').pop()?.replace(/\.svg$/, '')}
+                </a>{' '}
+                — {mark.licence}
+                {mark.author ? `, ${mark.author}` : ''}
+              </span>
+            ))}
+            .
+          </p>
+        ) : null}
       </Section>
 
       <Section title="How it is built">

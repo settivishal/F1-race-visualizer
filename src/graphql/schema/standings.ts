@@ -196,6 +196,7 @@ type PulseRoundShape = {
   slug: string | null;
   status: 'SCHEDULED' | 'COMPLETED' | 'CANCELLED';
   winnerCode: string | null;
+  teamName: string | null;
   teamColor: string | null;
 };
 
@@ -211,6 +212,9 @@ const PulseRound = builder.objectRef<PulseRoundShape>('PulseRound').implement({
     slug: t.exposeString('slug', { nullable: true }),
     status: t.field({ type: PulseStatus, resolve: (r) => r.status }),
     winnerCode: t.exposeString('winnerCode', { nullable: true }),
+    // The team as it is stored, which is the key the mark manifest is written
+    // against — see lib/team-marks.ts.
+    teamName: t.exposeString('teamName', { nullable: true }),
     teamColor: t.exposeString('teamColor', { nullable: true }),
   }),
 });
@@ -227,6 +231,7 @@ builder.queryField('seasonPulse', (t) =>
           slug: races.slug,
           status: races.status,
           winnerCode: drivers.code,
+          teamName: teams.name,
           teamColor: sql<string | null>`coalesce(${teamSeasons.color}, ${teams.color})`,
         })
         .from(meetings)
@@ -256,6 +261,7 @@ builder.queryField('seasonPulse', (t) =>
           slug: row.slug,
           status,
           winnerCode: run ? row.winnerCode : null,
+          teamName: run ? row.teamName : null,
           teamColor: run ? row.teamColor : null,
         };
       });

@@ -144,6 +144,7 @@ query SeasonPulse($season: Int!) {
     slug
     status
     winnerCode
+    teamName
     teamColor
   }
 }
