@@ -836,6 +836,7 @@ function AnimatedCar({
                 : false
           }
           muted={Boolean(state?.isBackmarker)}
+          dimmed={isDimmed}
           caution={raceControl.status !== "green" || Boolean(state?.isLapped)}
         />
         </motion.g>
