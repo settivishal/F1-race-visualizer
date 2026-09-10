@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { useMemo, useState } from "react";
+import { motion, AnimatePresence, MotionValue, useMotionValueEvent } from "framer-motion";
 import { cn } from "@/lib/cn";
 import { formatLapTime } from "@/lib/scale";
 import type { ReplayView } from "./types";
@@ -9,6 +9,10 @@ import type { ReplayView } from "./types";
 interface TimingTowerProps {
   visualization: ReplayView;
   currentLap: number;
+  /** The lap the chart is sliding towards; equal to `currentLap` on the last. */
+  nextLap: number;
+  /** How far through that slide the chart is, 0 to 1. */
+  lapProgress: MotionValue<number>;
   /** The driver held by a click — what `aria-pressed` reports. */
   focusedDriverId: string | null;
   /** The driver drawn at full strength: the hovered one, else the clicked one. */
@@ -48,6 +52,8 @@ export const TIMING_TOWER_ID = 'replay-timing-tower';
 export function LiveTimingTower({
   visualization,
   currentLap,
+  nextLap,
+  lapProgress,
   focusedDriverId,
   highlightedDriverId,
   onToggleDriver,
@@ -60,17 +66,40 @@ export function LiveTimingTower({
   // the column rendered a header over nothing for four seasons.
   const hasTimingDetail = visualization.race.dataTier === 'FULL';
 
+  // The order the chart is closest to, not the one it left.
+  //
+  // The chart spends the whole lap sliding from `currentLap` to `nextLap`, so a
+  // tower pinned to `currentLap` is up to a full lap behind by the end of the
+  // slide, and then snaps to the new order after the cars have already got
+  // there — the reorder reads as a delayed echo rather than the same event.
+  // This tower is the chart's `aria-describedby`, so it should round the way
+  // the eye does: past the halfway point, the cars are nearer the next order
+  // than the one they started from, and so is this list.
+  //
+  // Halfway is exactly where the eased position curve crosses, so the rows
+  // start moving on the frame the cars cross.
+  //
+  // A `useState` rather than a derived MotionValue because the order is React
+  // state that the layout spring animates; it changes once per lap, not once
+  // per frame. Under a reduced-motion preference `lapProgress` never leaves 0,
+  // so this stays false and the tower steps lap to lap as it always did.
+  const [leadsNextLap, setLeadsNextLap] = useState(false);
+  useMotionValueEvent(lapProgress, "change", (progress) => {
+    setLeadsNextLap(progress >= 0.5);
+  });
+  const standingsLap = leadsNextLap ? nextLap : currentLap;
+
   const standings = useMemo(() => {
     const currentStandings = [];
 
-    // Precompute overall bests up to currentLap
+    // Precompute overall bests up to standingsLap
     let overallBestS1: number | null = null;
     let overallBestS2: number | null = null;
     let overallBestS3: number | null = null;
 
     for (const entry of visualization.drivers) {
       for (const pos of entry.positions) {
-        if (pos.lap > currentLap) break;
+        if (pos.lap > standingsLap) break;
         if (pos.sector1 != null && (overallBestS1 == null || pos.sector1 < overallBestS1)) overallBestS1 = pos.sector1;
         if (pos.sector2 != null && (overallBestS2 == null || pos.sector2 < overallBestS2)) overallBestS2 = pos.sector2;
         if (pos.sector3 != null && (overallBestS3 == null || pos.sector3 < overallBestS3)) overallBestS3 = pos.sector3;
@@ -85,7 +114,7 @@ export function LiveTimingTower({
       let personalBestS3: number | null = null;
 
       for (const pos of entry.positions) {
-        if (pos.lap > currentLap) break;
+        if (pos.lap > standingsLap) break;
         currentPos = pos;
         
         if (pos.sector1 != null && (personalBestS1 == null || pos.sector1 < personalBestS1)) personalBestS1 = pos.sector1;
@@ -93,7 +122,7 @@ export function LiveTimingTower({
         if (pos.sector3 != null && (personalBestS3 == null || pos.sector3 < personalBestS3)) personalBestS3 = pos.sector3;
       }
 
-      if (currentPos && currentPos.lap <= currentLap) {
+      if (currentPos && currentPos.lap <= standingsLap) {
         currentStandings.push({
           entry,
           position: currentPos.position,
@@ -109,7 +138,7 @@ export function LiveTimingTower({
     }
 
     return currentStandings.sort((a, b) => a.position - b.position);
-  }, [visualization.drivers, currentLap]);
+  }, [visualization.drivers, standingsLap]);
 
   return (
     <div

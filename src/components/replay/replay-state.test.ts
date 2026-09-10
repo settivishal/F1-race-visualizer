@@ -6,6 +6,7 @@ import {
   withFocusLast,
   buildRaceControlByLap,
   classifyReplayEvent,
+  easeLapProgress,
   summarizeDriverReplayState,
 } from './replay-state';
 import type { ReplayEntry, ReplayEvent, ReplayPosition } from './types';
@@ -217,5 +218,30 @@ describe('withFocusLast', () => {
 
   it('drops nobody when the focused driver has no frame on this lap', () => {
     expect(ids(withFocusLast(frames, 'zzz'))).toEqual(['a', 'b', 'c']);
+  });
+});
+
+describe('easeLapProgress', () => {
+  it('starts, ends and crosses the middle exactly where linear does', () => {
+    // The eased curve only changes how a car gets between two laps, never
+    // which lap it is on: an endpoint that drifted would put every car in the
+    // wrong place at the lap boundary.
+    expect(easeLapProgress(0)).toBe(0);
+    expect(easeLapProgress(1)).toBe(1);
+    expect(easeLapProgress(0.5)).toBe(0.5);
+  });
+
+  it('never goes backwards', () => {
+    let previous = -1;
+    for (let step = 0; step <= 20; step += 1) {
+      const value = easeLapProgress(step / 20);
+      expect(value).toBeGreaterThanOrEqual(previous);
+      previous = value;
+    }
+  });
+
+  it('clamps, so a progress value past the ends cannot overshoot the lap', () => {
+    expect(easeLapProgress(-0.5)).toBe(0);
+    expect(easeLapProgress(1.5)).toBe(1);
   });
 });

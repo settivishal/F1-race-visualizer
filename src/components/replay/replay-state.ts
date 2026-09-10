@@ -404,6 +404,19 @@ export function describeMissingLaps(laps: number[], totalLaps: number): string |
  * focused, or when the focused driver has no entry in it, which happens on a
  * lap that has no row for them.
  */
+/**
+ * Smoothstep, for the position channel only.
+ *
+ * A lap's worth of linear interpolation makes twenty cars drift down straight
+ * diagonals; easing the ends makes a position swap read as a car pulling out
+ * and settling back in. It must not touch the x channel — x is time, and a
+ * chart whose playhead eases is a chart that disagrees with its own scrubber.
+ */
+export function easeLapProgress(progress: number) {
+  const p = Math.min(1, Math.max(0, progress));
+  return p * p * (3 - 2 * p);
+}
+
 export function withFocusLast<T extends { entry: { driver: { id: string } } }>(
   frames: T[],
   focusedDriverId: string | null,
