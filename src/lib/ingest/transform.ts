@@ -1,4 +1,5 @@
 import { formatDriverName } from '@/lib/format-name';
+import { isRacingStop } from '@/lib/pit-stops';
 import type { Lap, Meeting, Pit, PositionSample, Session, Stint } from './openf1';
 import type {
   EventRow, LineupRow, PitStopRow, PositionRow, RaceBundle, ResultRow, StintRow,
@@ -381,7 +382,24 @@ export function buildPitStops(pits: Pit[]): PitStopRow[] {
 export function buildEvents(bundle: RaceBundle, positions: PositionRow[]): EventRow[] {
   const events: EventRow[] = [];
 
+  // Laps where the field sat in the pit lane because the race was stopped.
+  // Upstream files that as a pit stop per driver, so without this the timeline
+  // narrates "1846.2s in the pit lane" twenty times and never says the race was
+  // suspended at all. Two or more cars, because one car parked in its garage for
+  // half an hour is a retirement, not a stoppage.
+  const stoppageLaps = new Set<number>();
+  const stoppedPerLap = new Map<number, number>();
   for (const pit of bundle.pits) {
+    if (isRacingStop(pit.pit_duration == null ? null : pit.pit_duration * 1000)) continue;
+    const seen = (stoppedPerLap.get(pit.lap_number) ?? 0) + 1;
+    stoppedPerLap.set(pit.lap_number, seen);
+    if (seen >= 2) stoppageLaps.add(pit.lap_number);
+  }
+
+  for (const pit of bundle.pits) {
+    // The stop rows themselves are still written verbatim; it is only the
+    // narration that would be wrong. See lib/pit-stops.ts.
+    if (pit.pit_duration != null && !isRacingStop(pit.pit_duration * 1000)) continue;
     events.push({
       lap: pit.lap_number,
       driverNumber: pit.driver_number,
@@ -405,7 +423,15 @@ export function buildEvents(bundle: RaceBundle, positions: PositionRow[]): Event
       });
     } else if (message.flag === 'RED') {
       events.push({ lap, driverNumber: null, type: 'RED_FLAG', details: message.message });
+      stoppageLaps.delete(lap);
     }
+  }
+
+  // Race control does not always carry the flag — the 2026 races have none at
+  // all — so where the pit lane says the race stopped and the messages did not,
+  // the event comes from the pit lane. One per lap, not one per car.
+  for (const lap of stoppageLaps) {
+    events.push({ lap, driverNumber: null, type: 'RED_FLAG', details: 'Race suspended' });
   }
 
   for (const result of bundle.results) {

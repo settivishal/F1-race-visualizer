@@ -284,7 +284,7 @@ const RACE_ANALYSIS = /* GraphQL */ `
           team { color }
         }
         pitStops {
-          lap durationSeconds
+          lap durationSeconds underStoppage
           driver { id code }
         }
       }

@@ -407,6 +407,41 @@ describe('analysis', () => {
     expect(norris!.laps.map((l) => l.lap)).toEqual([1, 3]);
   });
 
+  it('tells a race suspension apart from a pit stop, keeping both rows', async () => {
+    // Upstream files the stationary time under a red flag as a pit stop, so a
+    // stopped race arrives with one of these per car. Leclerc gets a half-hour
+    // one here; Norris keeps his 23.4s stop from the fixture.
+    const race = (await db.query.races.findFirst({
+      where: eq(dbSchema.races.slug, '2025-test'),
+    }))!;
+    const [existing] = await db
+      .select()
+      .from(dbSchema.pitStops)
+      .where(eq(dbSchema.pitStops.raceId, race.id));
+    const [leclerc] = await db
+      .select({ id: dbSchema.driverTeamAssignments.id })
+      .from(dbSchema.driverTeamAssignments)
+      .innerJoin(dbSchema.drivers, eq(dbSchema.drivers.id, dbSchema.driverTeamAssignments.driverId))
+      .where(eq(dbSchema.drivers.code, 'LEC'));
+
+    await db.insert(dbSchema.pitStops).values([
+      { raceId: race.id, assignmentId: leclerc.id, lap: existing.lap, durationMs: 1_842_500 },
+    ]);
+
+    const data = await run<{
+      race: { analysis: { pitStops: { lap: number; underStoppage: boolean }[] } };
+    }>(`query { race(slug: "2025-test") { analysis { pitStops { lap underStoppage } } } }`);
+
+    expect(data.race.analysis.pitStops).toEqual(
+      expect.arrayContaining([
+        { lap: 1, underStoppage: false },
+        { lap: 1, underStoppage: true },
+      ]),
+    );
+
+    await db.delete(dbSchema.pitStops).where(eq(dbSchema.pitStops.assignmentId, leclerc.id));
+  });
+
   it('flags a pit lap and its out-lap rather than deleting them', async () => {
     const data = await run<{ race: { analysis: { lapTimes: { driver: { code: string }; laps: { lap: number; isOutlier: boolean }[]; pace: { lapsCounted: number; lapsExcluded: number; best: number } }[] } } }>(`
       query {

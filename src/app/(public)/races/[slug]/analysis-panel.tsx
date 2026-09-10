@@ -67,6 +67,18 @@ export async function AnalysisPanel({
     lapsExcluded: d.pace.lapsExcluded,
   }));
 
+  // Laps the race was stopped on: several cars stationary for the same half
+  // hour. One car alone is a retirement into the garage, which upstream files
+  // the same way — it still does not count as a stop, but it is not a red flag
+  // either, so it gets no marker.
+  const stoppedCars = new Map<number, number>();
+  for (const stop of race.analysis.pitStops) {
+    if (stop.underStoppage) stoppedCars.set(stop.lap, (stoppedCars.get(stop.lap) ?? 0) + 1);
+  }
+  const stoppedOn = new Set(
+    [...stoppedCars].filter(([, cars]) => cars >= 2).map(([lap]) => lap),
+  );
+
   const strategyRows: StrategyRow[] = drivers
     .map((driver) => ({
       code: driver.code,
@@ -80,9 +92,14 @@ export async function AnalysisPanel({
           compound: stint.compound ?? null,
         }))
         .sort((a, b) => a.stintNumber - b.stintNumber),
+      // Split rather than filtered: a suspension is not a stop the driver
+      // chose, but it is why their tyres changed, so the row has to show both.
       stops: race.analysis.pitStops
-        .filter((stop) => stop.driver?.id === driver.id)
+        .filter((stop) => stop.driver?.id === driver.id && !stop.underStoppage)
         .map((stop) => ({ lap: stop.lap, durationSeconds: stop.durationSeconds ?? null })),
+      stoppageLaps: race.analysis.pitStops
+        .filter((stop) => stop.driver?.id === driver.id && stoppedOn.has(stop.lap))
+        .map((stop) => stop.lap),
     }))
     // A driver with no stint rows would draw an empty bar, which reads as a
     // rendering bug rather than as an absence of data.
@@ -108,7 +125,9 @@ export async function AnalysisPanel({
           description={
             race.dataTier === 'LAPS'
               ? 'Tyre compounds were not published for this era, so the stints below are the pit stops only.'
-              : 'Every stint, sized by the laps it lasted.'
+              : strategyRows.some((row) => row.stoppageLaps.length > 0)
+                ? 'Every stint, sized by the laps it lasted. This race was stopped, and a tyre change under a red flag costs nothing — so it is marked rather than counted as a stop.'
+                : 'Every stint, sized by the laps it lasted.'
           }
         />
         <div className="mt-5">

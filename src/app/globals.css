@@ -98,6 +98,22 @@
   --timing-best: #c084fc;
   --timing-personal: #4ade80;
   --timing-slower: #fbbf24;
+
+  /* Tyre compounds. Recognisably the sport's own colours, but as *fills* under
+     a lap count rather than as dots — the broadcast yellow (#f5c518) covering
+     half a bar glares on a dark ground, and the broadcast white for hard is
+     invisible on a light one. Each compound carries its own ink, because no
+     single text colour reads on both a red fill and a pale grey one. */
+  --tyre-soft: #cf3446;
+  --tyre-soft-ink: #ffffff;
+  --tyre-medium: #d4b03c;
+  --tyre-medium-ink: #1d1704;
+  --tyre-hard: #c6ccd5;
+  --tyre-hard-ink: #10151d;
+  --tyre-intermediate: #2f8b4e;
+  --tyre-intermediate-ink: #ffffff;
+  --tyre-wet: #3d6fae;
+  --tyre-wet-ink: #ffffff;
 }
 
 :root.light {
@@ -133,6 +149,19 @@
   --timing-best: #7e22ce;
   --timing-personal: #15803d;
   --timing-slower: #a16207;
+
+  /* Deeper than the dark theme's, because these sit on a white panel: a pale
+     grey hard tyre would vanish and the yellow would flare. */
+  --tyre-soft: #c3323f;
+  --tyre-soft-ink: #ffffff;
+  --tyre-medium: #d9ac36;
+  --tyre-medium-ink: #201900;
+  --tyre-hard: #aab1bb;
+  --tyre-hard-ink: #10151d;
+  --tyre-intermediate: #2f7d4c;
+  --tyre-intermediate-ink: #ffffff;
+  --tyre-wet: #35659c;
+  --tyre-wet-ink: #ffffff;
 }
 
 @media (prefers-color-scheme: light) {
@@ -169,6 +198,17 @@
     --timing-best: #7e22ce;
     --timing-personal: #15803d;
     --timing-slower: #a16207;
+
+    --tyre-soft: #c3323f;
+    --tyre-soft-ink: #ffffff;
+    --tyre-medium: #d9ac36;
+    --tyre-medium-ink: #201900;
+    --tyre-hard: #aab1bb;
+    --tyre-hard-ink: #10151d;
+    --tyre-intermediate: #2f7d4c;
+    --tyre-intermediate-ink: #ffffff;
+    --tyre-wet: #35659c;
+    --tyre-wet-ink: #ffffff;
   }
 }
 

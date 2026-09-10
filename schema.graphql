@@ -157,6 +157,7 @@ type PitStop {
   durationSeconds: Float
   lap: Int!
   team: Team
+  underStoppage: Boolean!
 }
 
 type PodiumSlot {
