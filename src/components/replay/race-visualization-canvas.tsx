@@ -256,7 +256,11 @@ export function RaceVisualizationCanvas({
   const lapTicks = getVisibleLapTicks(
     laps.filter((lap) => lap >= lapWindow.from && lap <= lapWindow.to),
   );
-  const activeLapX = useTransform(lapProgress, (p) => lapX(currentLap + (nextLap - currentLap) * p));
+  // Same split as the cars: the lap's own position is a render value, and the
+  // motion value carries only the travel from it.
+  const playheadBaseX = lapX(currentLap);
+  const playheadTravelX = lapX(nextLap) - playheadBaseX;
+  const activeLapX = useTransform(lapProgress, (p) => playheadTravelX * p);
 
   // How far the window will move when the lap index advances, in viewBox units:
   // zero on a desktop and at both ends of the race, where the window is pinned.
@@ -515,19 +519,25 @@ export function RaceVisualizationCanvas({
               {/* Glowing active lap scrubber line. Inside the pan, so while the
                   window is sliding the playhead holds its place on screen and
                   the race moves past it. */}
-              <motion.line
-                style={{ x: activeLapX }}
-                y1={MARGIN.top - 32}
-                y2={VIEWBOX_HEIGHT - MARGIN.bottom}
-                stroke="var(--accent)"
-                strokeWidth="2.5"
-                opacity="0.85"
-              />
-              {/* Top glowing handle for active line */}
-              <motion.g style={{ x: activeLapX, y: MARGIN.top - 32 }}>
-                <circle r="6" fill="var(--accent)" />
-                <circle r="2.5" fill="white" />
-              </motion.g>
+              <g transform={`translate(${playheadBaseX} 0)`}>
+                <motion.line
+                  // Named so a test can tell a car that moved on its own from a
+                  // whole chart that shifted underneath it: the playhead rides
+                  // the same lap scale, so if it moved too, the scale did.
+                  data-testid="lap-playhead"
+                  style={{ x: activeLapX }}
+                  y1={MARGIN.top - 32}
+                  y2={VIEWBOX_HEIGHT - MARGIN.bottom}
+                  stroke="var(--accent)"
+                  strokeWidth="2.5"
+                  opacity="0.85"
+                />
+                {/* Top glowing handle for active line */}
+                <motion.g style={{ x: activeLapX, y: MARGIN.top - 32 }}>
+                  <circle r="6" fill="var(--accent)" />
+                  <circle r="2.5" fill="white" />
+                </motion.g>
+              </g>
 
             {/* Vertical lap grid lines */}
             {lapTicks.map((lap) => {
@@ -708,18 +718,29 @@ function AnimatedCar({
   // value.
   const dim = isDimmed ? 0.3 : 1;
 
-  const x = useTransform(lapProgress, (p) => {
-    return lapX(isCarActive ? currentLap + (nextLap - currentLap) * p : currentLap);
-  });
+  // Where this car sits at the lap it is on, straight from the render. It used
+  // to come out of the same `useTransform` as the movement, which meant a lap
+  // change only reached the screen when `lapProgress` next emitted — and under
+  // a reduced-motion preference `lapProgress` is set to 0 when it is already 0,
+  // which emits nothing. The cars and the playhead lagged the lap counter.
+  //
+  // So the lap's position is a plain number, correct in the commit that
+  // changed the lap, and the motion values below carry only the movement away
+  // from it. At rest that offset is exactly zero, which is the whole of the
+  // reduced-motion behaviour, by construction rather than by arithmetic.
+  const baseX = lapX(currentLap);
+  const baseY = getPositionY(
+    currentPoint?.position ?? nextPoint?.position ?? 1,
+    summary.maxPosition,
+  );
+  const travelX = isCarActive ? lapX(nextLap) - baseX : 0;
+  const travelY =
+    isCarActive && currentPoint && nextPoint
+      ? getPositionY(nextPoint.position, summary.maxPosition) - baseY
+      : 0;
 
-  const y = useTransform(lapProgress, (p) => {
-    const eased = easeLapProgress(p);
-    const interpolatedPosition =
-      currentPoint && nextPoint
-        ? currentPoint.position + (nextPoint.position - currentPoint.position) * eased
-        : currentPoint?.position ?? nextPoint?.position ?? 1;
-    return getPositionY(interpolatedPosition, summary.maxPosition);
-  });
+  const x = useTransform(lapProgress, (p) => travelX * p);
+  const y = useTransform(lapProgress, (p) => travelY * easeLapProgress(p));
 
   if (!first || !last || !fullPath || !currentPoint || !nextPoint) {
     return null;
@@ -764,29 +785,6 @@ function AnimatedCar({
         />
       ) : null}
 
-      {/* The lap the car is currently driving.
-          `trail` is built in React from the laps already completed, so it only
-          grows when the lap index does — while the badge slides continuously
-          toward the next lap. That left every car detached from the end of its
-          own line for the whole lap, and the line snapping a lap-width to catch
-          up at the boundary. This segment is the gap: it ends on the same two
-          motion values the badge rides, so the line arrives exactly where the
-          recomputed `trail` picks it up. Under a reduced-motion preference
-          `lapProgress` stays at 0 and the segment has no length. */}
-      {isCarActive && currentPoint ? (
-        <motion.line
-          x1={lapX(currentLap)}
-          y1={getPositionY(currentPoint.position, summary.maxPosition)}
-          x2={x}
-          y2={y}
-          stroke={team.color}
-          strokeOpacity={(state?.isBackmarker ? 0.5 : 0.8) * dim}
-          strokeWidth={state?.isLapped ? "2.5" : "3.2"}
-          strokeLinecap="round"
-          strokeDasharray={state?.isLapped ? "8 6" : undefined}
-        />
-      ) : null}
-
       {isRetiredAtCurrentLap && markerPoint ? (
         <motion.g
           transform={`translate(${
@@ -806,42 +804,70 @@ function AnimatedCar({
         </motion.g>
       ) : null}
 
-      {/* Kept mounted for the lap the car retires on, so it fades out under the
-          cross rather than blinking out from under it. */}
-      {isCarActive || retirementEvent?.lap === currentLap ? (
-        // The badge is the loudest thing on the chart, so dimming it by the
-        // same factor as the lines is what actually makes a focused driver
-        // stand out. `muted` stays what it always was — a backmarker — and the
-        // two compound for a backmarker who is not the focused driver.
-        <g opacity={dim} className="transition-opacity duration-200">
-        {/* The focus dim stays an `opacity` attribute on the group above:
-            framer-motion writes opacity to style, and the dim is what the
-            replay e2e reads off the attribute to assert that exactly one car
-            is at full strength. The retirement fade is its own layer inside. */}
-        <motion.g
-          animate={{ opacity: isCarActive ? 1 : 0 }}
-          transition={{ duration: 0.25 }}
-        >
-        <RaceCar
-          color={team.color}
-          driverCode={driver.code}
-          label={positions.length === 1 ? driver.name : undefined}
-          x={x}
-          y={y}
-          accent={
-            currentPoint.position > nextPoint.position
-              ? "up"
-              : currentPoint.position < nextPoint.position
-                ? "down"
-                : false
-          }
-          muted={Boolean(state?.isBackmarker)}
-          dimmed={isDimmed}
-          caution={raceControl.status !== "green" || Boolean(state?.isLapped)}
-        />
-        </motion.g>
-        </g>
-      ) : null}
+      {/* Everything that moves within the lap, hung off the lap's own
+          position. The translate is a plain render value, so it is right
+          the moment the lap changes; the motion values inside it are the
+          travel away from that point, and they are zero at rest. */}
+      <g transform={`translate(${baseX} ${baseY})`}>
+        {/* The lap the car is currently driving.
+            `trail` is built in React from the laps already completed, so it only
+            grows when the lap index does — while the badge slides continuously
+            toward the next lap. That left every car detached from the end of its
+            own line for the whole lap, and the line snapping a lap-width to catch
+            up at the boundary. This segment is the gap: it ends on the same two
+            motion values the badge rides, so the line arrives exactly where the
+            recomputed `trail` picks it up. Under a reduced-motion preference
+            `lapProgress` stays at 0 and the segment has no length. */}
+        {isCarActive && currentPoint ? (
+          <motion.line
+            x1={0}
+            y1={0}
+            x2={x}
+            y2={y}
+            stroke={team.color}
+            strokeOpacity={(state?.isBackmarker ? 0.5 : 0.8) * dim}
+            strokeWidth={state?.isLapped ? "2.5" : "3.2"}
+            strokeLinecap="round"
+            strokeDasharray={state?.isLapped ? "8 6" : undefined}
+          />
+        ) : null}
+        {/* Kept mounted for the lap the car retires on, so it fades out under the
+            cross rather than blinking out from under it. */}
+        {isCarActive || retirementEvent?.lap === currentLap ? (
+          // The badge is the loudest thing on the chart, so dimming it by the
+          // same factor as the lines is what actually makes a focused driver
+          // stand out. `muted` stays what it always was — a backmarker — and the
+          // two compound for a backmarker who is not the focused driver.
+          <g opacity={dim} className="transition-opacity duration-200">
+          {/* The focus dim stays an `opacity` attribute on the group above:
+              framer-motion writes opacity to style, and the dim is what the
+              replay e2e reads off the attribute to assert that exactly one car
+              is at full strength. The retirement fade is its own layer inside. */}
+          <motion.g
+            animate={{ opacity: isCarActive ? 1 : 0 }}
+            transition={{ duration: 0.25 }}
+          >
+          <RaceCar
+            color={team.color}
+            driverCode={driver.code}
+            label={positions.length === 1 ? driver.name : undefined}
+            x={x}
+            y={y}
+            accent={
+              currentPoint.position > nextPoint.position
+                ? "up"
+                : currentPoint.position < nextPoint.position
+                  ? "down"
+                  : false
+            }
+            muted={Boolean(state?.isBackmarker)}
+            dimmed={isDimmed}
+            caution={raceControl.status !== "green" || Boolean(state?.isLapped)}
+          />
+          </motion.g>
+          </g>
+        ) : null}
+      </g>
     </g>
   );
 }

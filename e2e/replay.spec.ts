@@ -130,13 +130,25 @@ test.describe('with a reduced-motion preference', () => {
       page.evaluate(() => {
         const car = document.querySelector('[data-testid="race-car"]');
         const label = document.querySelector('svg[role="img"]')?.getAttribute('aria-label') ?? '';
+        const playhead = document.querySelector('[data-testid="lap-playhead"]');
+        const svg = document.querySelector('svg[role="img"]');
+
         return {
           lap: Number(/lap (\d+) of/i.exec(label)?.[1] ?? NaN),
           transform: car ? getComputedStyle(car).transform : null,
+          // Context, carried only so a failure can say which of the two it
+          // was: the car moving on its own, or the lap scale moving under it.
+          playhead: playhead ? getComputedStyle(playhead).transform : null,
+          width: svg ? Math.round(svg.getBoundingClientRect().width) : 0,
         };
       });
 
-    const samples: { lap: number; transform: string | null }[] = [];
+    const samples: {
+      lap: number;
+      transform: string | null;
+      playhead: string | null;
+      width: number;
+    }[] = [];
     for (let index = 0; index < 16; index += 1) {
       samples.push(await sample());
       await page.waitForTimeout(400);
@@ -162,7 +174,16 @@ test.describe('with a reduced-motion preference', () => {
     expect(withinLap.length, 'no two samples landed inside the same lap').toBeGreaterThan(0);
     for (const [before, after] of withinLap) {
       expect(before.transform).not.toBeNull();
-      expect(after.transform).toBe(before.transform);
+      // This has failed about one full run in three and has never reproduced
+      // in isolation, so the message carries everything needed to tell the two
+      // explanations apart rather than guessing again: if `playhead` and
+      // `width` also differ, the whole chart rescaled and the car went with
+      // it; if only `transform` differs, a car really did slide.
+      expect(after.transform, `moved within lap ${before.lap}\n${JSON.stringify(
+        { before, after },
+        null,
+        2,
+      )}`).toBe(before.transform);
     }
   });
 });
