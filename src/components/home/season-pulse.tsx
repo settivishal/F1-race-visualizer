@@ -40,29 +40,8 @@ export function SeasonPulse({ season, rounds }: { season: number; rounds: PulseR
         </p>
       </div>
 
-      {/* The curve is decoration and says nothing a reader needs, so it is
-          hidden and drawn behind the pills rather than between them. It only
-          exists at the width where the row does not wrap — a wave that wraps
-          is not a wave. */}
-      <div className="relative mt-4">
-        <svg
-          aria-hidden
-          viewBox="0 0 100 10"
-          preserveAspectRatio="none"
-          className="pointer-events-none absolute inset-x-0 top-1/2 hidden h-14 -translate-y-1/2 sm:block"
-        >
-          <path
-            d="M0,7 C8,1 16,1 25,5 C34,9 42,9 50,4 C58,0 66,0 75,6 C83,10 91,10 100,5"
-            fill="none"
-            stroke="var(--line-strong)"
-            strokeWidth={0.4}
-            strokeDasharray="1.5,1.5"
-            vectorEffect="non-scaling-stroke"
-          />
-        </svg>
-
-        <ol className="relative flex flex-wrap gap-1.5 sm:flex-nowrap sm:justify-between">
-        {rounds.map((round) => {
+      <ol className="mt-4 flex flex-wrap gap-1.5">
+        {rounds.map((round, index) => {
           const label =
             round.status === 'CANCELLED'
               ? `Round ${round.round}, ${round.name}: cancelled`
@@ -107,17 +86,14 @@ export function SeasonPulse({ season, rounds }: { season: number; rounds: PulseR
           );
 
           return (
-            // The wave. A sine of the round's place in the season, matching the
-            // guide line behind it, and only above `sm` where the row is one
-            // line — the wrapped layout below that keeps its flat grid.
+            // Each round arrives just after the one before it, so the strip
+            // reads left to right the way the season ran. Scroll-driven like
+            // every other entrance here, so it happens when the strip is
+            // looked at rather than while it is off screen.
             <li
               key={round.round}
-              className="sm:[transform:translateY(var(--wave))]"
-              style={
-                {
-                  '--wave': `${Math.sin((round.round / Math.max(rounds.length, 1)) * Math.PI * 3.6) * -10}px`,
-                } as React.CSSProperties
-              }
+              className="pulse-pill"
+              style={{ '--i': index } as React.CSSProperties}
             >
               {round.slug ? (
                 <Link href={`/races/${round.slug}`} className="group block rounded-lg" title={label}>
@@ -133,8 +109,7 @@ export function SeasonPulse({ season, rounds }: { season: number; rounds: PulseR
             </li>
           );
         })}
-        </ol>
-      </div>
+      </ol>
     </section>
   );
 }

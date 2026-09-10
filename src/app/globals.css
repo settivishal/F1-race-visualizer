@@ -574,6 +574,36 @@ html:has(:root.light) {
   }
 }
 
+/*
+ * The season strip, round by round. Same scroll-driven mechanism as `.reveal`
+ * — `animation-delay` does nothing on a view timeline, so the stagger is a
+ * later start *range* per pill instead, which is what makes the season appear
+ * to run left to right as it comes into view. Falls back to a plain strip
+ * wherever `view()` is unsupported, like everything else here.
+ */
+@layer components {
+  @supports (animation-timeline: view()) {
+    @media (prefers-reduced-motion: no-preference) {
+      .pulse-pill {
+        animation: pulse-pill linear both;
+        animation-timeline: view();
+        animation-range: entry calc(var(--i, 0) * 4%) entry 100%;
+      }
+    }
+  }
+}
+
+@keyframes pulse-pill {
+  from {
+    opacity: 0;
+    scale: 0.7;
+  }
+  to {
+    opacity: 1;
+    scale: 1;
+  }
+}
+
 /* The `*` reset above cannot reach view-transition pseudo-elements: they are
  * not in the document tree, so no selector of that shape matches them. */
 @media (prefers-reduced-motion: reduce) {
