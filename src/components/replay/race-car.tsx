@@ -8,6 +8,8 @@ type RaceCarProps = {
   y: number | MotionValue<number>;
   accent?: "up" | "down" | false;
   muted?: boolean;
+  /** True when another driver is focused and this car is drawn back. */
+  dimmed?: boolean;
   caution?: boolean;
 };
 
@@ -22,10 +24,18 @@ export function RaceCar({
   y,
   accent = false,
   muted = false,
+  dimmed = false,
   caution = false,
 }: RaceCarProps) {
   return (
     <motion.g
+      // The handle the replay e2e uses to find a car and read whether it is
+      // drawn back. Named state rather than a computed style: the dim has been
+      // an `opacity` attribute, a Tailwind class and a motion value at
+      // different points, and a test that reads the styling breaks on a
+      // refactor that changes nothing a user can see.
+      data-testid="race-car"
+      data-dimmed={dimmed ? "true" : "false"}
       className="group"
       style={{
         x,
