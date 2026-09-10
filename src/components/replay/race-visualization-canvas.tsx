@@ -1,6 +1,6 @@
 "use client";
 
-import { ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { ReactNode, useEffect, useId, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/cn";
 import type { ReplayEntry, ReplayEvent, ReplayPosition, ReplaySummary, ReplayView } from "./types";
 import { RaceCar } from "./race-car";
@@ -9,6 +9,7 @@ import {
   classifyReplayEvent,
   type ReplayEventKind,
   DriverReplayState,
+  easeLapProgress,
   getReplayEventMarkerColor,
   ReplayRaceControl,
   withFocusLast,
@@ -177,6 +178,16 @@ function getRetirementLapByDriver(events: ReplayEvent[]) {
   return result;
 }
 
+/**
+ * How many places a car changes over this lap. Zero when either end is missing
+ * — upstream leaves lap ranges out, and a gap is not a move.
+ */
+function lapMovement(frame: DriverFrame) {
+  const from = frame.currentPoint?.position;
+  const to = frame.nextPoint?.position;
+  return from == null || to == null ? 0 : Math.abs(from - to);
+}
+
 function getRetiredMarkerOffset(index: number) {
   const offsets = [
     { x: -12, y: -13 },
@@ -246,6 +257,21 @@ export function RaceVisualizationCanvas({
     laps.filter((lap) => lap >= lapWindow.from && lap <= lapWindow.to),
   );
   const activeLapX = useTransform(lapProgress, (p) => lapX(currentLap + (nextLap - currentLap) * p));
+
+  // How far the window will move when the lap index advances, in viewBox units:
+  // zero on a desktop and at both ends of the race, where the window is pinned.
+  const panDistance = useMemo(() => {
+    const span = lapWindow.to - lapWindow.from;
+    if (span <= 0) return 0;
+    const lapWidth = (VIEWBOX_WIDTH - MARGIN.left - MARGIN.right) / span;
+    const nextWindow = lapWindowFor(frameWidth, nextLap, summary.maxLap || race.laps);
+    return (nextWindow.from - lapWindow.from) * lapWidth;
+  }, [frameWidth, lapWindow, nextLap, race.laps, summary.maxLap]);
+  const panX = useTransform(lapProgress, (p) => -panDistance * p);
+  // Scoped to this chart: the landing page renders a second player, and a
+  // duplicate clipPath id would have both of them clipped by whichever mounted
+  // last.
+  const plotClipId = `${useId()}-plot`;
   const retirementEventByDriver = useMemo(
     () => getRetirementLapByDriver(visualization.events),
     [visualization.events],
@@ -424,23 +450,30 @@ export function RaceVisualizationCanvas({
               fill="var(--track)"
             />
 
-            {/* Glowing active lap scrubber line */}
-            <motion.line
-              style={{ x: activeLapX }}
-              y1={MARGIN.top - 32}
-              y2={VIEWBOX_HEIGHT - MARGIN.bottom}
-              stroke="var(--accent)"
-              strokeWidth="2.5"
-              opacity="0.85"
-              
-            />
-            {/* Top glowing handle for active line */}
-            <motion.g style={{ x: activeLapX, y: MARGIN.top - 32 }}>
-              <circle r="6" fill="var(--accent)" />
-              <circle r="2.5" fill="white" />
-            </motion.g>
+            {/* The plot's own bounds. Everything that pans is clipped to this,
+                so a lap label sliding out of the window stops at the axis
+                instead of drifting into the P-number gutter — which is also
+                where the trails have always overdrawn on a windowed chart.
+                Open to the right and the top edge, because badges and event
+                dots deliberately sit outside the plot on those sides. */}
+            <defs>
+              <clipPath id={plotClipId}>
+                {/* 28 units of slack on the left: the lap labels are centred
+                    on their tick, so a clip flush with the axis cuts "Lap 1"
+                    in half. The P numbers end 42 units out, so this still
+                    stops short of them. */}
+                <rect
+                  x={MARGIN.left - 28}
+                  y={0}
+                  width={VIEWBOX_WIDTH - MARGIN.left + 28}
+                  height={VIEWBOX_HEIGHT}
+                />
+              </clipPath>
+            </defs>
 
-            {/* Horizontal position grid lines */}
+            {/* Horizontal position grid lines. Outside the panning group: they
+                are horizontal, so panning them would only shorten them at the
+                right edge, and the P labels belong to the fixed axis. */}
             {Array.from({ length: summary.maxPosition }, (_, index) => {
               const position = index + 1;
               const y = getPositionY(position, summary.maxPosition);
@@ -469,6 +502,32 @@ export function RaceVisualizationCanvas({
                 </g>
               );
             })}
+
+            {/* Everything drawn against the lap axis, panned as one.
+                The window recentres on the current lap, so on a narrow screen
+                it used to shift a whole lap-width the instant the lap index
+                changed and the chart teleported once per lap. Sliding this
+                group by the same width over the course of the lap means the
+                recomputed geometry lands exactly where the slide arrived. On a
+                desktop the window is the whole race, the shift is zero, and
+                this group does nothing. */}
+            <motion.g clipPath={`url(#${plotClipId})`} style={{ x: panX }}>
+              {/* Glowing active lap scrubber line. Inside the pan, so while the
+                  window is sliding the playhead holds its place on screen and
+                  the race moves past it. */}
+              <motion.line
+                style={{ x: activeLapX }}
+                y1={MARGIN.top - 32}
+                y2={VIEWBOX_HEIGHT - MARGIN.bottom}
+                stroke="var(--accent)"
+                strokeWidth="2.5"
+                opacity="0.85"
+              />
+              {/* Top glowing handle for active line */}
+              <motion.g style={{ x: activeLapX, y: MARGIN.top - 32 }}>
+                <circle r="6" fill="var(--accent)" />
+                <circle r="2.5" fill="white" />
+              </motion.g>
 
             {/* Vertical lap grid lines */}
             {lapTicks.map((lap) => {
@@ -539,7 +598,17 @@ export function RaceVisualizationCanvas({
             })}
 
             {/* Render trails and active telemetry badges */}
-            {withFocusLast([...retiredFrames, ...activeFrames], highlightedDriverId).map((frame) => {
+            {withFocusLast(
+              // Movers last. Two cars trading places occupy the same pixels for
+              // most of the lap, and in document order the one being passed can
+              // paint over the one passing it — which draws the overtake
+              // backwards. Sorting by how far a car moves this lap puts the
+              // action on top; a focused driver still wins over all of it.
+              [...retiredFrames, ...activeFrames].sort(
+                (a, b) => lapMovement(a) - lapMovement(b),
+              ),
+              highlightedDriverId,
+            ).map((frame) => {
               const state = driverStates.get(frame.entry.driver.id);
               return (
                 <AnimatedCar
@@ -558,6 +627,7 @@ export function RaceVisualizationCanvas({
                 />
               );
             })}
+            </motion.g>
           </svg>
         </div>
       </div>
@@ -643,9 +713,10 @@ function AnimatedCar({
   });
 
   const y = useTransform(lapProgress, (p) => {
+    const eased = easeLapProgress(p);
     const interpolatedPosition =
       currentPoint && nextPoint
-        ? currentPoint.position + (nextPoint.position - currentPoint.position) * p
+        ? currentPoint.position + (nextPoint.position - currentPoint.position) * eased
         : currentPoint?.position ?? nextPoint?.position ?? 1;
     return getPositionY(interpolatedPosition, summary.maxPosition);
   });
@@ -693,25 +764,64 @@ function AnimatedCar({
         />
       ) : null}
 
+      {/* The lap the car is currently driving.
+          `trail` is built in React from the laps already completed, so it only
+          grows when the lap index does — while the badge slides continuously
+          toward the next lap. That left every car detached from the end of its
+          own line for the whole lap, and the line snapping a lap-width to catch
+          up at the boundary. This segment is the gap: it ends on the same two
+          motion values the badge rides, so the line arrives exactly where the
+          recomputed `trail` picks it up. Under a reduced-motion preference
+          `lapProgress` stays at 0 and the segment has no length. */}
+      {isCarActive && currentPoint ? (
+        <motion.line
+          x1={lapX(currentLap)}
+          y1={getPositionY(currentPoint.position, summary.maxPosition)}
+          x2={x}
+          y2={y}
+          stroke={team.color}
+          strokeOpacity={(state?.isBackmarker ? 0.5 : 0.8) * dim}
+          strokeWidth={state?.isLapped ? "2.5" : "3.2"}
+          strokeLinecap="round"
+          strokeDasharray={state?.isLapped ? "8 6" : undefined}
+        />
+      ) : null}
+
       {isRetiredAtCurrentLap && markerPoint ? (
-        <g
+        <motion.g
           transform={`translate(${
             lapX(markerPoint.lap) + markerOffset.x
           } ${getPositionY(markerPoint.position, summary.maxPosition) + markerOffset.y})`}
-          className="transition-[opacity,stroke-opacity] duration-200 hover:opacity-100"
-          opacity={0.9 * dim}
+          className="hover:opacity-100"
+          // Faded in rather than drawn, because it lands in the same frame the
+          // badge leaves: the two crossfade instead of one popping into the
+          // other's place. `reducedMotion="user"` on the player turns this into
+          // an instant swap for anyone who asked for that.
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 0.9 * dim }}
+          transition={{ duration: 0.25 }}
         >
           <circle r="8" fill="rgba(15,23,42,0.92)" stroke={team.color} strokeWidth="2.2" />
           <path d="M -3.5 -3.5 L 3.5 3.5 M 3.5 -3.5 L -3.5 3.5" stroke="white" strokeWidth="1.4" strokeLinecap="round" />
-        </g>
+        </motion.g>
       ) : null}
 
-      {isCarActive ? (
+      {/* Kept mounted for the lap the car retires on, so it fades out under the
+          cross rather than blinking out from under it. */}
+      {isCarActive || retirementEvent?.lap === currentLap ? (
         // The badge is the loudest thing on the chart, so dimming it by the
         // same factor as the lines is what actually makes a focused driver
         // stand out. `muted` stays what it always was — a backmarker — and the
         // two compound for a backmarker who is not the focused driver.
         <g opacity={dim} className="transition-opacity duration-200">
+        {/* The focus dim stays an `opacity` attribute on the group above:
+            framer-motion writes opacity to style, and the dim is what the
+            replay e2e reads off the attribute to assert that exactly one car
+            is at full strength. The retirement fade is its own layer inside. */}
+        <motion.g
+          animate={{ opacity: isCarActive ? 1 : 0 }}
+          transition={{ duration: 0.25 }}
+        >
         <RaceCar
           color={team.color}
           driverCode={driver.code}
@@ -728,6 +838,7 @@ function AnimatedCar({
           muted={Boolean(state?.isBackmarker)}
           caution={raceControl.status !== "green" || Boolean(state?.isLapped)}
         />
+        </motion.g>
         </g>
       ) : null}
     </g>
