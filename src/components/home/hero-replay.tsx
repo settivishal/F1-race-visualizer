@@ -2,8 +2,7 @@
 
 import { useState, type ReactNode } from 'react';
 import Link from 'next/link';
-import { CountUp } from '@/components/home/count-up';
-import { linePath, linearScale } from '@/lib/scale';
+import { linearScale, smoothLinePath } from '@/lib/scale';
 
 /**
  * The last race, as a chart you can drag — and, since the 2c wireframe, the
@@ -47,9 +46,6 @@ export function HeroReplay({
   // Opens at the end, showing the finished race. Starting at lap one would open
   // on a vertical line of grid slots, which says nothing about anything.
   const [lap, setLap] = useState(maxLap);
-  // Once the reader drags, the counter is theirs — a number counting up under a
-  // thumb they are holding reads as a bug.
-  const [scrubbed, setScrubbed] = useState(false);
 
   const x = linearScale([1, Math.max(2, maxLap)], [PADDING.left, WIDTH - PADDING.right]);
   // Scaled to the positions actually drawn, not to the whole field: the hero
@@ -65,6 +61,47 @@ export function HeroReplay({
     [PADDING.top, HEIGHT - PADDING.bottom],
   );
 
+  // Built once and rendered into both frames below.
+  const lines = (
+    <>
+    {drivers.map((driver, index) => {
+      const upTo = driver.positions.filter((point) => point.lap <= lap);
+      if (upTo.length === 0) return null;
+      const points = upTo.map((point) => ({ x: x(point.lap), y: y(point.position) }));
+      const last = points[points.length - 1];
+
+      return (
+        <g key={driver.code}>
+          <path
+            d={smoothLinePath(points)}
+            fill="none"
+            stroke={driver.color ?? '#8892a0'}
+            strokeWidth={2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            // Drawn in, staggered, once on load. Pure CSS, so the global
+            // reduced-motion rule already switches it off. pathLength
+            // normalises the dash maths across races of any length.
+            pathLength={1}
+            className="hero-line"
+            style={{ animationDelay: `${index * 0.08}s` }}
+          />
+          {/* The car, at the lap the scrubber is on. */}
+          <circle cx={last.x} cy={last.y} r={3} fill={driver.color ?? '#8892a0'} />
+          <text
+            x={last.x + 7}
+            y={last.y}
+            dy="0.32em"
+            className="fill-white/70 text-[9px] font-semibold"
+          >
+            {driver.code}
+          </text>
+        </g>
+      );
+    })}
+    </>
+  );
+
   return (
     <figure className="relative m-0 overflow-hidden border-y border-line bg-track">
       {/* The chart, filling the band. `aria-hidden` because the copy above it
@@ -73,46 +110,30 @@ export function HeroReplay({
       <div className="pointer-events-none absolute inset-0 sm:inset-y-0">
         <svg
           viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
-          preserveAspectRatio="xMidYMid slice"
-          className="h-full w-full"
+          // `meet`, not `slice`. The band is wider than the viewBox is tall, so
+          // slicing scaled to cover the height and cropped the sides — on a
+          // laptop that cut off lap one, the left end of the race. Meet fits
+          // the whole chart in, both ends included.
+          preserveAspectRatio="xMidYMid meet"
+          className="hidden h-full w-full sm:block"
           role="img"
           aria-label={`Position changes through lap ${lap} of the ${title}`}
         >
-          {drivers.map((driver, index) => {
-            const upTo = driver.positions.filter((point) => point.lap <= lap);
-            if (upTo.length === 0) return null;
-            const points = upTo.map((point) => ({ x: x(point.lap), y: y(point.position) }));
-            const last = points[points.length - 1];
-
-            return (
-              <g key={driver.code}>
-                <path
-                  d={linePath(points)}
-                  fill="none"
-                  stroke={driver.color ?? '#8892a0'}
-                  strokeWidth={2}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  // Drawn in, staggered, once on load. Pure CSS, so the global
-                  // reduced-motion rule already switches it off. pathLength
-                  // normalises the dash maths across races of any length.
-                  pathLength={1}
-                  className="hero-line"
-                  style={{ animationDelay: `${index * 0.08}s` }}
-                />
-                {/* The car, at the lap the scrubber is on. */}
-                <circle cx={last.x} cy={last.y} r={3} fill={driver.color ?? '#8892a0'} />
-                <text
-                  x={last.x + 7}
-                  y={last.y}
-                  dy="0.32em"
-                  className="fill-white/70 text-[9px] font-semibold"
-                >
-                  {driver.code}
-                </text>
-              </g>
-            );
-          })}
+          {lines}
+        </svg>
+        {/* A phone is taller than the chart is deep, so fitting it there leaves
+            a thin strip adrift in a tall band. Here the chart is texture behind
+            the copy rather than something to read, so it keeps filling the
+            band — and the cropped ends cost nothing that is legible anyway.
+            Only one of these two is ever displayed. */}
+        <svg
+          viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
+          preserveAspectRatio="xMidYMid slice"
+          className="h-full w-full sm:hidden"
+          role="img"
+          aria-label={`Position changes through lap ${lap} of the ${title}`}
+        >
+          {lines}
         </svg>
       </div>
 
@@ -139,17 +160,10 @@ export function HeroReplay({
               min={1}
               max={Math.max(1, maxLap)}
               value={lap}
-              onChange={(event) => {
-                setScrubbed(true);
-                setLap(Number(event.target.value));
-              }}
+              onChange={(event) => setLap(Number(event.target.value))}
               className="w-full accent-accent"
             />
           </label>
-          <span className="tabular shrink-0 text-eyebrow font-bold uppercase text-white/70">
-            Lap{' '}
-            {scrubbed ? lap : <CountUp value={lap} from={1} />}/{maxLap}
-          </span>
           <Link
             href={`/races/${slug}?lap=${lap}`}
             className="hidden shrink-0 rounded-sm text-eyebrow font-bold uppercase text-on-track-accent underline-offset-4 hover:underline sm:block"
