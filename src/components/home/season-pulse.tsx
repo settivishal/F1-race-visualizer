@@ -1,4 +1,6 @@
+import Image from 'next/image';
 import Link from 'next/link';
+import { markFor } from '@/lib/team-marks';
 
 /**
  * The season as a row of dots, one per round, in the winning team's colour.
@@ -18,6 +20,7 @@ export type PulseRound = {
   slug: string | null;
   status: 'SCHEDULED' | 'COMPLETED' | 'CANCELLED';
   winnerCode: string | null;
+  teamName: string | null;
   teamColor: string | null;
 };
 
@@ -47,6 +50,10 @@ export function SeasonPulse({ season, rounds }: { season: number; rounds: PulseR
                 ? `Round ${round.round}, ${round.name}: won by ${round.winnerCode}`
                 : `Round ${round.round}, ${round.name}: not yet run`;
 
+          // Only where a licensed file has been written down for that team; the
+          // rest keep the colour block. See lib/team-marks.ts.
+          const mark = round.winnerCode ? markFor(round.teamName) : null;
+
           const dot = (
             <span
               className={`relative block h-9 w-9 rounded-lg border transition-transform ${
@@ -61,6 +68,18 @@ export function SeasonPulse({ season, rounds }: { season: number; rounds: PulseR
               }
               aria-hidden
             >
+              {/* The team's own mark on its own colour, where there is one. The
+                  colour stays underneath, so a season still reads as a run of
+                  reds or silvers from across the room. */}
+              {mark ? (
+                <Image
+                  src={mark.src}
+                  alt=""
+                  width={36}
+                  height={36}
+                  className="absolute inset-1 h-auto w-auto max-h-7 max-w-7 object-contain m-auto"
+                />
+              ) : null}
               {/* A cancelled round keeps its place, struck through: the season
                   did schedule it, and a calendar that hides it never existed. */}
               {round.status === 'CANCELLED' ? (

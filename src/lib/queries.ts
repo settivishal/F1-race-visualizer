@@ -146,7 +146,7 @@ const LATEST_RESULT = /* GraphQL */ `
 const SEASON_PULSE = /* GraphQL */ `
   query SeasonPulse($season: Int!) {
     seasonPulse(season: $season) {
-      round name slug status winnerCode teamColor
+      round name slug status winnerCode teamName teamColor
     }
   }
 `;
