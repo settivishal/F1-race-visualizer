@@ -15,16 +15,25 @@ export type StrategyRow = {
 };
 
 /**
- * Tyre colours as the sport uses them. A compound the ingest has never seen
- * falls back to the muted token rather than to an invented colour, because a
- * made-up tyre colour is a lie a reader cannot detect.
+ * Tyre colours as the sport uses them, through tokens rather than hex: the
+ * broadcast palette is picked for a bright screen and a small dot, and these are
+ * large fills carrying a lap count in both themes — so each theme tunes its own
+ * shade, and each compound names the ink that reads on it. See globals.css.
+ *
+ * A compound the ingest has never seen falls back to the muted token rather
+ * than to an invented colour, because a made-up tyre colour is a lie a reader
+ * cannot detect.
  */
-const COMPOUND: Record<string, { fill: string; label: string }> = {
-  SOFT: { fill: "#e8002d", label: "Soft" },
-  MEDIUM: { fill: "#f5c518", label: "Medium" },
-  HARD: { fill: "#e8eaed", label: "Hard" },
-  INTERMEDIATE: { fill: "#22c55e", label: "Intermediate" },
-  WET: { fill: "#3b82f6", label: "Wet" },
+const COMPOUND: Record<string, { fill: string; ink: string; label: string }> = {
+  SOFT: { fill: "var(--tyre-soft)", ink: "var(--tyre-soft-ink)", label: "Soft" },
+  MEDIUM: { fill: "var(--tyre-medium)", ink: "var(--tyre-medium-ink)", label: "Medium" },
+  HARD: { fill: "var(--tyre-hard)", ink: "var(--tyre-hard-ink)", label: "Hard" },
+  INTERMEDIATE: {
+    fill: "var(--tyre-intermediate)",
+    ink: "var(--tyre-intermediate-ink)",
+    label: "Intermediate",
+  },
+  WET: { fill: "var(--tyre-wet)", ink: "var(--tyre-wet-ink)", label: "Wet" },
 };
 
 /**
@@ -98,11 +107,11 @@ export function StrategyChart({
                     }${afterStoppage ? ", fitted while the race was stopped" : ""}`}
                     className={cn(
                       "flex items-center justify-center text-[10px] font-semibold",
-                      compound === "HARD" ? "text-track" : "text-white",
                       // A red-flag boundary, drawn on the stint that follows it.
                       afterStoppage && "border-l-2 border-flag-red",
                     )}
                     style={{
+                      color: COMPOUND[compound]?.ink ?? "var(--foreground)",
                       // A share of the race distance, not of the row: a driver
                       // who retired on lap 32 gets a bar that stops there, so
                       // the rows are comparable to each other rather than each
