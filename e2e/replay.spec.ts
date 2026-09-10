@@ -76,16 +76,12 @@ test('hovering a driver previews the emphasis without committing to it', async (
     timeout: 30_000,
   });
 
-  // The cars are `<g opacity>` groups: exactly one at full strength is what
-  // "one driver stands out" means, and it is the assertion the pixels cannot
-  // give us.
+  // Exactly one car not drawn back is what "one driver stands out" means, and
+  // it is the assertion the pixels cannot give us. `data-dimmed` is the state
+  // itself rather than the styling that expresses it, which has changed shape
+  // more than once.
   const fullStrengthCars = () =>
-    page.evaluate(
-      () =>
-        [...document.querySelectorAll('svg g > g[opacity]')].filter(
-          (group) => group.getAttribute('opacity') === '1',
-        ).length,
-    );
+    page.getByTestId('race-car').and(page.locator('[data-dimmed="false"]')).count();
 
   const row = page.locator('#replay-timing-tower').getByRole('button').first();
 
@@ -132,7 +128,7 @@ test.describe('with a reduced-motion preference', () => {
     // preference asks for looks like the slide it forbids.
     const sample = () =>
       page.evaluate(() => {
-        const car = document.querySelector('svg g.group');
+        const car = document.querySelector('[data-testid="race-car"]');
         const label = document.querySelector('svg[role="img"]')?.getAttribute('aria-label') ?? '';
         return {
           lap: Number(/lap (\d+) of/i.exec(label)?.[1] ?? NaN),
