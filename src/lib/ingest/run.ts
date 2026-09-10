@@ -87,8 +87,12 @@ async function repairZeroPoints(race: TransformedRace): Promise<void> {
   const suspect = zeroPointResults(race.results);
   if (suspect.length === 0) return;
 
-  const { seasonYear, round } = race.meeting;
-  const archive = (await fetchSeasonResults(seasonYear)).find((r) => r.round === round);
+  // Matched on the date, never the round number. The two upstreams disagree
+  // about rounds: our numbering counts 2023's cancelled Imola and Ergast's does
+  // not, so every round after it is off by one — which quietly wrote Mexico
+  // City's points onto Austin the first time this ran.
+  const day = race.race.date.toISOString().slice(0, 10);
+  const archive = (await fetchSeasonResults(race.meeting.seasonYear)).find((r) => r.date === day);
   // Ergast's per-result `number` is the car number, which is what OpenF1 keys
   // a driver by too.
   const points = new Map(
@@ -103,7 +107,9 @@ async function repairZeroPoints(race: TransformedRace): Promise<void> {
     repaired++;
   }
   race.warnings.push(
-    `${suspect.length} results scored zero in the points; ${repaired} taken from Ergast`,
+    archive
+      ? `${suspect.length} results scored zero in the points; ${repaired} taken from Ergast`
+      : `${suspect.length} results scored zero in the points; Ergast has no race on ${day}`,
   );
 }
 
