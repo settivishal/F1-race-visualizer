@@ -161,9 +161,13 @@ async function RaceLibrary({ searchParams }: { searchParams: SearchParams }) {
           />
         </div>
       ) : (
-        <ul className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        // `auto-rows-fr` so a row of cards is one height whatever each holds —
+        // a sprint line, an Upcoming badge, a podium or none of them. Without
+        // it the grid stretches the <li> and nothing inside it, and the cards
+        // came out ragged.
+        <ul className="mt-8 grid auto-rows-fr gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {races.edges.map(({ node }) => (
-            <li key={node.id}>
+            <li key={node.id} className="h-full">
               {/* Not one big <Link> any more: a sprint weekend's card carries a
                   second link, and a link inside a link is not markup a browser
                   or a screen reader can make sense of. The title is the real
@@ -181,11 +185,10 @@ async function RaceLibrary({ searchParams }: { searchParams: SearchParams }) {
                 }`}
               >
                 <Card
-                  className={`relative flex h-full flex-col gap-4 transition-[background-color,border-color] group-hover:border-line-strong group-hover:bg-panel-strong ${
+                  className={`relative flex h-full gap-4 transition-[background-color,border-color] group-hover:border-line-strong group-hover:bg-panel-strong ${
                     node.slug === latestRace?.slug ? 'border-accent/40' : ''
                   }`}
                 >
-                  <div className="flex gap-4">
                   <div className="flex min-w-0 flex-1 flex-col">
                     <div className="flex items-center gap-2">
                       <span className="text-eyebrow font-semibold uppercase text-muted">
@@ -227,6 +230,41 @@ async function RaceLibrary({ searchParams }: { searchParams: SearchParams }) {
                         </>
                       )}
                     </p>
+
+                    {/* The other half of the weekend, on the line below rather
+                        than in a section of its own: a footer row only some
+                        cards have leaves the rest of the grid holding empty
+                        space, since a row of cards is as tall as its tallest. */}
+                    {node.weekendSprint ? (
+                      <Link
+                        href={`/races/${node.weekendSprint.slug}`}
+                        className="tap relative -mx-1.5 mt-1 inline-flex w-fit items-center gap-1.5 rounded-md px-1.5 py-1 text-sm text-muted transition-colors hover:bg-panel-strong hover:text-foreground"
+                      >
+                        <span className="text-eyebrow font-semibold uppercase text-subtle">
+                          Sprint
+                        </span>
+                        {node.weekendSprint.podium[0] ? (
+                          <>
+                            <span
+                              aria-hidden
+                              className="h-3.5 w-[3px] rounded-full"
+                              style={{
+                                backgroundColor:
+                                  node.weekendSprint.podium[0].teamColor ?? 'var(--muted)',
+                              }}
+                            />
+                            <span className="font-mono font-semibold text-foreground">
+                              {node.weekendSprint.podium[0].code}
+                            </span>
+                          </>
+                        ) : (
+                          <span>
+                            {node.weekendSprint.status === 'CANCELLED' ? 'Not held' : 'Not yet run'}
+                          </span>
+                        )}
+                        <span aria-hidden className="text-accent">→</span>
+                      </Link>
+                    ) : null}
                   </div>
 
                   {/* The result, which is what the tile was missing. Empty for a
@@ -247,55 +285,6 @@ async function RaceLibrary({ searchParams }: { searchParams: SearchParams }) {
                         </li>
                       ))}
                     </ol>
-                  ) : null}
-                  </div>
-
-                  {/* The other half of the weekend. A sprint is a session inside
-                      this round, so it belongs on this card rather than on one
-                      of its own — and it gets its own link, above the title's
-                      stretched one, because it is a different page. */}
-                  {node.weekendSprint ? (
-                    <div className="mt-auto border-t border-line pt-2">
-                      {/* The whole row is the link, not the arrow: an arrow on
-                          its own is a 15x20 target, under the 24x24 floor the
-                          mobile spec enforces — and "Sprint won by RUS" is a
-                          better name for it than "→". */}
-                      <Link
-                        href={`/races/${node.weekendSprint.slug}`}
-                        className="tap relative -mx-1.5 flex items-center justify-between gap-3 rounded-md px-1.5 py-1.5 transition-colors hover:bg-panel-strong"
-                      >
-                        <span className="flex items-center gap-2">
-                          <span className="text-eyebrow font-semibold uppercase text-subtle">
-                            Sprint
-                          </span>
-                          {node.weekendSprint.podium[0] ? (
-                            <span className="flex items-center gap-1.5 text-sm text-muted">
-                              won by
-                              <span
-                                aria-hidden
-                                className="h-3.5 w-[3px] rounded-full"
-                                style={{
-                                  backgroundColor:
-                                    node.weekendSprint.podium[0].teamColor ?? 'var(--muted)',
-                                }}
-                              />
-                              <span className="font-mono font-semibold text-foreground">
-                                {node.weekendSprint.podium[0].code}
-                              </span>
-                            </span>
-                          ) : (
-                            <span className="text-sm text-muted">
-                              {node.weekendSprint.status === 'CANCELLED'
-                                ? 'Not held'
-                                : 'Not yet run'}
-                            </span>
-                          )}
-                        </span>
-                        <span aria-hidden className="text-sm font-medium text-accent">
-                          →
-                        </span>
-                      </Link>
-                    </div>
                   ) : null}
                 </Card>
               </div>

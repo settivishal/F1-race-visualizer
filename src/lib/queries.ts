@@ -101,6 +101,10 @@ const RACE_HEADER = /* GraphQL */ `
       meeting {
         name country circuitName round season
         circuit { ergastId name locality country lengthKm turns firstGrandPrix }
+        # The weekend's other sessions, so a race page can point at its sibling
+        # — the library shows one card per weekend, and without this the sprint
+        # is reachable from the card and from nowhere else.
+        races { slug type status }
       }
       results {
         finalPosition lapsCompleted points status fastestLap

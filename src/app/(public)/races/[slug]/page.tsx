@@ -125,6 +125,10 @@ async function RaceDetail({
   if (!race) notFound();
 
   const meeting = race.meeting;
+  // The weekend's other session. The library lists one card per weekend, so
+  // this is how someone gets from a grand prix to its sprint and back without
+  // going through the library again.
+  const sibling = meeting?.races.find((session) => session.slug !== race.slug) ?? null;
   const classified = [...race.results].sort((a, b) => {
     // A DNF has no finishing position, so it sorts after everyone who has one
     // rather than to the front on a null.
@@ -146,7 +150,20 @@ async function RaceDetail({
               <span className="tabular">{race.laps}</span> laps
             </>
           }
-          actions={race.type === 'SPRINT' ? <Badge>Sprint</Badge> : null}
+          actions={
+            <div className="flex items-center gap-3">
+              {race.type === 'SPRINT' ? <Badge>Sprint</Badge> : null}
+              {sibling ? (
+                <Link
+                  href={`/races/${sibling.slug}`}
+                  className="tap inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm font-medium text-muted transition-colors hover:bg-panel-strong hover:text-foreground"
+                >
+                  {sibling.type === 'SPRINT' ? 'Sprint' : 'Grand prix'}
+                  <span aria-hidden className="text-accent">→</span>
+                </Link>
+              ) : null}
+            </div>
+          }
         />
       </div>
 
