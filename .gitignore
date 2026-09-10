@@ -24,6 +24,9 @@
 .DS_Store
 *.pem
 
+# editor swap files (vim writes these beside the file being edited)
+*.sw[a-p]
+
 # debug
 npm-debug.log*
 yarn-debug.log*
