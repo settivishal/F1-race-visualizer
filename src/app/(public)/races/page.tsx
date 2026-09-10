@@ -164,28 +164,28 @@ async function RaceLibrary({ searchParams }: { searchParams: SearchParams }) {
         <ul className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {races.edges.map(({ node }) => (
             <li key={node.id}>
-              {/* prefetch: the race pages are prerendered and cached, so warming
-                  one on hover costs almost nothing and removes the wait on the
-                  click that matters. */}
-              {/* The glow sits on the link, not the card: Card already carries
-                  `shadow-sm`, and cn() is a join rather than a tailwind-merge,
-                  so a second shadow utility there loses to whichever the
-                  stylesheet happens to order last. */}
-              <Link
-                href={`/races/${node.slug}`}
-                className={`block h-full rounded-xl ${
+              {/* Not one big <Link> any more: a sprint weekend's card carries a
+                  second link, and a link inside a link is not markup a browser
+                  or a screen reader can make sense of. The title is the real
+                  link and stretches over the card with `after:inset-0`, so the
+                  whole tile stays clickable and the sprint row sits above it. */}
+              {/* The glow sits on the wrapper, not the card: Card already
+                  carries `shadow-sm`, and cn() is a join rather than a
+                  tailwind-merge, so a second shadow utility there loses to
+                  whichever the stylesheet happens to order last. */}
+              <div
+                className={`group h-full rounded-xl ${
                   // The one race just run. A glow rather than a badge: it says
                   // "here" without taking a word away from the tile.
                   node.slug === latestRace?.slug ? 'shadow-glow' : ''
                 }`}
-                prefetch
               >
                 <Card
-                  interactive
-                  className={`flex h-full gap-4 ${
+                  className={`relative flex h-full flex-col gap-4 transition-[background-color,border-color] group-hover:border-line-strong group-hover:bg-panel-strong ${
                     node.slug === latestRace?.slug ? 'border-accent/40' : ''
                   }`}
                 >
+                  <div className="flex gap-4">
                   <div className="flex min-w-0 flex-1 flex-col">
                     <div className="flex items-center gap-2">
                       <span className="text-eyebrow font-semibold uppercase text-muted">
@@ -193,7 +193,6 @@ async function RaceLibrary({ searchParams }: { searchParams: SearchParams }) {
                           ? `${node.meeting.season} · Round ${node.meeting.round}`
                           : 'Season unknown'}
                       </span>
-                      {node.type === 'SPRINT' ? <Badge>Sprint</Badge> : null}
                       {/* Only the next one. Every scheduled race carrying this
                           badge made it mean "not yet run", which the date below
                           already says. */}
@@ -204,7 +203,16 @@ async function RaceLibrary({ searchParams }: { searchParams: SearchParams }) {
                         one object that moves rather than two that swap. */}
                     <ViewTransition name={`race-title-${node.slug}`} share="race-morph" default="none">
                       <h2 className="type-card-title mt-2.5">
-                        {node.meeting?.name ?? node.slug}
+                        {/* prefetch: the race pages are prerendered and cached,
+                            so warming one on hover costs almost nothing and
+                            removes the wait on the click that matters. */}
+                        <Link
+                          href={`/races/${node.slug}`}
+                          prefetch
+                          className="rounded-sm after:absolute after:inset-0 after:rounded-xl after:content-['']"
+                        >
+                          {node.meeting?.name ?? node.slug}
+                        </Link>
                       </h2>
                     </ViewTransition>
                     <p className="mt-1.5 text-sm text-muted">
@@ -240,8 +248,57 @@ async function RaceLibrary({ searchParams }: { searchParams: SearchParams }) {
                       ))}
                     </ol>
                   ) : null}
+                  </div>
+
+                  {/* The other half of the weekend. A sprint is a session inside
+                      this round, so it belongs on this card rather than on one
+                      of its own — and it gets its own link, above the title's
+                      stretched one, because it is a different page. */}
+                  {node.weekendSprint ? (
+                    <div className="mt-auto border-t border-line pt-2">
+                      {/* The whole row is the link, not the arrow: an arrow on
+                          its own is a 15x20 target, under the 24x24 floor the
+                          mobile spec enforces — and "Sprint won by RUS" is a
+                          better name for it than "→". */}
+                      <Link
+                        href={`/races/${node.weekendSprint.slug}`}
+                        className="tap relative -mx-1.5 flex items-center justify-between gap-3 rounded-md px-1.5 py-1.5 transition-colors hover:bg-panel-strong"
+                      >
+                        <span className="flex items-center gap-2">
+                          <span className="text-eyebrow font-semibold uppercase text-subtle">
+                            Sprint
+                          </span>
+                          {node.weekendSprint.podium[0] ? (
+                            <span className="flex items-center gap-1.5 text-sm text-muted">
+                              won by
+                              <span
+                                aria-hidden
+                                className="h-3.5 w-[3px] rounded-full"
+                                style={{
+                                  backgroundColor:
+                                    node.weekendSprint.podium[0].teamColor ?? 'var(--muted)',
+                                }}
+                              />
+                              <span className="font-mono font-semibold text-foreground">
+                                {node.weekendSprint.podium[0].code}
+                              </span>
+                            </span>
+                          ) : (
+                            <span className="text-sm text-muted">
+                              {node.weekendSprint.status === 'CANCELLED'
+                                ? 'Not held'
+                                : 'Not yet run'}
+                            </span>
+                          )}
+                        </span>
+                        <span aria-hidden className="text-sm font-medium text-accent">
+                          →
+                        </span>
+                      </Link>
+                    </div>
+                  ) : null}
                 </Card>
-              </Link>
+              </div>
             </li>
           ))}
         </ul>

@@ -209,6 +209,21 @@ Race.implement({
     // predates the column.
     openf1SessionKey: t.exposeInt('openf1SessionKey', { nullable: true }),
     date: t.field({ type: 'DateTime', resolve: (r) => r.date }),
+    /**
+     * The sprint that shared this race's weekend, if there was one.
+     *
+     * A sprint is a session inside a round, not a round of its own, so the
+     * library lists grands prix and hangs the weekend's sprint off this rather
+     * than showing the same weekend twice. Null for a weekend without one, and
+     * for the sprint itself — a sprint does not have a sprint.
+     */
+    weekendSprint: t.field({
+      type: Race,
+      nullable: true,
+      resolve: (race, _args, ctx) =>
+        race.type === 'SPRINT' ? null : ctx.loaders.sprintByMeetingId.load(race.meetingId),
+    }),
+
     // Through the loader, not a findFirst: the race library asks this once per
     // tile, which was 31 statements for a season that fits on one page.
     meeting: t.field({
@@ -461,6 +476,11 @@ builder.queryField('races', (t) =>
     args: {
       season: t.arg.int(),
       search: t.arg.string(),
+      /**
+       * One session kind. The library passes GRAND_PRIX so a sprint weekend is
+       * one row rather than two — the sprint arrives on `Race.weekendSprint`.
+       */
+      type: t.arg({ type: RaceType }),
       first: t.arg.int(),
       after: t.arg.string(),
       /** The page ending just before this row, for stepping back. */
@@ -473,9 +493,22 @@ builder.queryField('races', (t) =>
       const filters = [];
 
       if (args.season != null) filters.push(eq(meetings.seasonYear, args.season));
+      if (args.type != null) filters.push(eq(races.type, args.type));
       if (args.search) {
         const pattern = `%${args.search}%`;
-        filters.push(or(ilike(races.slug, pattern), ilike(meetings.name, pattern)));
+        filters.push(
+          or(
+            ilike(meetings.name, pattern),
+            // Any session of the weekend, not only the row being returned.
+            // With `type: GRAND_PRIX` the sprint rows are filtered out, and
+            // searching "sprint" would otherwise find nothing at all — while
+            // the six weekends that have one are exactly what was meant.
+            sql`exists (
+              select 1 from ${races} as sibling
+              where sibling.meeting_id = ${races.meetingId} and sibling.slug ilike ${pattern}
+            )`,
+          ),
+        );
       }
 
       // Stepping back is the same keyset walk in the other direction: take the
