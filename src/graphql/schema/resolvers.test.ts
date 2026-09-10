@@ -548,3 +548,35 @@ describe('races pagination', () => {
     expect(data.races.edges).toEqual([]);
   });
 });
+
+describe('a weekend, not its sessions', () => {
+  const weekend = () =>
+    run<{
+      races: { edges: { node: { slug: string; weekendSprint: { slug: string } | null } }[] };
+    }>(`query { races(type: GRAND_PRIX) { edges { node { slug weekendSprint { slug } } } } }`);
+
+  it('lists the grand prix once, carrying its own weekend’s sprint', async () => {
+    // The fixture is one meeting with two sessions — exactly the shape that
+    // used to render as two identical-looking cards.
+    const data = await weekend();
+    expect(data.races.edges.map((e) => e.node.slug)).toEqual(['2025-test']);
+    expect(data.races.edges[0].node.weekendSprint?.slug).toBe('2025-test-sprint');
+  });
+
+  it('gives a sprint no sprint of its own', async () => {
+    const data = await run<{ race: { weekendSprint: null } }>(
+      `query { race(slug: "2025-test-sprint") { weekendSprint { slug } } }`,
+    );
+    expect(data.race.weekendSprint).toBeNull();
+  });
+
+  it('still finds a weekend by a term that only its sprint matches', async () => {
+    // "sprint" appears in no meeting name and in no grand prix slug. Before the
+    // search looked across the weekend's sessions, filtering to grands prix
+    // made this a search that could never match anything.
+    const data = await run<{ races: { edges: { node: { slug: string } }[] } }>(
+      `query { races(type: GRAND_PRIX, search: "sprint") { edges { node { slug } } } }`,
+    );
+    expect(data.races.edges.map((e) => e.node.slug)).toEqual(['2025-test']);
+  });
+});

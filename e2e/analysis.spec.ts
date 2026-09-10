@@ -10,6 +10,21 @@ import { expect, test } from '@playwright/test';
  */
 const RACE = '2025-melbourne';
 
+/**
+ * The analysis payload is the heaviest read on the site — every lap of every
+ * driver — and it is behind a `use cache` scope, so the first request for it
+ * pays for all of it. Two workers hitting a freshly started server meant this
+ * file's first test raced that cold entry and lost: the pace table had no rows
+ * inside its timeout, three times in one afternoon.
+ *
+ * Warming it once here is the fix rather than a longer timeout, because a
+ * longer timeout would only make the same race take longer to fail. What the
+ * tests below assert is what the page renders, not how fast it warms.
+ */
+test.beforeAll(async ({ request }) => {
+  await request.get(`/races/${RACE}?view=analysis`);
+});
+
 test('the analysis tab charts lap times and tyre strategy', async ({ page }) => {
   await page.goto(`/races/${RACE}`);
 
@@ -23,9 +38,13 @@ test('the analysis tab charts lap times and tyre strategy', async ({ page }) => 
   await expect(page.getByRole('heading', { name: 'Tyres' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Race pace' })).toBeVisible();
 
-  // The pace table has a row per driver who set a lap.
-  const paceRows = page.locator('table').last().locator('tbody tr');
-  await expect.poll(async () => paceRows.count(), { timeout: 15_000 }).toBeGreaterThan(10);
+  // The pace table has a row per driver who set a lap. Found by its caption
+  // rather than as "the last table on the page" — the page has more than one,
+  // and which one is last depends on what has streamed in so far.
+  const paceRows = page
+    .getByRole('table', { name: /race pace by driver/i })
+    .locator('tbody tr');
+  await expect.poll(async () => paceRows.count(), { timeout: 30_000 }).toBeGreaterThan(10);
 });
 
 test('the selected view survives a reload, because it lives in the URL', async ({ page }) => {

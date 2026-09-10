@@ -5,6 +5,7 @@ import {
   drivers,
   meetings,
   raceResults,
+  races,
   teamSeasons,
   teams,
 } from '@/db/schema';
@@ -15,6 +16,7 @@ type DriverRow = typeof drivers.$inferSelect;
 type TeamSeasonRow = typeof teamSeasons.$inferSelect;
 type TeamRow = typeof teams.$inferSelect;
 type MeetingRow = typeof meetings.$inferSelect;
+type RaceRow = typeof races.$inferSelect;
 
 /**
  * Written by hand rather than through @pothos/plugin-dataloader, deliberately.
@@ -111,5 +113,18 @@ export function createLoaders(db: Db) {
       db.select().from(meetings).where(inArray(meetings.id, ids)),
     ),
     podiumByRaceId: podiumLoader(db),
+    /**
+     * The sprint of a weekend, if it had one. Keyed by meeting rather than by
+     * race, because that is the question the library asks: this grand prix's
+     * card wants the other session of its own weekend.
+     */
+    sprintByMeetingId: new DataLoader<string, RaceRow | null>(async (meetingIds) => {
+      const rows = await db
+        .select()
+        .from(races)
+        .where(and(inArray(races.meetingId, [...meetingIds]), eq(races.type, 'SPRINT')));
+      const byMeeting = new Map(rows.map((row) => [row.meetingId, row]));
+      return meetingIds.map((id) => byMeeting.get(id) ?? null);
+    }),
   };
 }
