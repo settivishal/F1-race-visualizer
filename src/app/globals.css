@@ -624,6 +624,17 @@ html:has(:root.light) {
 /* The hero's lines draw themselves. Each path carries `pathLength="1"` in the
  * markup, so one dash value works for a 3-lap sprint and a 78-lap Monaco
  * without measuring anything. */
+/* The scrubbed lap, as a slide rather than a jump. The clip's width and the
+   marker's transform are both plain CSS properties, so the reduced-motion
+   block above already flattens each to 0.01ms. */
+.hero-reveal {
+  transition: width 320ms var(--ease-out-fast);
+}
+
+.hero-car {
+  transition: transform 320ms var(--ease-out-fast), opacity 200ms linear;
+}
+
 .hero-line {
   stroke-dasharray: 1;
   stroke-dashoffset: 1;

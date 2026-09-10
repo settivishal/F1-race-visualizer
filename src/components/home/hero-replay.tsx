@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, type ReactNode } from 'react';
+import { useId, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { linearScale, smoothLinePath } from '@/lib/scale';
 
@@ -46,6 +46,9 @@ export function HeroReplay({
   // Opens at the end, showing the finished race. Starting at lap one would open
   // on a vertical line of grid slots, which says nothing about anything.
   const [lap, setLap] = useState(maxLap);
+  // The two frames below each need their own clip, and two elements cannot
+  // share an id even when only one of them is ever displayed.
+  const uid = useId();
 
   const x = linearScale([1, Math.max(2, maxLap)], [PADDING.left, WIDTH - PADDING.right]);
   // Scaled to the positions actually drawn, not to the whole field: the hero
@@ -61,44 +64,58 @@ export function HeroReplay({
     [PADDING.top, HEIGHT - PADDING.bottom],
   );
 
-  // Built once and rendered into both frames below.
-  const lines = (
+  // The whole race is drawn once and revealed to the scrubbed lap by a clip,
+  // rather than the path being rebuilt from a filtered slice of the points on
+  // every change. Dragging the slider used to jump the line a lap-width at a
+  // time, because that is what it was: a different path per lap. A clip whose
+  // width is a transitioned CSS property slides between laps instead, and the
+  // marker rides a transitioned transform to match. Both are plain CSS, so the
+  // global reduced-motion rule already flattens them.
+  const chart = (clipId: string) => (
     <>
-    {drivers.map((driver, index) => {
-      const upTo = driver.positions.filter((point) => point.lap <= lap);
-      if (upTo.length === 0) return null;
-      const points = upTo.map((point) => ({ x: x(point.lap), y: y(point.position) }));
-      const last = points[points.length - 1];
+      <defs>
+        <clipPath id={clipId}>
+          <rect x={0} y={0} height={HEIGHT} className="hero-reveal" style={{ width: `${x(lap)}px` }} />
+        </clipPath>
+      </defs>
+      {drivers.map((driver, index) => {
+        if (driver.positions.length === 0) return null;
+        const points = driver.positions.map((point) => ({ x: x(point.lap), y: y(point.position) }));
+        // The marker sits on the last lap actually driven at or before the
+        // scrubbed one — a driver who retired stops where they stopped.
+        const drivenCount = driver.positions.filter((point) => point.lap <= lap).length;
+        const marker = points[Math.max(0, drivenCount - 1)];
 
-      return (
-        <g key={driver.code}>
-          <path
-            d={smoothLinePath(points)}
-            fill="none"
-            stroke={driver.color ?? '#8892a0'}
-            strokeWidth={2}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            // Drawn in, staggered, once on load. Pure CSS, so the global
-            // reduced-motion rule already switches it off. pathLength
-            // normalises the dash maths across races of any length.
-            pathLength={1}
-            className="hero-line"
-            style={{ animationDelay: `${index * 0.08}s` }}
-          />
-          {/* The car, at the lap the scrubber is on. */}
-          <circle cx={last.x} cy={last.y} r={3} fill={driver.color ?? '#8892a0'} />
-          <text
-            x={last.x + 7}
-            y={last.y}
-            dy="0.32em"
-            className="fill-white/70 text-[9px] font-semibold"
-          >
-            {driver.code}
-          </text>
-        </g>
-      );
-    })}
+        return (
+          <g key={driver.code}>
+            <path
+              d={smoothLinePath(points)}
+              clipPath={`url(#${clipId})`}
+              fill="none"
+              stroke={driver.color ?? '#8892a0'}
+              strokeWidth={2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              // Drawn in, staggered, once on load. Pure CSS, so the global
+              // reduced-motion rule already switches it off. pathLength
+              // normalises the dash maths across races of any length.
+              pathLength={1}
+              className="hero-line"
+              style={{ animationDelay: `${index * 0.08}s` }}
+            />
+            {/* The car, at the lap the scrubber is on. */}
+            <g
+              className="hero-car"
+              style={{ transform: `translate(${marker.x}px, ${marker.y}px)`, opacity: drivenCount === 0 ? 0 : 1 }}
+            >
+              <circle r={3} fill={driver.color ?? '#8892a0'} />
+              <text x={7} dy="0.32em" className="fill-white/70 text-[9px] font-semibold">
+                {driver.code}
+              </text>
+            </g>
+          </g>
+        );
+      })}
     </>
   );
 
@@ -119,7 +136,7 @@ export function HeroReplay({
           role="img"
           aria-label={`Position changes through lap ${lap} of the ${title}`}
         >
-          {lines}
+          {chart(`${uid}-wide`)}
         </svg>
         {/* A phone is taller than the chart is deep, so fitting it there leaves
             a thin strip adrift in a tall band. Here the chart is texture behind
@@ -133,7 +150,7 @@ export function HeroReplay({
           role="img"
           aria-label={`Position changes through lap ${lap} of the ${title}`}
         >
-          {lines}
+          {chart(`${uid}-narrow`)}
         </svg>
       </div>
 
