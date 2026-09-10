@@ -167,9 +167,24 @@ describe('updateRaceMetadata', () => {
     expect(meeting.name).toBe('Monaco Grand Prix');
   });
 
-  it('rejects a lap count below one', async () => {
+  it('rejects a negative lap count', async () => {
     await expect(
-      run('mutation { updateRaceMetadata(slug: "2025-monaco", laps: 0) { slug } }', ADMIN),
-    ).rejects.toThrow('laps must be at least 1');
+      run('mutation { updateRaceMetadata(slug: "2025-monaco", laps: -1) { slug } }', ADMIN),
+    ).rejects.toThrow('laps cannot be negative');
+  });
+
+  it('accepts zero laps, which is what a race nobody ran has', async () => {
+    // The editor's whole purpose is corrections like marking a cancelled race
+    // CANCELLED, and the form posts the laps it is showing — 0 for such a race.
+    await run(
+      'mutation { updateRaceMetadata(slug: "2025-monaco", laps: 0, status: "CANCELLED") { slug } }',
+      ADMIN,
+    );
+
+    const [race] = await db.select().from(dbSchema.races)
+      .where(eq(dbSchema.races.slug, '2025-monaco'));
+    expect(race.status).toBe('CANCELLED');
+    expect(race.laps).toBe(0);
+    expect(race.adminEdited).toEqual(expect.arrayContaining(['laps', 'status']));
   });
 });
