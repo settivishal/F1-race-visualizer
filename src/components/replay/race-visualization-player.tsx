@@ -246,6 +246,8 @@ export function RaceVisualizationPlayer({
               <LiveTimingTower
                 visualization={visualization}
                 currentLap={currentLap}
+                nextLap={nextLap}
+                lapProgress={lapProgress}
                 focusedDriverId={focusedDriverId}
                 highlightedDriverId={highlightedDriverId}
                 onToggleDriver={toggleFocusedDriver}
