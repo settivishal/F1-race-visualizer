@@ -360,10 +360,17 @@ builder.queryField('latestRace', (t) =>
  * built. The cron that flips a race to COMPLETED is what moves this along.
  *
  * "Earliest SCHEDULED" alone is wrong on real data: the archive holds rows an
- * import never marked, so 2023 Imola — cancelled, never run — is the earliest
- * scheduled race in the database and would be announced as next. The newest
- * race actually run is the fence: whatever is scheduled after it is ahead of
- * us, and anything scheduled before it is a gap in the archive.
+ * import never marked. 2023 Imola — cancelled, never run — was the earliest
+ * scheduled race in the database and would have been announced as next. That
+ * row has since been set to CANCELLED by hand, and `admin_edited` holds its
+ * status so no re-import can put it back, which means nothing is behind the
+ * fence today.
+ *
+ * The fence stays anyway. It is one clause, and what put Imola there was the
+ * ingest having no way to know a race was called off — which is still true of
+ * the next one. The newest race actually run is the line: whatever is scheduled
+ * after it is ahead of us, and anything scheduled before it is a gap in the
+ * archive.
  */
 builder.queryField('nextRace', (t) =>
   t.field({
