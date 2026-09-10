@@ -99,3 +99,74 @@ test('hovering a driver previews the emphasis without committing to it', async (
   await page.mouse.move(0, 0);
   await expect.poll(fullStrengthCars).toBeGreaterThan(1);
 });
+
+/**
+ * The reduced-motion path, which had shipped untested.
+ *
+ * The preference must change *how* the replay moves without taking any of it
+ * away: playback, the lap counter and the running order all still work, and
+ * only the interpolation between laps stops. That second half is the part
+ * nothing asserted — the player's `shouldReduceMotion` branch swaps the
+ * animation for a `setTimeout`, and every piece of motion added since is
+ * written to fall out of `lapProgress` staying at 0.
+ */
+test.describe('with a reduced-motion preference', () => {
+  test.use({ reducedMotion: 'reduce' });
+
+  test('the replay still runs, and the cars step between laps instead of sliding', async ({
+    page,
+  }) => {
+    await page.goto(`/races/${RACE}`);
+
+    const chart = page.getByRole('img', { name: /race position chart/i });
+    await expect(chart).toBeVisible({ timeout: 30_000 });
+
+    const startingOrder = await page.getByTestId('tower-driver').allInnerTexts();
+
+    // Half speed, so several samples land inside one lap.
+    await page.getByRole('button', { name: '0.5x' }).click();
+    await page.getByRole('button', { name: 'Play replay' }).click();
+
+    // Lap and position read in one evaluate, not two round trips: read
+    // separately, a pair can straddle a lap boundary and the step the
+    // preference asks for looks like the slide it forbids.
+    const sample = () =>
+      page.evaluate(() => {
+        const car = document.querySelector('svg g.group');
+        const label = document.querySelector('svg[role="img"]')?.getAttribute('aria-label') ?? '';
+        return {
+          lap: Number(/lap (\d+) of/i.exec(label)?.[1] ?? NaN),
+          transform: car ? getComputedStyle(car).transform : null,
+        };
+      });
+
+    const samples: { lap: number; transform: string | null }[] = [];
+    for (let index = 0; index < 16; index += 1) {
+      samples.push(await sample());
+      await page.waitForTimeout(400);
+    }
+
+    // Nothing is taken away: the lap still advances and the order still changes.
+    expect(samples.at(-1)!.lap).toBeGreaterThan(samples[0]!.lap);
+    // Polled, not read once: the sampling window above is only a couple of
+    // laps, and a race need not change hands in those.
+    await expect
+      .poll(() => page.getByTestId('tower-driver').allInnerTexts(), { timeout: 45_000 })
+      .not.toEqual(startingOrder);
+
+    // And the part that had never been checked: inside a lap the leading car's
+    // badge does not move. Its transform comes from the same motion values the
+    // whole chart animates from, so a car that holds still is the whole chart
+    // holding still.
+    const withinLap = samples
+      .slice(1)
+      .map((entry, index) => [samples[index]!, entry] as const)
+      .filter(([before, after]) => before.lap === after.lap);
+
+    expect(withinLap.length, 'no two samples landed inside the same lap').toBeGreaterThan(0);
+    for (const [before, after] of withinLap) {
+      expect(before.transform).not.toBeNull();
+      expect(after.transform).toBe(before.transform);
+    }
+  });
+});
