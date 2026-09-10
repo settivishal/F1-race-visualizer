@@ -107,10 +107,14 @@ export async function updateMetadataAction(
   const slug = String(formData.get('slug') ?? '');
   if (!slug) return { ok: false, message: 'No race given.' };
 
+  // Zero is allowed, and has to be: a race that was never run has no laps, and
+  // the form posts the value it is showing. Rejecting 0 made every unrun race
+  // uneditable — including the one correction this editor exists for, marking a
+  // cancelled race CANCELLED.
   const rawLaps = String(formData.get('laps') ?? '').trim();
   const laps = rawLaps === '' ? null : Number(rawLaps);
-  if (laps !== null && (!Number.isInteger(laps) || laps < 1)) {
-    return { ok: false, message: 'Laps must be a whole number of at least 1.' };
+  if (laps !== null && (!Number.isInteger(laps) || laps < 0)) {
+    return { ok: false, message: 'Laps must be a whole number, zero or more.' };
   }
 
   try {
