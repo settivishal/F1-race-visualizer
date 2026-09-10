@@ -51,16 +51,16 @@ export const metadata: Metadata = {
   // applies it to whatever a child segment sets; `default` is what renders when
   // a segment sets nothing, and Next requires it alongside a template.
   title: {
-    default: "F1 Race Visualizer",
-    template: "%s — F1 Race Visualizer",
+    default: "RaceLines",
+    template: "%s — RaceLines",
   },
   description: "Watch a grand prix unfold as an animated position chart.",
   // Inherited by every route. The race pages add their own image through
   // `races/[slug]/opengraph-image.tsx`; everything else gets the site default.
   openGraph: {
     type: "website",
-    siteName: "F1 Race Visualizer",
-    title: "F1 Race Visualizer",
+    siteName: "RaceLines",
+    title: "RaceLines",
     description: "Watch a grand prix unfold as an animated position chart.",
     url: siteUrl,
   },
