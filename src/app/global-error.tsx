@@ -43,7 +43,7 @@ export default function GlobalError({
             'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
         }}
       >
-        <title>Something went wrong — F1 Race Visualizer</title>
+        <title>Something went wrong — RaceLines</title>
         <div role="alert" style={{ maxWidth: '32rem', textAlign: 'center' }}>
           <h1 style={{ fontSize: '1.25rem', fontWeight: 700, margin: 0 }}>
             The site failed to load

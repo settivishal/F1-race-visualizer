@@ -1473,3 +1473,26 @@ white on it is 4.3:1, under AA, which "red means white text" would have shipped.
 **What would change this:** a team supplying its own mark under terms this project can
 state, or the site becoming something other than an unaffiliated fan project. Neither is
 close.
+
+---
+
+## 2026-09-10 — The site is called RaceLines
+
+**Decided:** the product name is **RaceLines**. The wordmark reads Race**Lines**, the
+title template is `%s — RaceLines`, and "F1 Race Visualizer" and "Raceviz" are gone from
+every user-facing string.
+
+"F1 Race Visualizer" described a category, not a thing, and put a trademarked initialism
+first — the site is unaffiliated, and leading with someone else's mark is the wrong way
+round even with the disclaimer this site carries. "Raceviz" was better but named the
+technique. A line is what the site actually draws: one per driver, across the laps, and
+the whole product is the shape those lines make.
+
+**Not renamed:** the GitHub repository, the local folder, the Vercel project and the
+deployed URL, all still `f1-race-visualizer`. Renaming the Vercel project changes the URL,
+and every link anyone has been given points at the current one — a rename would be a
+redirect to maintain in exchange for tidiness nobody sees. The name inside the product and
+the name of the box it ships in are allowed to differ.
+
+**What would change this:** a custom domain, which is where the deployed URL stops being
+an implementation detail and starts being the name people type.

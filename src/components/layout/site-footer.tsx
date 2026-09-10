@@ -28,7 +28,7 @@ export function SiteFooter() {
   return (
     <footer className="mt-16 border-t border-line">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-6 py-8 text-sm text-muted lg:flex-row lg:items-center lg:justify-between lg:gap-8">
-        <Link href="/" className="group flex items-center gap-2.5 rounded-sm" aria-label="F1 Race Visualizer, home">
+        <Link href="/" className="group flex items-center gap-2.5 rounded-sm" aria-label="RaceLines, home">
           {/* The same racing stripe the header uses — the mark is a stripe and a
               word, so it costs no logo file and no licence for one. */}
           <span
@@ -36,7 +36,7 @@ export function SiteFooter() {
             className="h-5 w-1 rounded-full bg-accent transition-colors group-hover:bg-accent-strong"
           />
           <span className="font-heading text-base font-bold uppercase tracking-[0.14em] text-foreground">
-            Race<span className="text-accent">viz</span>
+            Race<span className="text-accent">Lines</span>
           </span>
         </Link>
 

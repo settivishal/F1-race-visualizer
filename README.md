@@ -1,8 +1,12 @@
-# F1 Race Visualizer
+# RaceLines
 
 A Formula 1 race replay platform. Race data is animated lap-by-lap so you can watch a
 grand prix unfold as a position chart — overtakes, pit stops, safety cars, and
 retirements in the order they actually happened.
+
+The repository, the Vercel project and the deployed URL are all still
+`f1-race-visualizer`; only what the site calls itself changed. See
+[`docs/decisions.md`](docs/decisions.md), "The site is called RaceLines".
 
 **Status:** design complete, implementation starting. See [`docs/system-design.md`](docs/system-design.md).
 

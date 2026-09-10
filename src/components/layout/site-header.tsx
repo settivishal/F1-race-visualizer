@@ -32,7 +32,7 @@ export function SiteHeader() {
         <Link
           href="/"
           className="group flex items-center gap-2.5 rounded-sm"
-          aria-label="F1 Race Visualizer, home"
+          aria-label="RaceLines, home"
         >
           {/* The accent bar is the wordmark. A racing stripe reads as the sport
               without needing a logo file or a licence for one. */}
@@ -41,7 +41,7 @@ export function SiteHeader() {
             className="h-5 w-1 rounded-full bg-accent transition-colors group-hover:bg-accent-strong"
           />
           <span className="font-heading text-base font-bold uppercase tracking-[0.14em]">
-            Race<span className="text-accent">viz</span>
+            Race<span className="text-accent">Lines</span>
           </span>
         </Link>
 

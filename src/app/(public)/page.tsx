@@ -24,7 +24,7 @@ import {
 // rather than the name plus a suffix.
 export const metadata = {
   title: {
-    absolute: 'F1 Race Visualizer — every position change, lap by lap',
+    absolute: 'RaceLines — every position change, lap by lap',
   },
   description:
     'Replay any grand prix as an animated position chart: pit windows, safety cars, and the lap someone finally got past.',
