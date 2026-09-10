@@ -86,8 +86,12 @@ export function SeasonStatus({ season, races }: { season: number; races: Schedul
             aria-valuenow={completed ?? undefined}
             aria-label={`${season} season progress`}
           >
+            {/* The fill animates for free: the first render has no clock, so
+                it starts at 0% and transitions to the real width the moment
+                `completed` arrives. Slower than the old 500ms because it now
+                reads as the section's arrival rather than as an update. */}
             <div
-              className="h-full rounded-full bg-accent transition-[width] duration-500"
+              className="h-full rounded-full bg-accent transition-[width] duration-[900ms] ease-out"
               style={{ width: `${((completed ?? 0) / total) * 100}%` }}
             />
           </div>

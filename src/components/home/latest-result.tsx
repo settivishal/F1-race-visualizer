@@ -64,9 +64,21 @@ export function LatestResult({
           {podium.map((row) => (
             <li
               key={row.driver?.code ?? row.finalPosition}
-              className="flex items-center gap-3 rounded-lg border border-line bg-panel-strong/40 px-4 py-3"
+              // The winner is the fact this section exists to carry, and three
+              // identical boxes made the reader find it by reading a digit.
+              className={`flex items-center gap-3 rounded-lg border px-4 py-3 ${
+                row.finalPosition === 1
+                  ? 'podium-lead border-accent/40 bg-accent-soft'
+                  : 'border-line bg-panel-strong/40'
+              }`}
             >
-              <span className="tabular text-2xl font-bold text-subtle">{row.finalPosition}</span>
+              <span
+                className={`tabular text-2xl font-bold ${
+                  row.finalPosition === 1 ? 'text-accent' : 'text-subtle'
+                }`}
+              >
+                {row.finalPosition}
+              </span>
               <span
                 className="h-8 w-1 shrink-0 rounded-full"
                 style={{ backgroundColor: row.team?.color ?? 'var(--muted)' }}

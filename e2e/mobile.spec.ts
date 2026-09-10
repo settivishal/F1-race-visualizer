@@ -56,7 +56,13 @@ test('the nav is reachable behind the menu button', async ({ page }) => {
   await expect(menu).toBeVisible();
 
   await menu.click();
-  await page.getByRole('link', { name: 'Standings', exact: true }).click();
+  // Scoped to the header: the footer carries its own Standings link now, and an
+  // unscoped locator matches both and fails on strict mode rather than on
+  // anything being wrong.
+  await page
+    .getByRole('banner')
+    .getByRole('link', { name: 'Standings', exact: true })
+    .click();
 
   await expect(page).toHaveURL(/\/standings/);
 });
