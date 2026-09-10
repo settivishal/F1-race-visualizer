@@ -66,11 +66,17 @@ const RACE_LIBRARY = /* GraphQL */ `
         node {
           id slug date laps status type isFeatured
           meeting { name country circuitName round season }
+          podium { position code teamColor }
         }
       }
       pageInfo { hasNextPage hasPreviousPage startCursor endCursor }
     }
     seasons { year }
+    # Which tile is "upcoming" and which one glows. Asked globally rather than
+    # derived from the page's own edges, so both stay right on page two of "all
+    # seasons" and on a past season, where neither should match anything.
+    latestRace { slug }
+    nextRace { slug }
   }
 `;
 

@@ -1,12 +1,20 @@
 import DataLoader from 'dataloader';
-import { inArray } from 'drizzle-orm';
-import { driverTeamAssignments, drivers, teamSeasons, teams } from '@/db/schema';
+import { and, asc, eq, inArray, lte, sql } from 'drizzle-orm';
+import {
+  driverTeamAssignments,
+  drivers,
+  meetings,
+  raceResults,
+  teamSeasons,
+  teams,
+} from '@/db/schema';
 import type { Db } from './context';
 
 type AssignmentRow = typeof driverTeamAssignments.$inferSelect;
 type DriverRow = typeof drivers.$inferSelect;
 type TeamSeasonRow = typeof teamSeasons.$inferSelect;
 type TeamRow = typeof teams.$inferSelect;
+type MeetingRow = typeof meetings.$inferSelect;
 
 /**
  * Written by hand rather than through @pothos/plugin-dataloader, deliberately.
@@ -38,6 +46,49 @@ function byId<Row extends { id: string }>(db: Db, load: (ids: string[]) => Promi
   });
 }
 
+/** One podium line: who finished there and in what colour. */
+export type PodiumSlot = { position: number; code: string; teamColor: string | null };
+
+/**
+ * The top three of many races in one statement.
+ *
+ * `Race.results` is a query per race, which is fine for one race page and forty
+ * statements for a page of the race library. This joins the way seasonPulse
+ * does — assignment to driver to team — and groups in memory, so a page of
+ * tiles costs one query no matter how many tiles it has.
+ */
+function podiumLoader(db: Db) {
+  return new DataLoader<string, PodiumSlot[]>(async (raceIds) => {
+    const rows = await db
+      .select({
+        raceId: raceResults.raceId,
+        position: raceResults.finalPosition,
+        code: drivers.code,
+        // Per-season livery first, the team's standing colour otherwise —
+        // the same coalesce seasonPulse uses.
+        teamColor: sql<string | null>`coalesce(${teamSeasons.color}, ${teams.color})`,
+      })
+      .from(raceResults)
+      .innerJoin(driverTeamAssignments, eq(driverTeamAssignments.id, raceResults.assignmentId))
+      .innerJoin(drivers, eq(drivers.id, driverTeamAssignments.driverId))
+      .leftJoin(teamSeasons, eq(teamSeasons.id, driverTeamAssignments.teamSeasonId))
+      .leftJoin(teams, eq(teams.id, teamSeasons.teamId))
+      .where(and(inArray(raceResults.raceId, [...raceIds]), lte(raceResults.finalPosition, 3)))
+      .orderBy(asc(raceResults.raceId), asc(raceResults.finalPosition));
+
+    const byRace = new Map<string, PodiumSlot[]>();
+    for (const row of rows) {
+      if (row.position === null) continue;
+      const slots = byRace.get(row.raceId) ?? [];
+      slots.push({ position: row.position, code: row.code, teamColor: row.teamColor });
+      byRace.set(row.raceId, slots);
+    }
+    // A race nobody has driven has no podium, not a missing one — an empty
+    // array is the answer, so the caller never has to branch on status.
+    return raceIds.map((id) => byRace.get(id) ?? []);
+  });
+}
+
 export type Loaders = ReturnType<typeof createLoaders>;
 
 export function createLoaders(db: Db) {
@@ -54,5 +105,11 @@ export function createLoaders(db: Db) {
     teamById: byId<TeamRow>(db, (ids) =>
       db.select().from(teams).where(inArray(teams.id, ids)),
     ),
+    // A page of race tiles asks for one meeting per tile, and a weekend's two
+    // sessions share one — so this batches and dedupes both.
+    meetingById: byId<MeetingRow>(db, (ids) =>
+      db.select().from(meetings).where(inArray(meetings.id, ids)),
+    ),
+    podiumByRaceId: podiumLoader(db),
   };
 }

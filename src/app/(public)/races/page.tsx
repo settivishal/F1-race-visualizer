@@ -73,7 +73,12 @@ async function RaceLibrary({ searchParams }: { searchParams: SearchParams }) {
   const after = first(params.after) ?? null;
   const before = first(params.before) ?? null;
 
-  const { races, seasons } = await getRaceLibrary(season, search, after, before);
+  const { races, seasons, latestRace, nextRace } = await getRaceLibrary(
+    season,
+    search,
+    after,
+    before,
+  );
 
   // Carried on every link so a filter survives paging and vice versa.
   const context = {
@@ -162,37 +167,79 @@ async function RaceLibrary({ searchParams }: { searchParams: SearchParams }) {
               {/* prefetch: the race pages are prerendered and cached, so warming
                   one on hover costs almost nothing and removes the wait on the
                   click that matters. */}
-              <Link href={`/races/${node.slug}`} className="block h-full rounded-xl" prefetch>
-                <Card interactive className="flex h-full flex-col">
-                  <div className="flex items-center gap-2">
-                    <span className="text-eyebrow font-semibold uppercase text-muted">
-                      {node.meeting
-                        ? `${node.meeting.season} · Round ${node.meeting.round}`
-                        : 'Season unknown'}
-                    </span>
-                    {node.type === 'SPRINT' ? <Badge>Sprint</Badge> : null}
-                    {node.status === 'SCHEDULED' ? <Badge tone="accent">Upcoming</Badge> : null}
-                    {node.status === 'CANCELLED' ? <Badge>Cancelled</Badge> : null}
+              {/* The glow sits on the link, not the card: Card already carries
+                  `shadow-sm`, and cn() is a join rather than a tailwind-merge,
+                  so a second shadow utility there loses to whichever the
+                  stylesheet happens to order last. */}
+              <Link
+                href={`/races/${node.slug}`}
+                className={`block h-full rounded-xl ${
+                  // The one race just run. A glow rather than a badge: it says
+                  // "here" without taking a word away from the tile.
+                  node.slug === latestRace?.slug ? 'shadow-glow' : ''
+                }`}
+                prefetch
+              >
+                <Card
+                  interactive
+                  className={`flex h-full gap-4 ${
+                    node.slug === latestRace?.slug ? 'border-accent/40' : ''
+                  }`}
+                >
+                  <div className="flex min-w-0 flex-1 flex-col">
+                    <div className="flex items-center gap-2">
+                      <span className="text-eyebrow font-semibold uppercase text-muted">
+                        {node.meeting
+                          ? `${node.meeting.season} · Round ${node.meeting.round}`
+                          : 'Season unknown'}
+                      </span>
+                      {node.type === 'SPRINT' ? <Badge>Sprint</Badge> : null}
+                      {/* Only the next one. Every scheduled race carrying this
+                          badge made it mean "not yet run", which the date below
+                          already says. */}
+                      {node.slug === nextRace?.slug ? <Badge tone="accent">Upcoming</Badge> : null}
+                      {node.status === 'CANCELLED' ? <Badge>Cancelled</Badge> : null}
+                    </div>
+                    {/* The same name on the race page's <h1>, so the title is
+                        one object that moves rather than two that swap. */}
+                    <ViewTransition name={`race-title-${node.slug}`} share="race-morph" default="none">
+                      <h2 className="type-card-title mt-2.5">
+                        {node.meeting?.name ?? node.slug}
+                      </h2>
+                    </ViewTransition>
+                    <p className="mt-1.5 text-sm text-muted">
+                      {node.meeting?.circuitName ?? node.meeting?.country ?? '—'} ·{' '}
+                      {node.status === 'CANCELLED' ? (
+                        <span className="line-through">Not held</span>
+                      ) : node.status === 'SCHEDULED' ? (
+                        <RaceStartTime date={node.date} />
+                      ) : (
+                        <>
+                          <span className="tabular">{node.laps}</span> laps
+                        </>
+                      )}
+                    </p>
                   </div>
-                  {/* The same name on the race page's <h1>, so the title is
-                      one object that moves rather than two that swap. */}
-                  <ViewTransition name={`race-title-${node.slug}`} share="race-morph" default="none">
-                    <h2 className="type-card-title mt-2.5">
-                      {node.meeting?.name ?? node.slug}
-                    </h2>
-                  </ViewTransition>
-                  <p className="mt-1.5 text-sm text-muted">
-                    {node.meeting?.circuitName ?? node.meeting?.country ?? '—'} ·{' '}
-                    {node.status === 'CANCELLED' ? (
-                      <span className="line-through">Not held</span>
-                    ) : node.status === 'SCHEDULED' ? (
-                      <RaceStartTime date={node.date} />
-                    ) : (
-                      <>
-                        <span className="tabular">{node.laps}</span> laps
-                      </>
-                    )}
-                  </p>
+
+                  {/* The result, which is what the tile was missing. Empty for a
+                      race not yet run, so no status test is needed here. */}
+                  {node.podium.length > 0 ? (
+                    <ol className="flex shrink-0 flex-col justify-center gap-1.5">
+                      {node.podium.map((slot) => (
+                        <li key={slot.position} className="flex items-center gap-2">
+                          <span className="tabular w-3 text-eyebrow font-semibold text-subtle">
+                            {slot.position}
+                          </span>
+                          <span
+                            aria-hidden
+                            className="h-4 w-[3px] rounded-full"
+                            style={{ backgroundColor: slot.teamColor ?? 'var(--muted)' }}
+                          />
+                          <span className="font-mono text-sm font-semibold">{slot.code}</span>
+                        </li>
+                      ))}
+                    </ol>
+                  ) : null}
                 </Card>
               </Link>
             </li>
