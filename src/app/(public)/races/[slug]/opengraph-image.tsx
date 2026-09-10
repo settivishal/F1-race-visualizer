@@ -59,7 +59,7 @@ export default async function Image({ params }: { params: Promise<{ slug: string
         <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
           <div style={{ width: 12, height: 56, borderRadius: 6, background: '#ff2016' }} />
           <div style={{ fontSize: 30, letterSpacing: 6, textTransform: 'uppercase' }}>
-            Raceviz
+            RaceLines
           </div>
         </div>
 

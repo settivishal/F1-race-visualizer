@@ -8,7 +8,7 @@ import { ImageResponse } from 'next/og';
  * resolves no CSS variables and no stylesheet — but no data, so it prerenders
  * once and costs nothing.
  */
-export const alt = 'F1 Race Visualizer';
+export const alt = 'RaceLines';
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
 
@@ -30,7 +30,7 @@ export default function Image() {
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
           <div style={{ width: 12, height: 56, borderRadius: 6, background: '#ff2016' }} />
-          <div style={{ fontSize: 30, letterSpacing: 6, textTransform: 'uppercase' }}>Raceviz</div>
+          <div style={{ fontSize: 30, letterSpacing: 6, textTransform: 'uppercase' }}>RaceLines</div>
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column' }}>
