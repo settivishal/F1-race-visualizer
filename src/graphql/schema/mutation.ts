@@ -183,7 +183,9 @@ builder.mutationType({
         const racePinned: string[] = [];
 
         if (typeof args.laps === 'number') {
-          if (args.laps < 1) throw new Error('laps must be at least 1');
+          // Zero is a real value here — a cancelled or unrun race has no laps —
+          // so only a negative one is wrong. See the same rule in the action.
+          if (args.laps < 0) throw new Error('laps cannot be negative');
           racePatch.laps = args.laps;
           racePinned.push('laps');
         }

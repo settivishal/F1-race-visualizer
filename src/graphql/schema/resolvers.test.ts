@@ -201,6 +201,69 @@ describe('seasonPulse', () => {
   });
 });
 
+describe('podium', () => {
+  it('is the top three in order, with the per-season livery', async () => {
+    const data = await run<{
+      race: { podium: { position: number; code: string; teamColor: string | null }[] };
+    }>(`query { race(slug: "2025-test-sprint") { podium { position code teamColor } } }`);
+
+    // Norris then Leclerc, and a DNF has no position so nothing else appears.
+    expect(data.race.podium).toEqual([
+      // McLaren has no 2025 team_seasons colour, so the team's own is used.
+      { position: 1, code: 'NOR', teamColor: '#FF8000' },
+      { position: 2, code: 'LEC', teamColor: '#E8002D' },
+    ]);
+  });
+
+  it('is empty for a race nobody has driven, rather than null', async () => {
+    const [later] = await db.insert(dbSchema.meetings).values({
+      seasonYear: 2025, round: 2, name: 'Scheduled Grand Prix', country: 'Testland',
+      startDate: new Date('2030-01-01T00:00:00Z'), openf1MeetingKey: 2,
+    }).returning();
+    await db.insert(dbSchema.races).values({
+      meetingId: later.id, type: 'GRAND_PRIX', slug: '2025-scheduled',
+      date: new Date('2030-01-01T00:00:00Z'), laps: 0, openf1SessionKey: 99,
+      status: 'SCHEDULED',
+    });
+
+    const data = await run<{ race: { podium: unknown[] }; nextRace: { slug: string } }>(
+      `query { race(slug: "2025-scheduled") { podium { position } } nextRace { slug } }`,
+    );
+    expect(data.race.podium).toEqual([]);
+    // And the same row is what the library calls upcoming: the earliest race
+    // not yet run, not the newest by date.
+    expect(data.nextRace.slug).toBe('2025-scheduled');
+
+    await db.delete(dbSchema.races).where(eq(dbSchema.races.slug, '2025-scheduled'));
+    await db.delete(dbSchema.meetings).where(eq(dbSchema.meetings.id, later.id));
+  });
+
+  it('has no next race when every race has been run', async () => {
+    const data = await run<{ nextRace: null }>(`query { nextRace { slug } }`);
+    expect(data.nextRace).toBeNull();
+  });
+
+  it('ignores a scheduled row older than the newest race run', async () => {
+    // 2023 Imola is this shape in production: cancelled, never run, still
+    // SCHEDULED. Earliest-scheduled alone would announce it as the next race.
+    const [stale] = await db.insert(dbSchema.meetings).values({
+      seasonYear: 2025, round: 3, name: 'Stale Grand Prix', country: 'Testland',
+      startDate: new Date('2024-01-01T00:00:00Z'), openf1MeetingKey: 3,
+    }).returning();
+    await db.insert(dbSchema.races).values({
+      meetingId: stale.id, type: 'GRAND_PRIX', slug: '2024-stale',
+      date: new Date('2024-01-01T00:00:00Z'), laps: 0, openf1SessionKey: 98,
+      status: 'SCHEDULED',
+    });
+
+    const data = await run<{ nextRace: null }>(`query { nextRace { slug } }`);
+    expect(data.nextRace).toBeNull();
+
+    await db.delete(dbSchema.races).where(eq(dbSchema.races.slug, '2024-stale'));
+    await db.delete(dbSchema.meetings).where(eq(dbSchema.meetings.id, stale.id));
+  });
+});
+
 describe('races paging', () => {
   const page = (args: string) => run<{
     races: {
@@ -342,6 +405,41 @@ describe('analysis', () => {
     `);
     const norris = data.race.analysis.lapTimes.find((d) => d.driver.code === 'NOR');
     expect(norris!.laps.map((l) => l.lap)).toEqual([1, 3]);
+  });
+
+  it('tells a race suspension apart from a pit stop, keeping both rows', async () => {
+    // Upstream files the stationary time under a red flag as a pit stop, so a
+    // stopped race arrives with one of these per car. Leclerc gets a half-hour
+    // one here; Norris keeps his 23.4s stop from the fixture.
+    const race = (await db.query.races.findFirst({
+      where: eq(dbSchema.races.slug, '2025-test'),
+    }))!;
+    const [existing] = await db
+      .select()
+      .from(dbSchema.pitStops)
+      .where(eq(dbSchema.pitStops.raceId, race.id));
+    const [leclerc] = await db
+      .select({ id: dbSchema.driverTeamAssignments.id })
+      .from(dbSchema.driverTeamAssignments)
+      .innerJoin(dbSchema.drivers, eq(dbSchema.drivers.id, dbSchema.driverTeamAssignments.driverId))
+      .where(eq(dbSchema.drivers.code, 'LEC'));
+
+    await db.insert(dbSchema.pitStops).values([
+      { raceId: race.id, assignmentId: leclerc.id, lap: existing.lap, durationMs: 1_842_500 },
+    ]);
+
+    const data = await run<{
+      race: { analysis: { pitStops: { lap: number; underStoppage: boolean }[] } };
+    }>(`query { race(slug: "2025-test") { analysis { pitStops { lap underStoppage } } } }`);
+
+    expect(data.race.analysis.pitStops).toEqual(
+      expect.arrayContaining([
+        { lap: 1, underStoppage: false },
+        { lap: 1, underStoppage: true },
+      ]),
+    );
+
+    await db.delete(dbSchema.pitStops).where(eq(dbSchema.pitStops.assignmentId, leclerc.id));
   });
 
   it('flags a pit lap and its out-lap rather than deleting them', async () => {

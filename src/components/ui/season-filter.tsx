@@ -17,6 +17,7 @@ export function SeasonFilter({
   seasons,
   active,
   extra = {},
+  allowAll = true,
 }: {
   pathname: string;
   seasons: number[];
@@ -24,6 +25,8 @@ export function SeasonFilter({
   active: number | null;
   /** Other query parameters to preserve, such as a search term. */
   extra?: Record<string, string>;
+  /** Off where "every season at once" is not a reading — a championship table. */
+  allowAll?: boolean;
 }) {
   const chip = (label: string, value: string, isActive: boolean) => (
     <Link
@@ -45,7 +48,7 @@ export function SeasonFilter({
       {[...seasons]
         .sort((a, b) => b - a)
         .map((year) => chip(String(year), String(year), active === year))}
-      {chip('All seasons', 'all', active === null)}
+      {allowAll ? chip('All seasons', 'all', active === null) : null}
     </nav>
   );
 }

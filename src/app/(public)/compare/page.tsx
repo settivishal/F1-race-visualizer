@@ -70,6 +70,9 @@ async function CompareBody({ searchParams }: { searchParams: Promise<Search> }) 
   return (
     <>
       <Card className="mt-8">
+        {/* No AutoSubmit here, deliberately: a comparison needs two sides, so
+            applying on every change would navigate twice on the way to one
+            answer — once through a half-picked pair. The button stays. */}
         <form className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5 lg:items-end">
           <Picker label="Compare" name="kind" value={kind}>
             <option value="driver">Drivers</option>
