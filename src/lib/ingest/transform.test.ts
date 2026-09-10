@@ -13,10 +13,10 @@ import stints from './__fixtures__/australia-2025/stints.json';
 import weather from './__fixtures__/australia-2025/weather.json';
 import {
   buildEvents, buildLapPositions, buildPitStops, buildResults, buildStints, deriveRounds,
-  findFastestLap, raceSlug, transformRace,
+  findFastestLap, raceSlug, transformRace, zeroPointResults,
 } from './transform';
 import type { Lap, Meeting, PositionSample, Session } from './openf1';
-import type { RaceBundle } from './types';
+import type { RaceBundle, ResultRow } from './types';
 
 const meeting: Meeting = {
   meeting_key: 1254,
@@ -449,5 +449,26 @@ describe('a red flag, which upstream files as a pit stop per car', () => {
       [],
     );
     expect(lone.filter((e) => e.type === 'RED_FLAG')).toEqual([]);
+  });
+});
+
+describe('zeroPointResults', () => {
+  const row = (over: Partial<ResultRow>): ResultRow => ({
+    driverNumber: 1, finalPosition: 2, status: 'FINISHED', lapsCompleted: 50,
+    points: 0, fastestLap: false, ...over,
+  });
+
+  it('flags a scoring position that upstream left on zero', () => {
+    // 2023 Jeddah: Verstappen second, points 0.
+    expect(zeroPointResults([row({ finalPosition: 2 })])).toHaveLength(1);
+  });
+
+  it('leaves alone the zeros that are real', () => {
+    expect(zeroPointResults([
+      row({ finalPosition: 11 }),                    // outside the points
+      row({ finalPosition: 3, status: 'DNF' }),      // never classified
+      row({ finalPosition: null, status: 'DNS' }),
+      row({ finalPosition: 1, points: 25 }),         // scored
+    ])).toEqual([]);
   });
 });
