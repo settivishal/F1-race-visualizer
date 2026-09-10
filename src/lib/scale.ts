@@ -59,6 +59,35 @@ export function linePath(points: { x: number; y: number }[]): string {
     .join(' ');
 }
 
+/**
+ * The same polyline with its corners rounded off.
+ *
+ * Position data is a step function — a driver holds a place for laps and then
+ * changes it — so a straight polyline is all right angles. Each segment gets a
+ * cubic whose two control points sit at its horizontal midpoint, which leaves
+ * every vertex exactly where it was and only softens the turn into it. Nothing
+ * is invented between laps and no line overshoots a position it never held,
+ * which a spline fitted through the points would do.
+ *
+ * Fewer than three points has no corner to round, so it falls back to the
+ * straight path.
+ */
+export function smoothLinePath(points: { x: number; y: number }[]): string {
+  if (points.length < 3) return linePath(points);
+
+  const start = points[0];
+  let d = `M${start.x.toFixed(2)} ${start.y.toFixed(2)}`;
+
+  for (let i = 1; i < points.length; i += 1) {
+    const from = points[i - 1];
+    const to = points[i];
+    const midX = ((from.x + to.x) / 2).toFixed(2);
+    d += ` C${midX} ${from.y.toFixed(2)} ${midX} ${to.y.toFixed(2)} ${to.x.toFixed(2)} ${to.y.toFixed(2)}`;
+  }
+
+  return d;
+}
+
 /** m:ss.mmm — how a lap time is read everywhere in the sport. */
 export function formatLapTime(seconds: number): string {
   const minutes = Math.floor(seconds / 60);

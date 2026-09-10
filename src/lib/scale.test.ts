@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatLapTime, linePath, linearScale, niceTicks } from './scale';
+import { formatLapTime, linePath, linearScale, niceTicks, smoothLinePath } from './scale';
 
 describe('linearScale', () => {
   it('maps the domain onto the range', () => {
@@ -41,6 +41,27 @@ describe('niceTicks', () => {
 describe('linePath', () => {
   it('moves once and then draws', () => {
     expect(linePath([{ x: 0, y: 1 }, { x: 2, y: 3 }])).toBe('M0.00 1.00 L2.00 3.00');
+  });
+});
+
+describe('smoothLinePath', () => {
+  const points = [
+    { x: 0, y: 0 },
+    { x: 10, y: 20 },
+    { x: 20, y: 20 },
+  ];
+
+  it('keeps every vertex where it was, and only rounds the turn into it', () => {
+    // The control points sit at each segment's horizontal midpoint, so the
+    // curve cannot bulge past a position the driver never held.
+    expect(smoothLinePath(points)).toBe(
+      'M0.00 0.00 C5.00 0.00 5.00 20.00 10.00 20.00 C15.00 20.00 15.00 20.00 20.00 20.00',
+    );
+  });
+
+  it('falls back to a straight path when there is no corner to round', () => {
+    expect(smoothLinePath([{ x: 0, y: 1 }, { x: 2, y: 3 }])).toBe(linePath([{ x: 0, y: 1 }, { x: 2, y: 3 }]));
+    expect(smoothLinePath([])).toBe('');
   });
 });
 
