@@ -212,8 +212,8 @@ const PulseRound = builder.objectRef<PulseRoundShape>('PulseRound').implement({
     slug: t.exposeString('slug', { nullable: true }),
     status: t.field({ type: PulseStatus, resolve: (r) => r.status }),
     winnerCode: t.exposeString('winnerCode', { nullable: true }),
-    // The team as it is stored, which is the key the mark manifest is written
-    // against — see lib/team-marks.ts.
+    // The team as it is stored, which is what the strip abbreviates — see
+    // lib/team-monogram.ts.
     teamName: t.exposeString('teamName', { nullable: true }),
     teamColor: t.exposeString('teamColor', { nullable: true }),
   }),
