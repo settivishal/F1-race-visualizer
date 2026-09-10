@@ -11,7 +11,7 @@ import {
   fetchDrivers, fetchLaps, fetchMeetings, fetchPits, fetchPositions,
   fetchRaceControl, fetchSessionByKey, fetchSessionResults, fetchSessions, fetchStints, fetchWeather,
 } from './openf1';
-import { deriveRounds, isScoredSession, transformRace } from './transform';
+import { deriveRounds, isScoredSession, transformRace, zeroPointResults } from './transform';
 import type { RaceBundle, TransformedRace } from './types';
 
 /**
@@ -43,6 +43,7 @@ export async function ingestRace(sessionKey: number): Promise<IngestResult> {
   try {
     const bundle = await fetchRaceBundle(sessionKey);
     const race = transformRace(bundle);
+    await repairZeroPoints(race);
     const rowsWritten = await writeRace(race);
 
     await db.update(ingestRuns)
@@ -67,6 +68,43 @@ export async function ingestRace(sessionKey: number): Promise<IngestResult> {
     // the silence becomes a race page missing 20 laps that nobody notices.
     throw error;
   }
+}
+
+/**
+ * Points OpenF1 lost, taken from the other upstream rather than scored here.
+ *
+ * Two 2023 races arrive with the points column zeroed for drivers who plainly
+ * scored (see `zeroPointResults`). Ergast has both right and is already a
+ * dependency of this file, so the repair is a read of a second source — "we
+ * sum; we do not score" still holds. It fires only when such a row exists, so
+ * a clean race costs nothing, and it survives a re-import because it runs on
+ * the way in rather than as a correction afterwards.
+ *
+ * Sprints are skipped: Ergast's results endpoint covers the grand prix only.
+ */
+async function repairZeroPoints(race: TransformedRace): Promise<void> {
+  if (race.race.type !== 'GRAND_PRIX') return;
+  const suspect = zeroPointResults(race.results);
+  if (suspect.length === 0) return;
+
+  const { seasonYear, round } = race.meeting;
+  const archive = (await fetchSeasonResults(seasonYear)).find((r) => r.round === round);
+  // Ergast's per-result `number` is the car number, which is what OpenF1 keys
+  // a driver by too.
+  const points = new Map(
+    (archive?.Results ?? []).map((r) => [Number(r.number), r.points] as const),
+  );
+
+  let repaired = 0;
+  for (const row of suspect) {
+    const scored = points.get(row.driverNumber);
+    if (!scored) continue;
+    row.points = scored;
+    repaired++;
+  }
+  race.warnings.push(
+    `${suspect.length} results scored zero in the points; ${repaired} taken from Ergast`,
+  );
 }
 
 /**
