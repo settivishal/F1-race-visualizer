@@ -2,7 +2,7 @@
 
 import { ReactNode, useEffect, useId, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/cn";
-import type { ReplayEntry, ReplayEvent, ReplayPosition, ReplaySummary, ReplayView } from "./types";
+import type { ReplayEntry, ReplayEvent, ReplayPosition, ReplayView } from "./types";
 import { RaceCar } from "./race-car";
 import { TIMING_TOWER_ID } from "./live-timing-tower";
 import {
@@ -16,20 +16,73 @@ import {
 } from "./replay-state";
 import { motion, MotionValue, useTransform } from "framer-motion";
 
-const VIEWBOX_WIDTH = 1120;
-const VIEWBOX_HEIGHT = 640;
-const MARGIN = {
-  top: 80,
-  // The driver badges ride the playhead rather than sitting at the right edge,
-  // so this only has to clear the last lap label.
-  right: 56,
-  // The last row sits exactly on top + innerHeight, so its label needs room
-  // below the plot or it is clipped by the container — P18 was rendering as a
-  // half-height label on an eighteen-car race.
-  bottom: 96,
-  // "P18" is four characters. 176 spent a sixth of the chart's width on it.
-  left: 96,
+/**
+ * The chart is drawn at the size it is displayed.
+ *
+ * It used to have a fixed 1120x640 viewBox scaled to whatever box it was given.
+ * On a 390px phone that is a scale factor of 0.35, so an 11px label rendered at
+ * 3.8px and the box letterboxed 129px of nothing. A drawing with a fixed
+ * coordinate space cannot be responsive — it can only be shrunk, and shrinking
+ * type is how you get 3.8px labels.
+ *
+ * So one viewBox unit is one CSS pixel: `fontSize="13"` is thirteen pixels at
+ * every width, and the drawing is the same shape as its container, so nothing
+ * letterboxes. Everything below that used to read the two constants now reads
+ * the measured size instead.
+ */
+const FALLBACK_SIZE = { width: 1120, height: 640 };
+
+/** Below this the chart is drawn for a phone. Tailwind's `sm`. */
+const COMPACT_WIDTH = 640;
+
+export type ChartSize = { width: number; height: number };
+
+export type ChartLayout = ChartSize & {
+  margin: { top: number; right: number; bottom: number; left: number };
+  /** How far outside the plot the P numbers sit. */
+  positionLabelGap: number;
+  /** How far below it the lap labels sit. */
+  lapLabelGap: number;
+  /** The row of event dots, above the plot. */
+  eventRowGap: number;
+  /** Where the playhead starts, above the plot and below the event dots. */
+  playheadGap: number;
+  /** A phone: no driver badges and no decorative caption. */
+  compact: boolean;
 };
+
+/**
+ * Margins scale with the space rather than being fixed, because a 96px left
+ * margin is a quarter of a 390px chart. On a phone the gutter only has to hold
+ * "P18"; on a desktop it holds what it always did.
+ */
+export function layoutFor({ width, height }: ChartSize): ChartLayout {
+  const compact = width < COMPACT_WIDTH;
+
+  return {
+    width,
+    height,
+    margin: compact
+      ? { top: 34, right: 14, bottom: 30, left: 34 }
+      : {
+          top: 80,
+          // The driver badges ride the playhead rather than sitting at the
+          // right edge, so this only has to clear the last lap label.
+          right: 56,
+          // The last row sits exactly on top + innerHeight, so its label needs
+          // room below the plot or it is clipped by the container — P18 was
+          // rendering as a half-height label on an eighteen-car race.
+          bottom: 96,
+          // "P18" is four characters. 176 spent a sixth of the width on it.
+          left: 96,
+        },
+    positionLabelGap: compact ? 5 : 42,
+    lapLabelGap: compact ? 18 : 28,
+    eventRowGap: compact ? 24 : 48,
+    playheadGap: compact ? 14 : 32,
+    compact,
+  };
+}
 
 /**
  * The signals that describe the race rather than one car, and so earn a rule
@@ -69,15 +122,16 @@ export type LapWindow = { from: number; to: number };
 
 type LapScale = (lap: number) => number;
 
-function makeLapX({ from, to }: LapWindow): LapScale {
-  const innerWidth = VIEWBOX_WIDTH - MARGIN.left - MARGIN.right;
+function makeLapX({ from, to }: LapWindow, layout: ChartLayout): LapScale {
+  const { margin } = layout;
+  const innerWidth = layout.width - margin.left - margin.right;
   const span = to - from;
 
   if (span <= 0) {
-    return () => MARGIN.left + innerWidth / 2;
+    return () => margin.left + innerWidth / 2;
   }
 
-  return (lap: number) => MARGIN.left + ((lap - from) / span) * innerWidth;
+  return (lap: number) => margin.left + ((lap - from) / span) * innerWidth;
 }
 
 /** Laps per screen at a spacing a finger and an eye can both deal with. */
@@ -86,10 +140,10 @@ const MIN_LAP_SPACING = 16;
 export function lapWindowFor(containerWidth: number, currentLap: number, maxLap: number): LapWindow {
   if (containerWidth <= 0) return { from: 1, to: Math.max(2, maxLap) };
 
-  // The viewBox is scaled to the container, so a lap's spacing on screen is its
-  // spacing in viewBox units times that ratio.
-  const scale = containerWidth / VIEWBOX_WIDTH;
-  const usable = (VIEWBOX_WIDTH - MARGIN.left - MARGIN.right) * scale;
+  // One viewBox unit is one pixel now, so the plot's width on screen is the
+  // container less its own margins — no scale factor in between.
+  const { margin } = layoutFor({ width: containerWidth, height: FALLBACK_SIZE.height });
+  const usable = containerWidth - margin.left - margin.right;
   const fits = Math.max(6, Math.floor(usable / MIN_LAP_SPACING));
 
   if (fits >= maxLap) return { from: 1, to: Math.max(2, maxLap) };
@@ -104,25 +158,28 @@ export function lapWindowFor(containerWidth: number, currentLap: number, maxLap:
   return { from, to };
 }
 
-function getPositionY(position: number, maxPosition: number) {
-  const innerHeight = VIEWBOX_HEIGHT - MARGIN.top - MARGIN.bottom;
+type PositionScale = (position: number) => number;
+
+function makePositionY(maxPosition: number, layout: ChartLayout): PositionScale {
+  const { margin } = layout;
+  const innerHeight = layout.height - margin.top - margin.bottom;
 
   if (maxPosition <= 1) {
-    return MARGIN.top + innerHeight / 2;
+    return () => margin.top + innerHeight / 2;
   }
 
-  return MARGIN.top + ((position - 1) / (maxPosition - 1)) * innerHeight;
+  return (position: number) => margin.top + ((position - 1) / (maxPosition - 1)) * innerHeight;
 }
 
 function buildPath(
   positions: ReplayPosition[],
   lapX: LapScale,
-  maxPosition: number,
+  positionY: PositionScale,
 ) {
   return positions
     .map((entry, index) => {
       const x = lapX(entry.lap);
-      const y = getPositionY(entry.position, maxPosition);
+      const y = positionY(entry.position);
       return `${index === 0 ? "M" : "L"} ${x} ${y}`;
     })
     .join(" ");
@@ -147,12 +204,19 @@ function getPointForLap(
   return candidate ?? positions[0];
 }
 
-function getVisibleLapTicks(laps: number[]) {
-  if (laps.length <= 12) {
+/**
+ * As many lap labels as fit, rather than a fixed eight.
+ *
+ * The count used to be constant because the chart was, and on a 390px phone
+ * that put nine "Lap 33" labels along 340 pixels of axis and they overlapped
+ * into one grey smear.
+ */
+function getVisibleLapTicks(laps: number[], maxTicks: number) {
+  if (laps.length <= maxTicks) {
     return laps;
   }
 
-  const step = Math.ceil(laps.length / 8);
+  const step = Math.ceil(laps.length / maxTicks);
   return laps.filter((_, index) => index === 0 || index === laps.length - 1 || index % step === 0);
 }
 
@@ -235,26 +299,43 @@ export function RaceVisualizationCanvas({
   // The chart measures itself so the window suits the space it actually has,
   // rather than a breakpoint guessing at it.
   const frame = useRef<HTMLDivElement>(null);
-  const [frameWidth, setFrameWidth] = useState(0);
+  // Nothing is measured until the observer fires, and the server has no box to
+  // measure at all, so the old desktop size stands in until then — first paint
+  // is exactly what it has always been.
+  const [size, setSize] = useState<ChartSize>(FALLBACK_SIZE);
 
   useEffect(() => {
     const element = frame.current;
     if (!element) return;
-    const observer = new ResizeObserver(([entry]) => setFrameWidth(entry.contentRect.width));
+    const observer = new ResizeObserver(([entry]) => {
+      const { width, height } = entry.contentRect;
+      if (width > 0 && height > 0) setSize({ width, height });
+    });
     observer.observe(element);
     return () => observer.disconnect();
   }, []);
+
+  const layout = useMemo(() => layoutFor(size), [size]);
+  const { margin } = layout;
+  const frameWidth = size.width;
 
   const lapWindow = useMemo(
     () => lapWindowFor(frameWidth, currentLap, summary.maxLap || race.laps),
     [frameWidth, currentLap, summary.maxLap, race.laps],
   );
-  const lapX = useMemo(() => makeLapX(lapWindow), [lapWindow]);
+  const lapX = useMemo(() => makeLapX(lapWindow, layout), [lapWindow, layout]);
+  const positionY = useMemo(
+    () => makePositionY(summary.maxPosition, layout),
+    [summary.maxPosition, layout],
+  );
 
   // Only the ticks inside the window, or a windowed chart labels laps it is not
   // showing.
+  // A label is "Lap 40" on a desktop and a bare "40" on a phone, so they need
+  // different room; either way the axis holds as many as fit and no more.
   const lapTicks = getVisibleLapTicks(
     laps.filter((lap) => lap >= lapWindow.from && lap <= lapWindow.to),
+    Math.max(3, Math.floor((layout.width - margin.left - margin.right) / (layout.compact ? 44 : 110))),
   );
   // Same split as the cars: the lap's own position is a render value, and the
   // motion value carries only the travel from it.
@@ -267,10 +348,10 @@ export function RaceVisualizationCanvas({
   const panDistance = useMemo(() => {
     const span = lapWindow.to - lapWindow.from;
     if (span <= 0) return 0;
-    const lapWidth = (VIEWBOX_WIDTH - MARGIN.left - MARGIN.right) / span;
+    const lapWidth = (layout.width - margin.left - margin.right) / span;
     const nextWindow = lapWindowFor(frameWidth, nextLap, summary.maxLap || race.laps);
     return (nextWindow.from - lapWindow.from) * lapWidth;
-  }, [frameWidth, lapWindow, nextLap, race.laps, summary.maxLap]);
+  }, [frameWidth, layout, margin, lapWindow, nextLap, race.laps, summary.maxLap]);
   const panX = useTransform(lapProgress, (p) => -panDistance * p);
   // Scoped to this chart: the landing page renders a second player, and a
   // duplicate clipPath id would have both of them clipped by whichever mounted
@@ -303,11 +384,11 @@ export function RaceVisualizationCanvas({
         const nextPoint = getPointForLap(entry.positions, isCarActive ? nextLap : currentLap);
         const markerPoint =
           retirementLap !== null ? getPointForLap(entry.positions, retirementLap) : null;
-        const fullPath = buildPath(visiblePositions, lapX, summary.maxPosition);
+        const fullPath = buildPath(visiblePositions, lapX, positionY);
         const trail = buildPath(
           visiblePositions.filter((position) => position.lap <= currentLap),
           lapX,
-          summary.maxPosition,
+          positionY,
         );
         const markerOffset = getRetiredMarkerOffset(index);
 
@@ -329,8 +410,8 @@ export function RaceVisualizationCanvas({
       drivers,
       lapX,
       nextLap,
+      positionY,
       retirementEventByDriver,
-      summary.maxPosition,
     ],
   );
   const retiredFrames = currentDriverFrames.filter((frame) => frame.isRetiredAtCurrentLap);
@@ -427,10 +508,14 @@ export function RaceVisualizationCanvas({
       {/* No min-width and no scrolling any more. The chart shows a window of
           laps sized to this box, so it fits whatever space it is given rather
           than making the reader pan a 760px canvas on a 390px screen. */}
-      <div ref={frame} className="mt-4 min-h-0 flex-1">
+      {/* Portrait on a phone. The viewBox is this box, so its shape is the
+          chart's shape: 390x520 puts 22 rows 21.9px apart, which is the same row
+          density a 1100x640 desktop chart has. The phone shows fewer laps, not
+          thinner lines — the trade already made for the lap window in #81. */}
+      <div ref={frame} className="mt-4 min-h-[32rem] flex-1 sm:min-h-0">
         <div className="h-full">
           <svg
-            viewBox={`0 0 ${VIEWBOX_WIDTH} ${VIEWBOX_HEIGHT}`}
+            viewBox={`0 0 ${layout.width} ${layout.height}`}
             role="img"
             // The focus is named here as well, because dimming nineteen lines
             // is a change to the picture and `role="img"` is all a screen
@@ -448,9 +533,9 @@ export function RaceVisualizationCanvas({
             <rect
               x="0"
               y="0"
-              width={VIEWBOX_WIDTH}
-              height={VIEWBOX_HEIGHT}
-              rx="28"
+              width={layout.width}
+              height={layout.height}
+              rx={layout.compact ? "16" : "28"}
               fill="var(--track)"
             />
 
@@ -467,10 +552,10 @@ export function RaceVisualizationCanvas({
                     in half. The P numbers end 42 units out, so this still
                     stops short of them. */}
                 <rect
-                  x={MARGIN.left - 28}
+                  x={margin.left - layout.lapLabelGap}
                   y={0}
-                  width={VIEWBOX_WIDTH - MARGIN.left + 28}
-                  height={VIEWBOX_HEIGHT}
+                  width={layout.width - margin.left + layout.lapLabelGap}
+                  height={layout.height}
                 />
               </clipPath>
             </defs>
@@ -480,23 +565,23 @@ export function RaceVisualizationCanvas({
                 right edge, and the P labels belong to the fixed axis. */}
             {Array.from({ length: summary.maxPosition }, (_, index) => {
               const position = index + 1;
-              const y = getPositionY(position, summary.maxPosition);
+              const y = positionY(position);
 
               return (
                 <g key={`position-${position}`}>
                   <line
-                    x1={MARGIN.left}
+                    x1={margin.left}
                     y1={y}
-                    x2={VIEWBOX_WIDTH - MARGIN.right}
+                    x2={layout.width - margin.right}
                     y2={y}
                     stroke={position === 1 ? "rgba(255,255,255,0.22)" : "rgba(255,255,255,0.045)"}
                     strokeWidth="1"
                   />
                   <text
-                    x={MARGIN.left - 42}
+                    x={margin.left - layout.positionLabelGap}
                     y={y + 4}
                     textAnchor="end"
-                    fontSize="13"
+                    fontSize={layout.compact ? "10" : "13"}
                     fontWeight="700"
                     fill="rgba(255,255,255,0.68)"
                     style={{ fontFamily: "monospace" }}
@@ -526,14 +611,14 @@ export function RaceVisualizationCanvas({
                   // the same lap scale, so if it moved too, the scale did.
                   data-testid="lap-playhead"
                   style={{ x: activeLapX }}
-                  y1={MARGIN.top - 32}
-                  y2={VIEWBOX_HEIGHT - MARGIN.bottom}
+                  y1={margin.top - layout.playheadGap}
+                  y2={layout.height - margin.bottom}
                   stroke="var(--accent)"
                   strokeWidth="2.5"
                   opacity="0.85"
                 />
                 {/* Top glowing handle for active line */}
-                <motion.g style={{ x: activeLapX, y: MARGIN.top - 32 }}>
+                <motion.g style={{ x: activeLapX, y: margin.top - layout.playheadGap }}>
                   <circle r="6" fill="var(--accent)" />
                   <circle r="2.5" fill="white" />
                 </motion.g>
@@ -547,21 +632,21 @@ export function RaceVisualizationCanvas({
                 <g key={`lap-${lap}`}>
                   <line
                     x1={x}
-                    y1={MARGIN.top}
+                    y1={margin.top}
                     x2={x}
-                    y2={VIEWBOX_HEIGHT - MARGIN.bottom}
+                    y2={layout.height - margin.bottom}
                     stroke="rgba(255,255,255,0.045)"
                     strokeWidth="1"
                   />
                   <text
                     x={x}
-                    y={VIEWBOX_HEIGHT - MARGIN.bottom + 28}
+                    y={layout.height - margin.bottom + layout.lapLabelGap}
                     textAnchor="middle"
-                    fontSize="12"
+                    fontSize={layout.compact ? "10" : "12"}
                     fill="rgba(255,255,255,0.68)"
                     style={{ fontFamily: "monospace" }}
                   >
-                    Lap {lap}
+                    {layout.compact ? lap : `Lap ${lap}`}
                   </text>
                 </g>
               );
@@ -586,9 +671,9 @@ export function RaceVisualizationCanvas({
                     {isRaceControl ? (
                       <line
                         x1={cx}
-                        y1={MARGIN.top - 48}
+                        y1={margin.top - layout.eventRowGap}
                         x2={cx}
-                        y2={VIEWBOX_HEIGHT - MARGIN.bottom}
+                        y2={layout.height - margin.bottom}
                         stroke={color}
                         strokeOpacity="0.25"
                         strokeDasharray="4 4"
@@ -596,13 +681,13 @@ export function RaceVisualizationCanvas({
                     ) : null}
                     <circle
                       cx={cx}
-                      cy={MARGIN.top - 48}
-                      r="6"
+                      cy={margin.top - layout.eventRowGap}
+                      r={layout.compact ? "4" : "6"}
                       fill="var(--track)"
                       stroke={color}
                       strokeWidth="2"
                     />
-                    <circle cx={cx} cy={MARGIN.top - 48} r="2" fill={color} />
+                    <circle cx={cx} cy={margin.top - layout.eventRowGap} r="2" fill={color} />
                 </g>
               );
             })}
@@ -630,10 +715,11 @@ export function RaceVisualizationCanvas({
                   }
                   raceControl={raceControl}
                   lapProgress={lapProgress}
-                  summary={summary}
                   currentLap={currentLap}
                   nextLap={nextLap}
                   lapX={lapX}
+                  positionY={positionY}
+                  compact={layout.compact}
                 />
               );
             })}
@@ -643,7 +729,10 @@ export function RaceVisualizationCanvas({
       </div>
 
       <div className="mt-5 grid gap-4 border-t border-white/10 px-4 pt-5 text-eyebrow font-bold uppercase text-white/45 lg:grid-cols-[1fr_auto] lg:items-center">
-        <p>
+        {/* Decorative, and uppercase with wide tracking, so on a phone it wraps
+            to four lines and takes more height than the axis it sits under. The
+            lap counter beside it is not decorative and stays at every width. */}
+        <p className="hidden sm:block">
           The replay controller drives car positions, lap progress, and event markers from the same
           synchronized race state.
         </p>
@@ -680,10 +769,11 @@ function AnimatedCar({
   isDimmed,
   raceControl,
   lapProgress,
-  summary,
   currentLap,
   nextLap,
   lapX,
+  positionY,
+  compact,
 }: {
   frame: DriverFrame;
   state?: DriverReplayState;
@@ -691,10 +781,12 @@ function AnimatedCar({
   isDimmed: boolean;
   raceControl: ReplayRaceControl;
   lapProgress: MotionValue<number>;
-  summary: ReplaySummary;
   currentLap: number;
   nextLap: number;
   lapX: LapScale;
+  positionY: PositionScale;
+  /** A phone: the badge comes off, the line stays. */
+  compact: boolean;
 }) {
   const {
     entry,
@@ -729,14 +821,11 @@ function AnimatedCar({
   // from it. At rest that offset is exactly zero, which is the whole of the
   // reduced-motion behaviour, by construction rather than by arithmetic.
   const baseX = lapX(currentLap);
-  const baseY = getPositionY(
-    currentPoint?.position ?? nextPoint?.position ?? 1,
-    summary.maxPosition,
-  );
+  const baseY = positionY(currentPoint?.position ?? nextPoint?.position ?? 1);
   const travelX = isCarActive ? lapX(nextLap) - baseX : 0;
   const travelY =
     isCarActive && currentPoint && nextPoint
-      ? getPositionY(nextPoint.position, summary.maxPosition) - baseY
+      ? positionY(nextPoint.position) - baseY
       : 0;
 
   const x = useTransform(lapProgress, (p) => travelX * p);
@@ -789,7 +878,7 @@ function AnimatedCar({
         <motion.g
           transform={`translate(${
             lapX(markerPoint.lap) + markerOffset.x
-          } ${getPositionY(markerPoint.position, summary.maxPosition) + markerOffset.y})`}
+          } ${positionY(markerPoint.position) + markerOffset.y})`}
           className="hover:opacity-100"
           // Faded in rather than drawn, because it lands in the same frame the
           // badge leaves: the two crossfade instead of one popping into the
@@ -799,7 +888,7 @@ function AnimatedCar({
           animate={{ opacity: 0.9 * dim }}
           transition={{ duration: 0.25 }}
         >
-          <circle r="8" fill="rgba(15,23,42,0.92)" stroke={team.color} strokeWidth="2.2" />
+          <circle r={compact ? 5 : 8} fill="rgba(15,23,42,0.92)" stroke={team.color} strokeWidth="2.2" />
           <path d="M -3.5 -3.5 L 3.5 3.5 M 3.5 -3.5 L -3.5 3.5" stroke="white" strokeWidth="1.4" strokeLinecap="round" />
         </motion.g>
       ) : null}
@@ -833,7 +922,13 @@ function AnimatedCar({
         ) : null}
         {/* Kept mounted for the lap the car retires on, so it fades out under the
             cross rather than blinking out from under it. */}
-        {isCarActive || retirementEvent?.lap === currentLap ? (
+        {/* Twenty-two badges down a 390px screen would be a column of labels
+            over the plot, and each one is 46 units wide against a 340-unit
+            phone chart. The timing tower sits directly above, lists every
+            driver in order as real text, and is already what this chart points
+            at with `aria-describedby` — so the phone reads positions there and
+            the chart keeps only its lines. */}
+        {!compact && (isCarActive || retirementEvent?.lap === currentLap) ? (
           // The badge is the loudest thing on the chart, so dimming it by the
           // same factor as the lines is what actually makes a focused driver
           // stand out. `muted` stays what it always was — a backmarker — and the
