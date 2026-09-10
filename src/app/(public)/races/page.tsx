@@ -238,9 +238,14 @@ async function RaceLibrary({ searchParams }: { searchParams: SearchParams }) {
                     {node.weekendSprint ? (
                       <Link
                         href={`/races/${node.weekendSprint.slug}`}
-                        className="tap relative -mx-1.5 mt-1 inline-flex w-fit items-center gap-1.5 rounded-md px-1.5 py-1 text-sm text-muted transition-colors hover:bg-panel-strong hover:text-foreground"
+                        // Its own thing, not a third line of the same
+                        // paragraph: an accent rule down the left separates the
+                        // weekend's other session from this one's details, and
+                        // it lights up on hover so a click that leaves for a
+                        // different race says so before it happens.
+                        className="tap group/sprint relative mt-2 inline-flex w-fit items-center gap-1.5 rounded-md border-l-2 border-line bg-panel-strong/50 py-1 pl-2 pr-2 text-sm text-muted transition-[background-color,border-color,color] hover:border-accent hover:bg-accent-soft hover:text-foreground"
                       >
-                        <span className="text-eyebrow font-semibold uppercase text-subtle">
+                        <span className="text-eyebrow font-semibold uppercase text-subtle transition-colors group-hover/sprint:text-accent">
                           Sprint
                         </span>
                         {node.weekendSprint.podium[0] ? (
@@ -262,7 +267,18 @@ async function RaceLibrary({ searchParams }: { searchParams: SearchParams }) {
                             {node.weekendSprint.status === 'CANCELLED' ? 'Not held' : 'Not yet run'}
                           </span>
                         )}
-                        <span aria-hidden className="text-accent">→</span>
+                        {/* Only on hover, and only as a word: the row already
+                            says which session it is, and this says what
+                            clicking it does. */}
+                        <span className="hidden text-xs text-accent group-hover/sprint:inline">
+                          replay
+                        </span>
+                        <span
+                          aria-hidden
+                          className="text-accent transition-transform group-hover/sprint:translate-x-0.5"
+                        >
+                          →
+                        </span>
                       </Link>
                     ) : null}
                   </div>

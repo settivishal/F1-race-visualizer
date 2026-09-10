@@ -1,11 +1,11 @@
 import { Suspense } from 'react';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PageContainer } from '@/components/ui/page-container';
 import { SectionHeader } from '@/components/ui/section-header';
+import { sessionTitle } from '@/lib/session-title';
 import { Tabs } from '@/components/ui/tabs';
 import { UpcomingRace } from '@/components/schedule/upcoming-race';
 import { CircuitInfoPanel } from '@/components/replay/circuit-info-panel';
@@ -32,7 +32,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 
   if (!race) return { title: 'Race not found' };
 
-  const name = race.meeting?.name ?? race.slug;
+  const name = race.meeting ? sessionTitle(race.meeting.name, race.type) : race.slug;
   return {
     title: `${name}`,
     description: `Lap-by-lap replay of the ${race.meeting?.season ?? ''} ${name}.`.trim(),
@@ -142,7 +142,9 @@ async function RaceDetail({
       <div className="mt-5">
         <SectionHeader
           eyebrow={meeting ? `${meeting.season} · Round ${meeting.round}` : 'Season unknown'}
-          title={meeting?.name ?? race.slug}
+          // "British Sprint", not "British Grand Prix" with a pill beside it
+          // saying otherwise.
+          title={meeting ? sessionTitle(meeting.name, race.type) : race.slug}
           viewTransitionName={`race-title-${race.slug}`}
           description={
             <>
@@ -150,19 +152,24 @@ async function RaceDetail({
               <span className="tabular">{race.laps}</span> laps
             </>
           }
+          // The weekend, as two sessions you can switch between: this one, and
+          // the one you are not on. Reads as a control rather than as a link in
+          // a sentence, which is what it is — the two pages are peers.
           actions={
-            <div className="flex items-center gap-3">
-              {race.type === 'SPRINT' ? <Badge>Sprint</Badge> : null}
-              {sibling ? (
+            sibling ? (
+              <nav aria-label="Weekend sessions" className="flex items-center gap-1 rounded-lg border border-line bg-panel p-1">
+                <span className="rounded-md bg-panel-strong px-3 py-1.5 text-sm font-semibold text-foreground">
+                  {race.type === 'SPRINT' ? 'Sprint' : 'Grand prix'}
+                </span>
                 <Link
                   href={`/races/${sibling.slug}`}
-                  className="tap inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm font-medium text-muted transition-colors hover:bg-panel-strong hover:text-foreground"
+                  className="tap inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-semibold text-muted transition-colors hover:bg-panel-strong hover:text-foreground"
                 >
                   {sibling.type === 'SPRINT' ? 'Sprint' : 'Grand prix'}
                   <span aria-hidden className="text-accent">→</span>
                 </Link>
-              ) : null}
-            </div>
+              </nav>
+            ) : null
           }
         />
       </div>
