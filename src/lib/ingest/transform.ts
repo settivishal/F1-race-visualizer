@@ -314,6 +314,24 @@ export function buildResults(bundle: RaceBundle, fastestLapDriver: number | null
   }));
 }
 
+/**
+ * Results that claim a driver finished in the points and scored none of them.
+ *
+ * OpenF1 publishes rows like that: 2023 Jeddah gives the runner-up zero, 2023
+ * Austin zeroes every position but the winner, and the derived standings come
+ * out short by exactly those points. A genuine zero belongs to P11 and below,
+ * or to a driver upstream did not classify as FINISHED, so neither trips this.
+ *
+ * The top ten is the grand prix scale; a sprint scores its top eight, which is
+ * why the caller only asks about a grand prix.
+ */
+export function zeroPointResults(results: ResultRow[]): ResultRow[] {
+  return results.filter(
+    (r) => r.status === 'FINISHED' && r.finalPosition !== null && r.finalPosition <= 10
+      && r.points === 0,
+  );
+}
+
 /** The single quickest valid lap of the session, or null if none is timed. */
 export function findFastestLap(laps: Lap[]): { driverNumber: number; lap: number; time: number } | null {
   let best: { driverNumber: number; lap: number; time: number } | null = null;
