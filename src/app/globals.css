@@ -574,6 +574,36 @@ html:has(:root.light) {
   }
 }
 
+/*
+ * The season strip, round by round. Same scroll-driven mechanism as `.reveal`
+ * — `animation-delay` does nothing on a view timeline, so the stagger is a
+ * later start *range* per pill instead, which is what makes the season appear
+ * to run left to right as it comes into view. Falls back to a plain strip
+ * wherever `view()` is unsupported, like everything else here.
+ */
+@layer components {
+  @supports (animation-timeline: view()) {
+    @media (prefers-reduced-motion: no-preference) {
+      .pulse-pill {
+        animation: pulse-pill linear both;
+        animation-timeline: view();
+        animation-range: entry calc(var(--i, 0) * 4%) entry 100%;
+      }
+    }
+  }
+}
+
+@keyframes pulse-pill {
+  from {
+    opacity: 0;
+    scale: 0.7;
+  }
+  to {
+    opacity: 1;
+    scale: 1;
+  }
+}
+
 /* The `*` reset above cannot reach view-transition pseudo-elements: they are
  * not in the document tree, so no selector of that shape matches them. */
 @media (prefers-reduced-motion: reduce) {
@@ -582,5 +612,44 @@ html:has(:root.light) {
   ::view-transition-new(*) {
     animation-duration: 0s !important;
     animation-delay: 0s !important;
+  }
+}
+
+/* ── Landing page, option 2c ──────────────────────────────────────────
+ *
+ * Three one-shot load animations, all CSS: the reduced-motion block above
+ * already stops every one of them without any of them having to ask.
+ */
+
+/* The hero's lines draw themselves. Each path carries `pathLength="1"` in the
+ * markup, so one dash value works for a 3-lap sprint and a 78-lap Monaco
+ * without measuring anything. */
+.hero-line {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: hero-draw 1.2s var(--ease-out-fast) forwards;
+}
+
+@keyframes hero-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* The race just run, on the podium's first place. Slow enough to read as a
+ * pulse rather than a blink, and it stops for anyone who asked it to. */
+.podium-lead {
+  animation: podium-glow 2.2s ease-in-out 1s infinite;
+}
+
+@keyframes podium-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--accent) 55%, transparent),
+      0 0 22px -6px color-mix(in srgb, var(--accent) 70%, transparent);
   }
 }

@@ -60,13 +60,27 @@ const HOME_LINEUP = /* GraphQL */ `
 
 const RACE_LIBRARY = /* GraphQL */ `
   query RaceLibrary($season: Int, $search: String, $first: Int, $after: String, $before: String) {
-    races(season: $season, search: $search, first: $first, after: $after, before: $before) {
+    # Grands prix only: a sprint is a session inside the weekend, and it arrives
+    # on its grand prix as \`weekendSprint\` rather than as a second card.
+    races(
+      season: $season
+      search: $search
+      type: GRAND_PRIX
+      first: $first
+      after: $after
+      before: $before
+    ) {
       edges {
         cursor
         node {
           id slug date laps status type isFeatured
           meeting { name country circuitName round season }
           podium { position code teamColor }
+          weekendSprint {
+            slug
+            status
+            podium { position code teamColor }
+          }
         }
       }
       pageInfo { hasNextPage hasPreviousPage startCursor endCursor }
@@ -87,6 +101,10 @@ const RACE_HEADER = /* GraphQL */ `
       meeting {
         name country circuitName round season
         circuit { ergastId name locality country lengthKm turns firstGrandPrix }
+        # The weekend's other sessions, so a race page can point at its sibling
+        # — the library shows one card per weekend, and without this the sprint
+        # is reachable from the card and from nowhere else.
+        races { slug type status }
       }
       results {
         finalPosition lapsCompleted points status fastestLap

@@ -195,7 +195,7 @@ type Query {
   latestRace: Race
   nextRace: Race
   race(slug: String!): Race
-  races(after: String, before: String, first: Int, search: String, season: Int): RaceConnection!
+  races(after: String, before: String, first: Int, search: String, season: Int, type: RaceType): RaceConnection!
   search(query: String!): [SearchHit!]!
   seasonPulse(season: Int!): [PulseRound!]!
   seasons: [Season!]!
@@ -221,6 +221,7 @@ type Race {
   slug: String!
   status: RaceStatus!
   type: RaceType!
+  weekendSprint: Race
 }
 
 type RaceAnalysis {

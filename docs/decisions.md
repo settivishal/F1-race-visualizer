@@ -1442,3 +1442,34 @@ an HTML readout through a new optional `overlay` slot on `ChartFrame`.
 
 **What would change this:** a chart type that is not a linear scale over numbers — a map, a
 tree, anything needing layout rather than plotting.
+
+---
+
+## 2026-09-10 — Team logos: the licence is not there, so the strip abbreviates instead
+
+**Answers:** the open question left by "Reversal: images are not mirrored into Vercel Blob",
+which named Wikimedia's CC BY-SA marks as the thing that would let team logos onto the site.
+
+**Decided:** no team logo is shown. The season strip carries the team's short code — FER,
+MCL, RBR — in the ink its livery can take, and `lib/team-marks.ts`, the manifest built to
+hold licensed logo files, is deleted with it.
+
+The premise turned out to be wrong for constructor logos specifically. Checked on Commons
+before building anything: `McLaren Speedmark.svg` carries `PD-textlogo` — simple shapes, no
+copyright, trademark notice attached — but Ferrari's mark is not on Commons at all, only
+photographs of it, because the prancing horse is figurative and copyrighted. That split runs
+through the grid: wordmarks are public domain, emblems are not, so roughly half the 2026
+teams could be badged and half could not.
+
+A strip where five rounds carry a logo and six carry a colour is worse than one that carries
+neither. It reads as a loading failure, and the missing half would be the teams a reader is
+most likely to look for.
+
+A monogram costs no licence, covers a team the ingest invented last week, and is the
+abbreviation a timing screen already uses. `inkOn()` picks black or white per livery by
+relative luminance rather than by convention: the 2026 Ferrari red is bright enough that
+white on it is 4.3:1, under AA, which "red means white text" would have shipped.
+
+**What would change this:** a team supplying its own mark under terms this project can
+state, or the site becoming something other than an unaffiliated fan project. Neither is
+close.

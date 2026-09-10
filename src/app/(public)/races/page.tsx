@@ -161,28 +161,31 @@ async function RaceLibrary({ searchParams }: { searchParams: SearchParams }) {
           />
         </div>
       ) : (
-        <ul className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        // `auto-rows-fr` so a row of cards is one height whatever each holds —
+        // a sprint line, an Upcoming badge, a podium or none of them. Without
+        // it the grid stretches the <li> and nothing inside it, and the cards
+        // came out ragged.
+        <ul className="mt-8 grid auto-rows-fr gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {races.edges.map(({ node }) => (
-            <li key={node.id}>
-              {/* prefetch: the race pages are prerendered and cached, so warming
-                  one on hover costs almost nothing and removes the wait on the
-                  click that matters. */}
-              {/* The glow sits on the link, not the card: Card already carries
-                  `shadow-sm`, and cn() is a join rather than a tailwind-merge,
-                  so a second shadow utility there loses to whichever the
-                  stylesheet happens to order last. */}
-              <Link
-                href={`/races/${node.slug}`}
-                className={`block h-full rounded-xl ${
+            <li key={node.id} className="h-full">
+              {/* Not one big <Link> any more: a sprint weekend's card carries a
+                  second link, and a link inside a link is not markup a browser
+                  or a screen reader can make sense of. The title is the real
+                  link and stretches over the card with `after:inset-0`, so the
+                  whole tile stays clickable and the sprint row sits above it. */}
+              {/* The glow sits on the wrapper, not the card: Card already
+                  carries `shadow-sm`, and cn() is a join rather than a
+                  tailwind-merge, so a second shadow utility there loses to
+                  whichever the stylesheet happens to order last. */}
+              <div
+                className={`group h-full rounded-xl ${
                   // The one race just run. A glow rather than a badge: it says
                   // "here" without taking a word away from the tile.
                   node.slug === latestRace?.slug ? 'shadow-glow' : ''
                 }`}
-                prefetch
               >
                 <Card
-                  interactive
-                  className={`flex h-full gap-4 ${
+                  className={`relative flex h-full gap-4 transition-[background-color,border-color] group-hover:border-line-strong group-hover:bg-panel-strong ${
                     node.slug === latestRace?.slug ? 'border-accent/40' : ''
                   }`}
                 >
@@ -193,7 +196,6 @@ async function RaceLibrary({ searchParams }: { searchParams: SearchParams }) {
                           ? `${node.meeting.season} · Round ${node.meeting.round}`
                           : 'Season unknown'}
                       </span>
-                      {node.type === 'SPRINT' ? <Badge>Sprint</Badge> : null}
                       {/* Only the next one. Every scheduled race carrying this
                           badge made it mean "not yet run", which the date below
                           already says. */}
@@ -204,7 +206,16 @@ async function RaceLibrary({ searchParams }: { searchParams: SearchParams }) {
                         one object that moves rather than two that swap. */}
                     <ViewTransition name={`race-title-${node.slug}`} share="race-morph" default="none">
                       <h2 className="type-card-title mt-2.5">
-                        {node.meeting?.name ?? node.slug}
+                        {/* prefetch: the race pages are prerendered and cached,
+                            so warming one on hover costs almost nothing and
+                            removes the wait on the click that matters. */}
+                        <Link
+                          href={`/races/${node.slug}`}
+                          prefetch
+                          className="rounded-sm after:absolute after:inset-0 after:rounded-xl after:content-['']"
+                        >
+                          {node.meeting?.name ?? node.slug}
+                        </Link>
                       </h2>
                     </ViewTransition>
                     <p className="mt-1.5 text-sm text-muted">
@@ -219,6 +230,57 @@ async function RaceLibrary({ searchParams }: { searchParams: SearchParams }) {
                         </>
                       )}
                     </p>
+
+                    {/* The other half of the weekend, on the line below rather
+                        than in a section of its own: a footer row only some
+                        cards have leaves the rest of the grid holding empty
+                        space, since a row of cards is as tall as its tallest. */}
+                    {node.weekendSprint ? (
+                      <Link
+                        href={`/races/${node.weekendSprint.slug}`}
+                        // Its own thing, not a third line of the same
+                        // paragraph: an accent rule down the left separates the
+                        // weekend's other session from this one's details, and
+                        // it lights up on hover so a click that leaves for a
+                        // different race says so before it happens.
+                        className="tap group/sprint relative mt-2 inline-flex w-fit items-center gap-1.5 rounded-md border-l-2 border-line bg-panel-strong/50 py-1 pl-2 pr-2 text-sm text-muted transition-[background-color,border-color,color] hover:border-accent hover:bg-accent-soft hover:text-foreground"
+                      >
+                        <span className="text-eyebrow font-semibold uppercase text-subtle transition-colors group-hover/sprint:text-accent">
+                          Sprint
+                        </span>
+                        {node.weekendSprint.podium[0] ? (
+                          <>
+                            <span
+                              aria-hidden
+                              className="h-3.5 w-[3px] rounded-full"
+                              style={{
+                                backgroundColor:
+                                  node.weekendSprint.podium[0].teamColor ?? 'var(--muted)',
+                              }}
+                            />
+                            <span className="font-mono font-semibold text-foreground">
+                              {node.weekendSprint.podium[0].code}
+                            </span>
+                          </>
+                        ) : (
+                          <span>
+                            {node.weekendSprint.status === 'CANCELLED' ? 'Not held' : 'Not yet run'}
+                          </span>
+                        )}
+                        {/* Only on hover, and only as a word: the row already
+                            says which session it is, and this says what
+                            clicking it does. */}
+                        <span className="hidden text-xs text-accent group-hover/sprint:inline">
+                          replay
+                        </span>
+                        <span
+                          aria-hidden
+                          className="text-accent transition-transform group-hover/sprint:translate-x-0.5"
+                        >
+                          →
+                        </span>
+                      </Link>
+                    ) : null}
                   </div>
 
                   {/* The result, which is what the tile was missing. Empty for a
@@ -241,7 +303,7 @@ async function RaceLibrary({ searchParams }: { searchParams: SearchParams }) {
                     </ol>
                   ) : null}
                 </Card>
-              </Link>
+              </div>
             </li>
           ))}
         </ul>
