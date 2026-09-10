@@ -1,5 +1,6 @@
 import { ImageResponse } from 'next/og';
 import { getRaceHeader } from '@/lib/queries';
+import { sessionTitle } from '@/lib/session-title';
 
 /**
  * The share card for a race.
@@ -21,7 +22,9 @@ export default async function Image({ params }: { params: Promise<{ slug: string
   const { race } = await getRaceHeader(slug);
 
   const meeting = race?.meeting;
-  const title = meeting?.name ?? slug;
+  // Named like the page it illustrates: the sprint's card should not share a
+  // headline with the grand prix it shares a weekend with.
+  const title = meeting && race ? sessionTitle(meeting.name, race.type) : (meeting?.name ?? slug);
 
   // Satori requires an explicit display on any element with more than one
   // child, and adjacent expressions count as several. Building each line as one
