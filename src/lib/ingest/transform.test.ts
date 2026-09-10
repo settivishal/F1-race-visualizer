@@ -12,7 +12,7 @@ import results from './__fixtures__/australia-2025/results.json';
 import stints from './__fixtures__/australia-2025/stints.json';
 import weather from './__fixtures__/australia-2025/weather.json';
 import {
-  buildLapPositions, buildPitStops, buildResults, buildStints, deriveRounds,
+  buildEvents, buildLapPositions, buildPitStops, buildResults, buildStints, deriveRounds,
   findFastestLap, raceSlug, transformRace,
 } from './transform';
 import type { Lap, Meeting, PositionSample, Session } from './openf1';
@@ -410,5 +410,44 @@ describe('pit stops', () => {
   it('collapses to one stop per driver per lap, which is the unique key', () => {
     const seen = new Set(rows.map((r) => `${r.driverNumber}:${r.lap}`));
     expect(seen.size).toBe(rows.length);
+  });
+});
+
+describe('a red flag, which upstream files as a pit stop per car', () => {
+  // 2026 Monza: the field sat in the pit lane for half an hour on lap 3, and
+  // race control published no red flag at all.
+  const stoppedBundle: RaceBundle = {
+    ...bundle,
+    raceControl: [],
+    pits: [
+      { driver_number: 1, lap_number: 3, pit_duration: 1842.5 },
+      { driver_number: 4, lap_number: 3, pit_duration: 1844.1 },
+      { driver_number: 16, lap_number: 20, pit_duration: 23.4 },
+    ] as typeof bundle.pits,
+  };
+  const events = buildEvents(stoppedBundle, buildLapPositions(bundle.laps, bundle.positions));
+
+  it('narrates the real stop and not the stoppage', () => {
+    const pitEvents = events.filter((e) => e.type === 'PIT_STOP');
+    expect(pitEvents).toEqual([
+      { lap: 20, driverNumber: 16, type: 'PIT_STOP', details: '23.4s in the pit lane' },
+    ]);
+  });
+
+  it('says the race was stopped, once, with no driver attached', () => {
+    const red = events.filter((e) => e.type === 'RED_FLAG');
+    expect(red).toEqual([
+      { lap: 3, driverNumber: null, type: 'RED_FLAG', details: 'Race suspended' },
+    ]);
+  });
+
+  it('leaves a lone car parked in its garage as a stop, not a stoppage', () => {
+    // One car standing still for half an hour is a retirement into the garage.
+    // A suspension is the whole field, which is why the rule needs two.
+    const lone = buildEvents(
+      { ...bundle, raceControl: [], pits: [{ driver_number: 1, lap_number: 3, pit_duration: 1842.5 }] as typeof bundle.pits },
+      [],
+    );
+    expect(lone.filter((e) => e.type === 'RED_FLAG')).toEqual([]);
   });
 });

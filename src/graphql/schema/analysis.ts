@@ -1,6 +1,7 @@
 import { asc, eq } from 'drizzle-orm';
 import { pitStops, racePositions, raceResults, stints } from '@/db/schema';
 import { summarizePace, markOutliers, type LapTime } from '@/lib/pace';
+import { isRacingStop } from '@/lib/pit-stops';
 import { builder } from '../builder';
 import type { Context } from '../context';
 import { Driver, Team } from './entity';
@@ -59,6 +60,13 @@ const PitStop = builder.objectRef<PitStopRow>('PitStop').implement({
       nullable: true,
       resolve: (row) => (row.durationMs == null ? null : row.durationMs / 1000),
     }),
+    /**
+     * True where this row is a race suspension rather than a stop the driver
+     * chose to make — see lib/pit-stops.ts. The row is still here: what it
+     * means is a reading, and a caller that wants upstream's record verbatim
+     * should still get it.
+     */
+    underStoppage: t.boolean({ resolve: (row) => !isRacingStop(row.durationMs) }),
     driver: t.field({
       type: Driver,
       nullable: true,

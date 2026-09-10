@@ -56,6 +56,9 @@ query RaceAnalysis($slug: String!) {
       pitStops {
         lap
         durationSeconds
+        # A red flag arrives from upstream as a pit stop for the whole field;
+        # this is how the strategy chart tells the two apart.
+        underStoppage
         driver {
           id
           code

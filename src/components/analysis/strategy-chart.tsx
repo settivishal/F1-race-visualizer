@@ -10,6 +10,8 @@ export type StrategyRow = {
     compound: string | null;
   }[];
   stops: { lap: number; durationSeconds: number | null }[];
+  /** Laps this driver sat in the pit lane because the race was stopped. */
+  stoppageLaps: number[];
 };
 
 /**
@@ -77,15 +79,20 @@ export function StrategyChart({
               {row.stints.map((stint) => {
                 const laps = stint.lapEnd - stint.lapStart + 1;
                 const compound = stint.compound ?? "";
+                // The stint that began when the race restarted. Its tyres were
+                // changed while the field stood still, which is not a stop.
+                const afterStoppage = row.stoppageLaps.includes(stint.lapStart - 1);
                 return (
                   <span
                     key={stint.stintNumber}
                     title={`${row.name}: laps ${stint.lapStart}–${stint.lapEnd} on ${
                       COMPOUND[compound]?.label ?? (compound || "an unknown compound")
-                    }`}
+                    }${afterStoppage ? ", fitted while the race was stopped" : ""}`}
                     className={cn(
                       "flex items-center justify-center text-[10px] font-semibold",
                       compound === "HARD" ? "text-track" : "text-white",
+                      // A red-flag boundary, drawn on the stint that follows it.
+                      afterStoppage && "border-l-2 border-flag-red",
                     )}
                     style={{
                       // A share of the race distance, not of the row: a driver
@@ -101,10 +108,15 @@ export function StrategyChart({
                 );
               })}
             </span>
-            <span className="tabular w-24 shrink-0 text-right text-xs text-muted">
+            <span className="tabular w-36 shrink-0 whitespace-nowrap text-right text-xs text-muted">
               {row.stops.length === 0
                 ? "no stops"
                 : `${row.stops.length} ${row.stops.length === 1 ? "stop" : "stops"}`}
+              {/* Said out loud rather than folded into the count: this driver's
+                  tyres changed, and it cost them nothing. */}
+              {row.stoppageLaps.length > 0 ? (
+                <span className="text-flag-red"> · red flag</span>
+              ) : null}
             </span>
           </li>
         ))}
