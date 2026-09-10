@@ -181,7 +181,7 @@ async function RaceDetail({
           <div className="mt-8">
             <UpcomingRace
               date={race.date}
-              name={meeting?.name ?? race.slug}
+              name={meeting ? sessionTitle(meeting.name, race.type) : race.slug}
               cancelled={race.status === 'CANCELLED'}
             />
           </div>
@@ -237,7 +237,8 @@ async function RaceDetail({
         <Card className="mt-4 overflow-x-auto p-0">
         <table className="w-full min-w-[34rem] text-left text-sm">
           <caption className="sr-only">
-            Final classification for the {meeting?.name ?? race.slug}
+            Final classification for the{' '}
+            {meeting ? sessionTitle(meeting.name, race.type) : race.slug}
           </caption>
           <thead>
             <tr className="border-b border-line text-eyebrow uppercase text-muted">
